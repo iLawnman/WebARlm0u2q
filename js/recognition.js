@@ -385,5 +385,189 @@ export class ImageRecognition {
     this.ui.showQuestion(data, (value) => this._onQuestionAnswered(entry, value));
   }
 
-/**
- * Пользователь дал ответ (через questionpanel или через та
+  /**
+   * Пользователь дал ответ (через questionpanel или через тап-ярлык).
+   * Валидирует ответ, прячет AR-цель и questionpanel, показывает resultPanel
+   * с текстом из RightReaction/WrongReaction.
+   */
+  _onQuestionAnswered(entry, value) {
+    if (entry.dismissed) return;
+    entry.dismissed = true;
+
+    if (entry.arTarget) {
+      entry.arTarget.visible = false;
+    }
+    this.ui.hideQuestion();
+
+    const questData = entry.questData;
+    const questId = questData?.questId;
+
+    let isCorrect = true;
+    if (questId && this.questManager.quests.has(questId)) {
+      isCorrect = this.questManager.validateAnswer(questId, value);
+    }
+
+    this.state = 'showingResult';
+    this.ui.log(
+        `[Quest ${questId || '?'}] answer=${JSON.stringify(value)} → ${isCorrect ? 'CORRECT' : 'WRONG'}`,
+        isCorrect ? 'ok' : 'warn'
+    );
+
+    const reactionText = this.questManager.getReactionText(questId, isCorrect);
+
+    this.ui.showResult(isCorrect, reactionText, () => {
+      this.presentSearchPrompt();
+    });
+  }
+
+  processTracking(frame, xrRefSpace, frameCount, arScene) {
+    try {
+      if (!frame || typeof frame.getImageTrackingResults !== 'function') return;
+
+      const results = frame.getImageTrackingResults();
+      if (!results) return;
+
+      const seen = new Set();
+
+      for (const result of results) {
+        if (!result) continue;
+
+        const trackingState = result.trackingState;
+        const idx = result.index;
+        seen.add(idx);
+
+        const pose = frame.getPose(result.imageSpace, xrRefSpace);
+        if (!pose || !pose.transform) continue;
+
+        let entry = this.trackedMarkers.get(idx);
+
+        if (!entry) {
+          if (this.state !== 'waitingImage') continue;
+
+          const markerName = this.getMarkerName(idx);
+
+          // Поиск квеста по имени маркера (recognitionImage == markerName)
+          const questData = this.questManager.getArTargetData(markerName);
+
+          if (questData && questData.questId) {
+            this.ui.log(`[Quest] Matched marker "${markerName}" to Quest ID "${questData.questId}"`, 'ok');
+            if (questData.question) {
+              this.ui.log(`[Quest] Question: "${questData.question}"`, 'info');
+            }
+          } else {
+            this.ui.log(`[Quest] No quest match for marker "${markerName}". Using fallback data.`, 'warn');
+          }
+
+          // Формируем объект данных для создания 3D панели ARTarget
+          const targetInfoData = {
+            title: questData?.title || markerName,
+            subtitle: questData?.question || 'AR Target', // Вывод вопроса quest.question
+            textLabel: questData?.questId ? `QUEST ${questData.questId}` : 'MARKER',
+            imgLabel: 'IMAGE',
+            okText: 'OK',
+            questData: questData // Сохраняем полный контекст квеста
+          };
+
+          // Синхронный create — никаких Promise в frame loop
+          const arTarget = createArTargetSync(targetInfoData, {
+            onOk: () => {
+              const e = this.trackedMarkers.get(idx);
+              if (e) this._handleOk(e);
+            }
+          });
+
+          if (!arTarget || !arTarget.isObject3D) {
+            this.ui.log('[' + idx + '] createArTargetSync returned invalid object', 'err');
+            continue;
+          }
+
+          arScene.scene.add(arTarget);
+          entry = { arTarget, lastState: trackingState, dismissed: false, questData };
+          this.trackedMarkers.set(idx, entry);
+
+          this.state = 'waitingInput';
+          this.ui.log('[' + idx + '] AR Target created for marker: ' + markerName + ' (state=' + trackingState + ')', 'ok');
+          this.ui.log('state → waitingInput', 'info');
+
+          // Картинка найдена: прячем "ИЩИТЕ!", открываем панель вопроса
+          this.ui.hideQuestStart();
+          this._openQuestionPanel(entry, markerName);
+
+          playSound("click");
+        }
+
+        if (entry.dismissed) {
+          entry.lastState = trackingState;
+          continue;
+        }
+
+        const target = entry.arTarget;
+        if (!target || !target.isObject3D) continue;
+
+        const t = pose.transform;
+        const pos = t.position;
+        const ori = t.orientation;
+
+        if (target.position && pos &&
+            Number.isFinite(pos.x) && Number.isFinite(pos.y) && Number.isFinite(pos.z)) {
+          target.position.set(pos.x, pos.y, pos.z);
+        }
+
+        if (target.quaternion && ori &&
+            Number.isFinite(ori.x) && Number.isFinite(ori.y) &&
+            Number.isFinite(ori.z) && Number.isFinite(ori.w)) {
+          target.quaternion.set(ori.x, ori.y, ori.z, ori.w);
+        }
+
+        entry.lastState = trackingState;
+
+        if (target.scale) {
+          target.scale.setScalar(trackingState === 'emulated' ? 0.7 : 1.0);
+        }
+      }
+
+      for (const [idx, entry] of this.trackedMarkers) {
+        if (!seen.has(idx) && entry.lastState !== 'lost') {
+          entry.lastState = 'lost';
+          this.ui.log('[' + idx + '] Tracking lost', 'warn');
+
+          if (entry.arTarget) {
+            arScene.scene.remove(entry.arTarget);
+            this._disposeTarget(entry.arTarget);
+          }
+          this.trackedMarkers.delete(idx);
+
+          // Если ответ ещё не был дан (маркер потерян до завершения вопроса) —
+          // закрываем questionpanel и возвращаемся к поиску.
+          if (!entry.dismissed) {
+            this.ui.hideQuestion();
+            this.ui.log('state → waitingImage (lost before answer)', 'info');
+            this.presentSearchPrompt('Маркер потерян. Покажите картинку снова.');
+          }
+        }
+      }
+    } catch (e) {
+      if (frameCount % 60 === 0) {
+        this.ui.log('getImageTrackingResults err: ' + (e && e.message ? e.message : String(e)), 'err');
+      }
+    }
+  }
+
+  _disposeTarget(group) {
+    if (!group) return;
+    group.traverse((obj) => {
+      if (obj.geometry) obj.geometry.dispose();
+      if (obj.material) {
+        if (Array.isArray(obj.material)) {
+          obj.material.forEach(m => {
+            if (m.map) m.map.dispose();
+            m.dispose();
+          });
+        } else {
+          if (obj.material.map) obj.material.map.dispose();
+          obj.material.dispose();
+        }
+      }
+    });
+  }
+}
