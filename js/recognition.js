@@ -201,7 +201,6 @@ export class ImageRecognition {
     }
 
     const names = this.targetBitmaps.map(t => t.name).join(', ');
-    this.ui.setHint('Нажмите «Start AR». Покажите: ' + names);
     this.ui.enableArButton();
     this.ui.log('state → waitingImage | markers: ' + names, 'info');
   }
