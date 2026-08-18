@@ -10,7 +10,7 @@ export class ImageRecognition {
     this.targetBitmaps = [];
     this.trackedMarkers = new Map();
     // waitingImage   — ждём распознавания маркера (показана панель "ИЩИТЕ!")
-    // waitingInput   — маркер найден, открыта questionpanel, ждём ответа пользователя
+    // waitingInput   — маркер найден, открыта 3D-панель с вопросом прямо на артаргете, ждём ответа
     // showingResult  — ответ дан, показана resultpanel
     this.state = 'waitingImage';
 
@@ -62,11 +62,6 @@ export class ImageRecognition {
 
   /**
    * Загружает манифест recognitionimages.json.
-   * Поддерживаемые форматы:
-   *   ["T1.jpg", "T2.jpg"]
-   *   [{ "name": "T1", "src": "T1.jpg" }, ...]
-   *   { "images": [ ... ] }
-   * Пути без префикса считаются относительно ./assets/
    */
   async loadImageList() {
     const url = ImageRecognition.MANIFEST_URL;
@@ -145,10 +140,6 @@ export class ImageRecognition {
     });
   }
 
-  /**
-   * Загружает список картинок из манифеста, таблицы квестов и готовит ImageBitmap[] для XR Image Tracking.
-   * При ошибке манифеста или загрузки — fallback на сгенерированный маркер.
-   */
   async init() {
     this.state = 'waitingImage';
     this.targetBitmaps = [];
@@ -195,9 +186,6 @@ export class ImageRecognition {
       ctx.fillRect(0, 0, 128, 128);
       ctx.fillStyle = '#ff0055';
       ctx.fillRect(32, 32, 64, 64);
-      // this.ui.setPreview(c.toDataURL());
-    } else {
-      // this.ui.setPreview(this.targetBitmaps[0].src);
     }
 
     const names = this.targetBitmaps.map(t => t.name).join(', ');
@@ -205,16 +193,10 @@ export class ImageRecognition {
     this.ui.log('state → waitingImage | markers: ' + names, 'info');
   }
 
-  /** Массив ImageBitmap (сырой). */
   getBitmaps() {
     return this.targetBitmaps.map(t => t.bmp);
   }
 
-  /**
-   * Готовый массив для XRSessionInit.trackedImages.
-   * Использование:
-   *   trackedImages: recognition.getTrackedImages(0.2)
-   */
   getTrackedImages(widthInMeters = 0.2) {
     return this.targetBitmaps
         .filter(t => t && t.bmp)
@@ -224,13 +206,11 @@ export class ImageRecognition {
         }));
   }
 
-  /** Имя маркера по индексу из getImageTrackingResults(). */
   getMarkerName(idx) {
     const entry = this.targetBitmaps[idx];
     return entry ? entry.name : ('T' + (idx + 1));
   }
 
-  /** Обратная совместимость (первый битмап). */
   get targetBitmap() {
     return this.targetBitmaps[0]?.bmp ?? null;
   }
@@ -261,28 +241,14 @@ export class ImageRecognition {
     this._boundOnClick = null;
   }
 
-  /**
-   * Показывает панель "ИЩИТЕ!" со случайной картинкой из списка распознаваемых
-   * маркеров. Вызывается когда пол установлен (сессия готова) и когда
-   * пользователь возвращается в режим поиска (маркер потерян / ответ дан).
-   * @param {string} [hintText]
-   */
   presentSearchPrompt(hintText) {
     this.state = 'waitingImage';
     if (!this.targetBitmaps.length) return;
 
     const pick = this.targetBitmaps[Math.floor(Math.random() * this.targetBitmaps.length)];
     this.ui.showQuestStart(pick.src, 'ИЩИТЕ!');
-
-    // const names = this.targetBitmaps.map(t => t.name).join(', ');
-    // this.ui.setHint(hintText || ('Покажите одну из картинок: ' + names));
   }
 
-  /**
-   * Полный сброс состояния распознавания (используется при завершении AR-сессии):
-   * убирает все AR-цели со сцены, закрывает все overlay-панели.
-   * @param {import('./arscene.js').ARScene} [arScene]
-   */
   reset(arScene) {
     for (const [, entry] of this.trackedMarkers) {
       if (entry.arTarget) {
@@ -328,18 +294,75 @@ export class ImageRecognition {
 
     for (const [, entry] of this.trackedMarkers) {
       if (!entry.arTarget || !entry.arTarget.visible || entry.dismissed) continue;
+
       const ud = entry.arTarget.userData || {};
-      const okPanel = ud.okPanel || ud.okButton
-          || (ud.panels && (ud.panels.okPanel || ud.panels.okButton));
-      if (!okPanel) continue;
-      const hits = this._raycaster.intersectObject(okPanel, false);
-      if (hits.length > 0) {
-        this._handleOk(entry);
-        return;
+      const questionPanel = ud.questionPanel || (ud.panels && ud.panels.questionPanel);
+      const okPanel = ud.okPanel || ud.okButton || (ud.panels && (ud.panels.okPanel || ud.panels.okButton));
+
+      // 1. Проверка нажатия на центральную 3D-панель вопроса
+      if (questionPanel) {
+        const hits = this._raycaster.intersectObject(questionPanel, false);
+        if (hits.length > 0 && hits[0].uv) {
+          const uv = hits[0].uv;
+          const canvasW = 384;
+          const canvasH = 512;
+          const cx = uv.x * canvasW;
+          const cy = (1 - uv.y) * canvasH;
+
+          const qUserData = questionPanel.userData || {};
+          const hitRegions = qUserData.hitRegions || [];
+
+          for (const region of hitRegions) {
+            if (cx >= region.x && cx <= region.x + region.w &&
+                cy >= region.y && cy <= region.y + region.h) {
+
+              if (region.type === 'button') {
+                this._onQuestionAnswered(entry, region.index);
+                return;
+              } else if (region.type === 'prev') {
+                const total = qUserData.questData?.options?.length || 1;
+                qUserData.slideIndex = (qUserData.slideIndex - 1 + total) % total;
+                if (qUserData.redraw) qUserData.redraw();
+                return;
+              } else if (region.type === 'next') {
+                const total = qUserData.questData?.options?.length || 1;
+                qUserData.slideIndex = (qUserData.slideIndex + 1) % total;
+                if (qUserData.redraw) qUserData.redraw();
+                return;
+              } else if (region.type === 'input') {
+                const val = prompt('Введите ответ:', qUserData.inputValue || '');
+                if (val !== null) {
+                  qUserData.inputValue = val;
+                  if (qUserData.redraw) qUserData.redraw();
+                }
+                return;
+              } else if (region.type === 'ok') {
+                const type = qUserData.questData?.answerType;
+                if (type === 'InputField') {
+                  this._onQuestionAnswered(entry, qUserData.inputValue || '');
+                } else if (type === 'Slide') {
+                  this._onQuestionAnswered(entry, qUserData.slideIndex + 1);
+                } else {
+                  this._onQuestionAnswered(entry, true);
+                }
+                return;
+              }
+            }
+          }
+        }
+      }
+
+      // 2. Проверка нажатия на внешнюю нижнюю кнопку OK (okPanel)
+      if (okPanel) {
+        const hits = this._raycaster.intersectObject(okPanel, false);
+        if (hits.length > 0) {
+          this._handleOk(entry);
+          return;
+        }
       }
     }
 
-    // mobile UX: one visible target → any tap = OK
+    // mobile UX: один видимый таргет → любой клик в районе таргета = OK
     if (this.state === 'waitingInput') {
       for (const [, entry] of this.trackedMarkers) {
         if (entry.arTarget && entry.arTarget.visible && !entry.dismissed) {
@@ -350,45 +373,24 @@ export class ImageRecognition {
     }
   }
 
-  /**
-   * Тап по 3D OK-кнопке / по маркеру. Настоящий ответ на вопрос всегда даётся
-   * через 2D questionpanel (см. _openQuestionPanel/_onQuestionAnswered).
-   * Тап по 3D-объекту работает только как ярлык подтверждения для типов
-   * без выбора (Art/AntiArt/без совпадения в quest-таблице) — для Button/
-   * Slide/InputField он игнорируется, чтобы не подменять реальный ответ.
-   */
   _handleOk(entry) {
     if (entry.dismissed) return;
+    const qUserData = entry.arTarget?.userData?.questionPanel?.userData;
     const type = entry.questData?.answerType;
-    if (type === 'Art' || type === 'AntiArt' || !type) {
+
+    if (type === 'InputField') {
+      this._onQuestionAnswered(entry, qUserData?.inputValue || '');
+    } else if (type === 'Slide') {
+      this._onQuestionAnswered(entry, (qUserData?.slideIndex ?? 0) + 1);
+    } else {
       this._onQuestionAnswered(entry, true);
     }
   }
 
-  /**
-   * Открывает 2D questionpanel с картинкой распознанного маркера и вопросом
-   * из questtable.json, подключает обработчик ответа.
-   */
   _openQuestionPanel(entry, markerName) {
-    const questData = entry.questData;
-    const bitmapEntry = this.targetBitmaps.find(t => t.name === markerName);
-
-    const data = {
-      imageSrc: bitmapEntry ? bitmapEntry.src : '',
-      question: questData?.question || questData?.title || markerName,
-      mainText: questData?.mainText || '',
-      answerType: questData?.answerType || 'Slide',
-      options: questData?.options || []
-    };
-
-    this.ui.showQuestion(data, (value) => this._onQuestionAnswered(entry, value));
+    // Больше не открываем 2D HTML-оверлей, вопрос находится на 3D-панели в составе arTarget
   }
 
-  /**
-   * Пользователь дал ответ (через questionpanel или через тап-ярлык).
-   * Валидирует ответ, прячет AR-цель и questionpanel, показывает resultPanel
-   * с текстом из RightReaction/WrongReaction.
-   */
   _onQuestionAnswered(entry, value) {
     if (entry.dismissed) return;
     entry.dismissed = true;
@@ -457,17 +459,17 @@ export class ImageRecognition {
             this.ui.log(`[Quest] No quest match for marker "${markerName}". Using fallback data.`, 'warn');
           }
 
-          // Формируем объект данных для создания 3D панели ARTarget
+          // Формируем объект данных для создания 3D объекта ARTarget с центральной панелью вопроса
           const targetInfoData = {
             title: questData?.title || markerName,
-            subtitle: questData?.question || 'AR Target', // Вывод вопроса quest.question
+            subtitle: questData?.question || 'AR Target',
             textLabel: questData?.questId ? `QUEST ${questData.questId}` : 'MARKER',
             imgLabel: 'IMAGE',
             okText: 'OK',
-            questData: questData // Сохраняем полный контекст квеста
+            questData: questData // Сохраняем полный контекст квеста для отрисовки центральной панели
           };
 
-          // Синхронный create — никаких Promise в frame loop
+          // Синхронный create — создает 3D объект вместе с центральной панелью вопроса
           const arTarget = createArTargetSync(targetInfoData, {
             onOk: () => {
               const e = this.trackedMarkers.get(idx);
@@ -488,7 +490,7 @@ export class ImageRecognition {
           this.ui.log('[' + idx + '] AR Target created for marker: ' + markerName + ' (state=' + trackingState + ')', 'ok');
           this.ui.log('state → waitingInput', 'info');
 
-          // Картинка найдена: прячем "ИЩИТЕ!", открываем панель вопроса
+          // Картинка найдена: прячем "ИЩИТЕ!", вопрос доступен на 3D-панели в сцене
           this.ui.hideQuestStart();
           this._openQuestionPanel(entry, markerName);
 
@@ -536,8 +538,6 @@ export class ImageRecognition {
           }
           this.trackedMarkers.delete(idx);
 
-          // Если ответ ещё не был дан (маркер потерян до завершения вопроса) —
-          // закрываем questionpanel и возвращаемся к поиску.
           if (!entry.dismissed) {
             this.ui.hideQuestion();
             this.ui.log('state → waitingImage (lost before answer)', 'info');

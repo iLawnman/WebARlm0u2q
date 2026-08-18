@@ -50,7 +50,7 @@ export class ModelFactory {
             imgLabel: targetInfo.imgLabel ?? 'IMAGE',
             subtitle: targetInfo.subtitle ?? 'AR Target',
             okText: targetInfo.okText ?? 'OK',
-            markerName: title, // Backward compatibility for existing template references
+            markerName: title, // Backward compatibility
             ...extraVars
         };
 
@@ -62,14 +62,26 @@ export class ModelFactory {
             panels: {}
         };
 
+        let hasQuestionPanel = false;
+
         for (const panelEl of panels) {
             const mesh = await this._createPanelFromHtml(panelEl, templateVars);
             group.add(mesh);
             userData.panels[mesh.name] = mesh;
             userData[mesh.name] = mesh; // legacy direct access
+            if (mesh.name === 'questionPanel') hasQuestionPanel = true;
             if (mesh.userData.texture) {
                 userData[`${mesh.name}Texture`] = mesh.userData.texture;
             }
+        }
+
+        // Если в HTML-шаблоне нет центральной панели вопроса — добавляем холст вопроса
+        if (!hasQuestionPanel) {
+            const questionPanel = this._makeQuestionPanel(targetInfo);
+            group.add(questionPanel);
+            userData.panels.questionPanel = questionPanel;
+            userData.questionPanel = questionPanel;
+            userData.questionTexture = questionPanel.userData.texture;
         }
 
         group.position.z = 0.02;
@@ -105,10 +117,11 @@ export class ModelFactory {
         const sphere = this._createSphere();
         group.add(sphere);
 
+        // Левая панель
         const textPanel = this._makeCanvasPanel({
             name: 'textPanel',
             w: 0.12, h: 0.18,
-            pos: [-0.12, 0, 0.02],
+            pos: [-0.18, 0, 0.02],
             rot: [-Math.PI / 2, (20 * Math.PI) / 180, 0],
             draw: (ctx, cw, ch) => {
                 ctx.fillStyle = 'rgba(10, 10, 30, 0.92)';
@@ -130,10 +143,11 @@ export class ModelFactory {
         });
         group.add(textPanel);
 
+        // Правая панель
         const imgPanel = this._makeCanvasPanel({
             name: 'imgPanel',
             w: 0.12, h: 0.18,
-            pos: [0.12, 0, 0.02],
+            pos: [0.18, 0, 0.02],
             rot: [-Math.PI / 2, (-20 * Math.PI) / 180, 0],
             draw: (ctx, cw, ch) => {
                 const grad = ctx.createLinearGradient(0, 0, 0, ch);
@@ -161,10 +175,15 @@ export class ModelFactory {
         });
         group.add(imgPanel);
 
+        // Центральная панель с вопросом
+        const questionPanel = this._makeQuestionPanel(targetInfo);
+        group.add(questionPanel);
+
+        // Нижная панель подтверждения OK
         const okPanel = this._makeCanvasPanel({
             name: 'okButton',
             w: 0.16, h: 0.06,
-            pos: [0, -0.22, 0.02],
+            pos: [0, -0.18, 0.02],
             rot: [-Math.PI / 2, 0, 0],
             canvasW: 256, canvasH: 96,
             draw: (ctx, cw, ch) => {
@@ -192,9 +211,11 @@ export class ModelFactory {
             sphere,
             textPanel,
             imgPanel,
+            questionPanel,
             okPanel,
             textTexture: textPanel.userData.texture,
             imgTexture: imgPanel.userData.texture,
+            questionTexture: questionPanel.userData.texture,
             okTexture: okPanel.userData.texture,
             onOk
         };
@@ -358,6 +379,308 @@ export class ModelFactory {
         mesh.rotation.set(...rot);
         mesh.userData.texture = tex;
         return mesh;
+    }
+
+    /**
+     * Создает центральную 3D-панель вопроса с динамическим интерактивом
+     */
+    _makeQuestionPanel(targetInfo) {
+        const questData = targetInfo.questData || {};
+        const answerType = questData.answerType || 'Slide';
+        const title = questData.title || targetInfo.title || 'КВЕСТ';
+        const question = questData.question || targetInfo.subtitle || '';
+        const mainText = questData.mainText || '';
+        const options = questData.options || [];
+
+        const canvasW = 384;
+        const canvasH = 512;
+        const canvas = document.createElement('canvas');
+        canvas.width = canvasW;
+        canvas.height = canvasH;
+        const ctx = canvas.getContext('2d');
+
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.colorSpace = THREE.SRGBColorSpace;
+
+        const userData = {
+            texture: tex,
+            questData,
+            slideIndex: 0,
+            inputValue: '',
+            hitRegions: [],
+            redraw: null
+        };
+
+        const redraw = () => {
+            ctx.clearRect(0, 0, canvasW, canvasH);
+            userData.hitRegions = [];
+
+            // Фону карточки
+            ctx.fillStyle = 'rgba(12, 16, 38, 0.95)';
+            this._roundRectPath(ctx, 4, 4, canvasW - 8, canvasH - 8, 20);
+            ctx.fill();
+            ctx.strokeStyle = '#00e5ff';
+            ctx.lineWidth = 6;
+            ctx.stroke();
+
+            // Заголовок
+            ctx.fillStyle = 'rgba(0, 229, 255, 0.15)';
+            this._roundRectPath(ctx, 16, 16, canvasW - 32, 54, 12);
+            ctx.fill();
+
+            ctx.fillStyle = '#00e5ff';
+            ctx.font = 'bold 22px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            this._wrapText(ctx, title, canvasW / 2, 43, canvasW - 50, 24);
+
+            // Текст вопроса
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '20px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            const nextY = this._wrapText(ctx, question, canvasW / 2, 85, canvasW - 40, 26);
+
+            // Интерактивное содержимое в зависимости от answerType
+            if (answerType === 'Button') {
+                const totalOpts = options.length || 1;
+                const startY = Math.max(nextY + 20, 200);
+                const availableH = canvasH - startY - 20;
+                const btnH = Math.min(60, Math.floor((availableH - (totalOpts - 1) * 12) / totalOpts));
+
+                options.forEach((opt, idx) => {
+                    const btnY = startY + idx * (btnH + 12);
+                    const btnX = 30;
+                    const btnW = canvasW - 60;
+
+                    ctx.fillStyle = 'rgba(0, 180, 216, 0.25)';
+                    this._roundRectPath(ctx, btnX, btnY, btnW, btnH, 10);
+                    ctx.fill();
+                    ctx.strokeStyle = '#00b4d8';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 18px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    this._wrapText(ctx, opt.text || `Вариант ${idx + 1}`, canvasW / 2, btnY + btnH / 2, btnW - 20, 22);
+
+                    userData.hitRegions.push({
+                        type: 'button',
+                        index: idx + 1,
+                        x: btnX,
+                        y: btnY,
+                        w: btnW,
+                        h: btnH
+                    });
+                });
+            } else if (answerType === 'InputField') {
+                const inputY = Math.max(nextY + 30, 220);
+                const inputX = 30;
+                const inputW = canvasW - 60;
+                const inputH = 60;
+
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                this._roundRectPath(ctx, inputX, inputY, inputW, inputH, 10);
+                ctx.fill();
+                ctx.strokeStyle = '#00ffaa';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                ctx.fillStyle = userData.inputValue ? '#ffffff' : '#888888';
+                ctx.font = '18px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(userData.inputValue || 'Нажмите для ввода...', canvasW / 2, inputY + inputH / 2);
+
+                userData.hitRegions.push({
+                    type: 'input',
+                    x: inputX,
+                    y: inputY,
+                    w: inputW,
+                    h: inputH
+                });
+
+                // Кнопка OK
+                const okY = inputY + inputH + 30;
+                const okX = 80;
+                const okW = canvasW - 160;
+                const okH = 55;
+
+                ctx.fillStyle = '#00cc66';
+                this._roundRectPath(ctx, okX, okY, okW, okH, 12);
+                ctx.fill();
+                ctx.strokeStyle = '#00ff99';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 24px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('OK', canvasW / 2, okY + okH / 2);
+
+                userData.hitRegions.push({
+                    type: 'ok',
+                    x: okX,
+                    y: okY,
+                    w: okW,
+                    h: okH
+                });
+            } else if (answerType === 'Slide') {
+                const slideY = Math.max(nextY + 20, 210);
+                const currentOpt = options[userData.slideIndex] || {};
+                const slideText = currentOpt.text || mainText || '';
+
+                // Кнопка назад ◄
+                const navW = 50;
+                const navH = 50;
+                const navY = slideY + 30;
+
+                ctx.fillStyle = 'rgba(0, 229, 255, 0.3)';
+                this._roundRectPath(ctx, 20, navY, navW, navH, 10);
+                ctx.fill();
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 24px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('◄', 20 + navW / 2, navY + navH / 2);
+
+                userData.hitRegions.push({
+                    type: 'prev',
+                    x: 20,
+                    y: navY,
+                    w: navW,
+                    h: navH
+                });
+
+                // Кнопка вперед ►
+                ctx.fillStyle = 'rgba(0, 229, 255, 0.3)';
+                this._roundRectPath(ctx, canvasW - 20 - navW, navY, navW, navH, 10);
+                ctx.fill();
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 24px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('►', canvasW - 20 - navW / 2, navY + navH / 2);
+
+                userData.hitRegions.push({
+                    type: 'next',
+                    x: canvasW - 20 - navW,
+                    y: navY,
+                    w: navW,
+                    h: navH
+                });
+
+                // Текст слайда
+                const contentX = 80;
+                const contentW = canvasW - 160;
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+                this._roundRectPath(ctx, contentX, slideY, contentW, 110, 10);
+                ctx.fill();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '18px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                this._wrapText(ctx, slideText, canvasW / 2, slideY + 15, contentW - 20, 22);
+
+                // Кнопка OK
+                const okY = slideY + 130;
+                const okX = 80;
+                const okW = canvasW - 160;
+                const okH = 55;
+
+                ctx.fillStyle = '#00cc66';
+                this._roundRectPath(ctx, okX, okY, okW, okH, 12);
+                ctx.fill();
+                ctx.strokeStyle = '#00ff99';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 24px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('OK', canvasW / 2, okY + okH / 2);
+
+                userData.hitRegions.push({
+                    type: 'ok',
+                    x: okX,
+                    y: okY,
+                    w: okW,
+                    h: okH
+                });
+            } else {
+                // Art / AntiArt или по умолчанию
+                const okY = Math.max(nextY + 40, 300);
+                const okX = 80;
+                const okW = canvasW - 160;
+                const okH = 60;
+
+                ctx.fillStyle = '#00cc66';
+                this._roundRectPath(ctx, okX, okY, okW, okH, 12);
+                ctx.fill();
+                ctx.strokeStyle = '#00ff99';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 26px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('OK', canvasW / 2, okY + okH / 2);
+
+                userData.hitRegions.push({
+                    type: 'ok',
+                    x: okX,
+                    y: okY,
+                    w: okW,
+                    h: okH
+                });
+            }
+
+            tex.needsUpdate = true;
+        };
+
+        userData.redraw = redraw;
+        redraw();
+
+        const w = 0.20;
+        const h = 0.26;
+        const mesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(w, h),
+            new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide })
+        );
+        mesh.name = 'questionPanel';
+        mesh.position.set(0, 0, 0.02);
+        mesh.rotation.set(-Math.PI / 2, 0, 0);
+        mesh.userData = userData;
+
+        return mesh;
+    }
+
+    _wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+        if (!text) return y;
+        const words = String(text).split(' ');
+        let line = '';
+        let currentY = y;
+
+        for (let n = 0; n < words.length; n++) {
+            const testLine = line + words[n] + ' ';
+            const metrics = ctx.measureText(testLine);
+            const testWidth = metrics.width;
+            if (testWidth > maxWidth && n > 0) {
+                ctx.fillText(line.trim(), x, currentY);
+                line = words[n] + ' ';
+                currentY += lineHeight;
+            } else {
+                line = testLine;
+            }
+        }
+        ctx.fillText(line.trim(), x, currentY);
+        return currentY + lineHeight;
     }
 
     _roundRectPath(ctx, x, y, w, h, r) {
