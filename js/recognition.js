@@ -361,16 +361,6 @@ export class ImageRecognition {
         }
       }
     }
-
-    // mobile UX: один видимый таргет → любой клик в районе таргета = OK
-    if (this.state === 'waitingInput') {
-      for (const [, entry] of this.trackedMarkers) {
-        if (entry.arTarget && entry.arTarget.visible && !entry.dismissed) {
-          this._handleOk(entry);
-          return;
-        }
-      }
-    }
   }
 
   _handleOk(entry) {
