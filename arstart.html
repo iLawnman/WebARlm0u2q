@@ -37,24 +37,6 @@
       border-radius: 8px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer;
       backdrop-filter: blur(4px); display: none;
     }
-Покажите
-    #btn-ar {
-      position: fixed;
-      bottom: -50px;            
-      left: 50%;                /* Сдвинули край в центр */
-      transform: translateX(-50%); /* Выровняли точный центр кнопки */
-      z-index: 101;
-      background: rgba(255, 59, 48, 0.8);
-      color: #fff;
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 6px;       /* Уменьшили радиус для компактности */
-      padding: 4px 10px;        /* Уменьшили внутренние отступы (было 6px 14px) */
-      font-size: 11px;          /* Уменьшили шрифт (было 12px) */
-      font-weight: 600;
-      cursor: pointer;
-      backdrop-filter: blur(4px);
-      display: none;
-    }
 
     #ctrl {
       position: fixed; bottom: 24px; left: 0; width: 100%;
@@ -68,6 +50,9 @@
     }
     #ctrl button:disabled { opacity: .45; cursor: not-allowed; }
     #ctrl button.secondary { background: rgba(255,255,255,0.15); color: #fff; }
+    #btn-ar {
+      display: none; /* показывается через UI.enableArButton() */
+    }
     #hint {
       position: fixed; top: 50px; left: 0; width: 100%; text-align: center;
       color: #fff; font-size: 13px; pointer-events: none; z-index: 40;
