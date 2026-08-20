@@ -127,7 +127,6 @@ export class ImageRecognition {
   _onSelect(ev) {
     if (this.state !== 'waitingInput' || !this._arScene) return;
     this._pointerNdc.set(0, 0);
-    this._tryHitOk();
   }
 
   _onCanvasTap(ev) {
@@ -138,24 +137,6 @@ export class ImageRecognition {
 
     this._pointerNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
     this._pointerNdc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-    this._tryHitOk();
-  }
-
-  _tryHitOk() {
-    if (!this._arScene) return;
-
-    // Сначала закрываем активную карточку при любом тапе вне или по кнопке
-    for (const [idx, entry] of this.imageReco.trackedMarkers) {
-      if (entry.arTarget && entry.arTarget.visible && !entry.dismissed) {
-        this._handleOk(entry);
-        return;
-      }
-    }
-  }
-
-  _handleOk(entry) {
-    if (entry.dismissed) return;
-    this._onQuestionAnswered(entry, true);
   }
 
   _onQuestionAnswered(entry, value) {
@@ -237,6 +218,7 @@ export class ImageRecognition {
           };
 
           const arTarget = createArTargetSync(targetInfoData, {
+            ui: this.ui,
             onAnswer: (value) => {
               const e = this.imageReco.trackedMarkers.get(idx);
               if (e) this._onQuestionAnswered(e, value);
@@ -275,6 +257,9 @@ export class ImageRecognition {
             e.effectDone = true;
             e.pendingAnchorPose = this.imageReco.computeStablePose(e.poseSamples);
             e.recognizing = false;
+
+            this.ui.hideScanFrame();
+            this.ui.hideQuestStart();
 
             if (e.arTarget) e.arTarget.visible = true;
 
@@ -351,7 +336,7 @@ export class ImageRecognition {
           this.imageReco.trackedMarkers.delete(idx);
 
           if (!entry.dismissed) {
-            this.presentSearchPrompt('Маркер потерян. Покажите картинку снова.');
+            this.presentSearchPrompt();
           }
         }
       }
