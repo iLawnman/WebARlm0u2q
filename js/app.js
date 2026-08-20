@@ -1,9 +1,10 @@
 import { UI } from './ui.js';
 import { ImageRecognition } from './recognition.js';
 import { ARScene } from './arscene.js';
-import { playSound } from './audio.js';
+import { playSound } from "./audio.js";
 import { Settings } from './settings.js';
 import { ARSettings } from './arsettings.js';
+import { ARInput } from './arinput.js';
 import { UIInput } from './uiinput.js';
 
 export class App {
@@ -13,6 +14,8 @@ export class App {
     this.arSettings = new ARSettings();
     this.recognition = null;
     this.arScene = new ARScene(this.ui);
+
+    this.arInput = new ARInput(this.ui);
     this.uiInput = new UIInput(this.ui);
 
     this.xrSession = null;
@@ -26,27 +29,35 @@ export class App {
 
   async init() {
     this.ui.log('App init (WebGL / Three.js WebXR)...', 'info');
+
+    this.uiInput.attach();
     this.ui.showCurtain();
 
+    // 0. AR CSS-темы
     this.ui.log('Loading AR CSS themes...', 'info');
     try {
       await this.arSettings.init();
       this.ui.log(
-        `AR themes ready | count=${this.arSettings.getThemes().length} active=${this.arSettings.getActiveThemeId()}`,
-        'ok'
+          `AR themes ready | count=${this.arSettings.getThemes().length} active=${this.arSettings.getActiveThemeId()}`,
+          'ok'
       );
     } catch (e) {
       this.ui.log('AR themes failed: ' + (e && e.message ? e.message : e), 'warn');
     }
 
+    // 1. Settings
     this.ui.log('Loading settings...', 'info');
     await this.settings.load();
     if (this.settings.isLoaded) {
-      this.ui.log(`Settings loaded | unique_targets=${this.settings.uniqueTargets}`, 'ok');
+      this.ui.log(
+          `Settings loaded | unique_targets=${this.settings.uniqueTargets}`,
+          'ok'
+      );
     } else {
-      this.ui.log('Settings failed to load, using defaults', 'warn');
+      this.ui.log('Settings failed to load, using defaults (unique_targets=0)', 'warn');
     }
 
+    // 2. Recognition
     this.recognition = new ImageRecognition(this.ui, this.settings);
     await this.recognition.init();
 
@@ -85,45 +96,19 @@ export class App {
       return;
     }
 
-    // 1. Подготавливаем Overlay Root без разрушения исходной структуры DOM
-    let overlayRoot = document.getElementById('xr-overlay-container');
-    if (!overlayRoot) {
-      overlayRoot = document.createElement('div');
-      overlayRoot.id = 'xr-overlay-container';
-      overlayRoot.style.position = 'fixed';
-      overlayRoot.style.top = '0';
-      overlayRoot.style.left = '0';
-      overlayRoot.style.width = '100vw';
-      overlayRoot.style.height = '100vh';
-      overlayRoot.style.pointerEvents = 'none';
-      overlayRoot.style.zIndex = '99999';
-      document.body.appendChild(overlayRoot);
-    }
-
-    // Переносим слой 3D CSS рендерера в overlay Root
-    if (this.arScene.cssRenderer.domElement && this.arScene.cssRenderer.domElement.parentNode !== overlayRoot) {
-      overlayRoot.appendChild(this.arScene.cssRenderer.domElement);
-    }
-
-    // Гарантируем видимость основных UI-узлов
-    const uiMainContainer = document.getElementById('ui-container') || document.querySelector('.ui-root') || document.body;
-    uiMainContainer.style.pointerEvents = 'auto';
-
-    // Включаем модуль перехвата ввода UI
-    this.uiInput.attach();
+    this.ui.log('trackedImages: ' + trackedImages.length, 'info');
 
     const sessionInit = {
       requiredFeatures: ['local-floor'],
       optionalFeatures: ['image-tracking', 'dom-overlay', 'anchors'],
       trackedImages,
-      domOverlay: { root: document.body } // Передаем body как корень, чтобы браузер не скрывал UI
+      domOverlay: { root: document.body }
     };
 
     try {
       this.xrSession = await navigator.xr.requestSession('immersive-ar', sessionInit);
-      this.ui.log('WebXR Session initialized with DOM Overlay', 'ok');
     } catch (e) {
-      this.ui.log('DOM Overlay failed, fallback session: ' + e.message, 'warn');
+      this.ui.log('Session with dom-overlay/anchors failed, retrying without them...', 'warn');
       try {
         this.xrSession = await navigator.xr.requestSession('immersive-ar', {
           requiredFeatures: ['local-floor'],
@@ -136,26 +121,22 @@ export class App {
         this.ui.enableArButton();
         return;
       }
+      playSound("click");
     }
 
-    this.xrSession.addEventListener('selectstart', () => {
-      this.ui.log('[XR] selectstart fired', 'info');
-    });
-
     await this.arScene.renderer.xr.setSession(this.xrSession);
+    this.ui.log('Renderer session set (WebGL + local-floor)', 'ok');
 
     this.ui.showEndArButton();
     this.imageTrackingEnabled = true;
 
     this.recognition.attachInput(this.xrSession, this.arScene);
+
     this.ui.hideCurtain();
     this.recognition.presentSearchPrompt();
 
     this.xrSession.addEventListener('end', () => {
       this.ui.log('Session ended', 'warn');
-
-      this.uiInput.detach();
-
       this.imageTrackingEnabled = false;
       this.recognition.detachInput();
       this.recognition.reset(this.arScene);
