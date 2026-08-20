@@ -3,13 +3,23 @@ import { CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
 import { playSound } from './audio.js';
 import { ARInput } from './arinput.js';
 
-const DEFAULT_PREFAB_URL = './assets/artargetprefab.html';
+const DEFAULT_PREFAB_URL = './assets/artargetPrefabNew.html';
 
+/**
+ * ModelFactory — изолированная фабрика AR-таргета.
+ * Prefab-first → если панель есть в HTML — используем, иначе fallback.
+ * Зоны расширения: // === ZONE: ... ===
+ */
 export class ModelFactory {
   constructor(defaults = {}) {
     this.prefabUrl = defaults.prefabUrl || DEFAULT_PREFAB_URL;
     this._prefabCache = null;
+    this._debugSaveBtn = null;
   }
+
+  // ────────────────────────────────────────────────
+  // === ZONE: Public API ===
+  // ────────────────────────────────────────────────
 
   async createArTarget(targetData = '', options = {}) {
     const prefabUrl = options.prefabUrl || this.prefabUrl;
@@ -29,7 +39,7 @@ export class ModelFactory {
     group.add(sphere);
 
     const handleAnswer = (value) => {
-      if (ui) ui.log(`[Target:${data.groupName}] Answer triggered with value: ${value}`, 'ok');
+      if (ui) ui.log(`[Target:${data.groupName}] Answer triggered: ${value}`, 'ok');
       playSound('click');
       if (typeof onAnswer === 'function') onAnswer(value);
     };
@@ -41,8 +51,12 @@ export class ModelFactory {
       const name = src.dataset.name || 'panel';
       const el = src.cloneNode(true);
 
+      // === ZONE: Panel events (критично для кликабельности) ===
       arInput.bindPanelEvents(el, name);
+      el.style.pointerEvents = 'auto';
+      el.style.touchAction = 'manipulation';
 
+      // === ZONE: Fill content ===
       this._fillPanel(el, name, data, handleAnswer, ui, arInput);
 
       const pos = this._parseVec3(el.dataset.position, [0, 0, 0]);
@@ -73,14 +87,23 @@ export class ModelFactory {
       panelEl: panels.MainBlock?.element || null,
       cssObject: panels.MainBlock || null,
       onAnswer,
-      answerType: data.answerType
+      answerType: data.answerType,
+      groupName: data.groupName
     };
 
+    this._ensureDebugSaveButton(group, ui);
     return group;
   }
 
+  // ────────────────────────────────────────────────
+  // === ZONE: Data normalization + Unity rich-text cleanup ===
+  // ────────────────────────────────────────────────
+
   _normalizeTargetData(targetData) {
-    const raw = typeof targetData === 'object' && targetData !== null ? targetData : { title: String(targetData ?? '') };
+    const raw = typeof targetData === 'object' && targetData !== null
+        ? targetData
+        : { title: String(targetData ?? '') };
+
     const pick = (...keys) => {
       for (const k of keys) {
         const v = raw[k];
@@ -89,32 +112,72 @@ export class ModelFactory {
       return '';
     };
 
-    const title = String(pick('TitleText_Text', 'title', 'name', 'Title') || '');
-    const question = String(pick('Question', 'question', 'MainTxt_Text', 'mainText') || '');
-    let mainText = String(pick('MainTxt_Text', 'mainText') || '');
+    const clean = (str) => this._cleanUnityRichText(String(str || ''));
+
+    const title = clean(pick('TitleText_Text', 'title', 'name', 'Title'));
+    const question = clean(pick('Question', 'question'));
+    let mainText = clean(pick('MainTxt_Text', 'mainText'));
     if (mainText === question) mainText = '';
 
-    const help = String(pick('HelpUpText_Text', 'HelpDownText_Text', 'help', 'helpUp', 'helpDown', 'HelpUp', 'HelpDown') || '');
-    const helpUp = String(pick('HelpUpText_Text', 'helpUp', 'HelpUp') || '');
-    const helpDown = String(pick('HelpDownText_Text', 'helpDown', 'HelpDown') || '');
-    const helpCombined = help || [helpUp, helpDown].filter(Boolean).join('\n\n') || '';
+    const helpUp = clean(pick('HelpUpText_Text', 'helpUp', 'HelpUp'));
+    const helpDown = clean(pick('HelpDownText_Text', 'helpDown', 'HelpDown'));
+    const help = clean(pick('help')) || [helpUp, helpDown].filter(Boolean).join('\n\n');
 
     const imageSrc = String(pick('imageSrc', 'AnswerPicture_Image', 'AdditionalImg_Image', 'image', 'img') || '');
-    const imageCaption = String(pick('imageCaption', 'imgLabel', 'AnswerPictureCaption') || '');
+    const imageCaption = clean(pick('imageCaption', 'imgLabel', 'AnswerPictureCaption'));
     const answerType = String(pick('AnswerType', 'answerType', 'type') || 'Slide');
 
     let options = raw.options || raw.Options || [];
     if (!Array.isArray(options)) options = [];
     options = options.map((o, i) => {
-      if (typeof o === 'string') return { text: o };
-      if (o && typeof o === 'object') return { text: o.text ?? o.MainTxt_Text ?? String(o) };
+      if (typeof o === 'string') return { text: clean(o) };
+      if (o && typeof o === 'object') {
+        return { text: clean(o.text ?? o.MainTxt_Text ?? String(o)) };
+      }
       return { text: `Вариант ${i + 1}` };
     });
 
     const groupName = String(pick('questId', 'QuestID', 'id', 'AnswerID', 'title', 'name') || 'target');
 
-    return { raw, title, question, mainText, help: helpCombined, helpUp, helpDown, imageSrc, imageCaption, answerType, options, groupName };
+    return {
+      raw,
+      title,
+      question,
+      mainText,
+      help,
+      helpUp,
+      helpDown,
+      imageSrc,
+      imageCaption,
+      answerType,
+      options,
+      groupName
+    };
   }
+
+  /** Убирает Unity rich-text теги, оставляя читаемый текст */
+  _cleanUnityRichText(str) {
+    if (!str) return '';
+    return str
+        // size / color / align / font
+        .replace(/<\/?size(?:=[^>]*)?>/gi, '')
+        .replace(/<\/?color(?:=[^>]*)?>/gi, '')
+        .replace(/<\/?align(?:=[^>]*)?>/gi, '')
+        .replace(/<\/?font(?:=[^>]*)?>/gi, '')
+        // b / i / u
+        .replace(/<\/?b>/gi, '')
+        .replace(/<\/?i>/gi, '')
+        .replace(/<\/?u>/gi, '')
+        // прочие
+        .replace(/<[^>]+>/g, '')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+  }
+
+  // ────────────────────────────────────────────────
+  // === ZONE: Prefab loading ===
+  // ────────────────────────────────────────────────
 
   async _ensurePrefab(url) {
     if (this._prefabCache) return;
@@ -135,13 +198,14 @@ export class ModelFactory {
             pointer-events: auto !important;
             touch-action: manipulation !important;
           }
+          .ar-buttons-block { z-index: 30 !important; }
         `;
         document.head.appendChild(s);
       }
 
       this._prefabCache = tpl.content || tpl;
     } catch (e) {
-      console.warn('[ModelFactory] prefab load failed, using fallback', url, e);
+      console.warn('[ModelFactory] prefab load failed → fallback', url, e);
       this._prefabCache = this._buildFallbackPrefab();
     }
   }
@@ -153,6 +217,10 @@ export class ModelFactory {
     this._prefabCache = this._buildFallbackPrefab();
     return Array.from(this._prefabCache.querySelectorAll('[data-name]'));
   }
+
+  // ────────────────────────────────────────────────
+  // === ZONE: Fallback prefab ===
+  // ────────────────────────────────────────────────
 
   _buildFallbackPrefab() {
     const root = document.createDocumentFragment();
@@ -169,13 +237,32 @@ export class ModelFactory {
       root.appendChild(div);
     };
 
-    make('LeftHelpBlock', 'ar-left-help-block', '-0.115, 0.025, 0', '-90, 16, 0', '0.00048', '<div class="ar-panel-help" data-field="help"></div>');
-    make('MainBlock', 'ar-main-block', '0, 0.04, 0', '-90, 0, 0', '0.0005', `<div class="ar-panel-title" data-field="title"></div><div class="ar-panel-question" data-field="question"></div><div class="ar-panel-maintext" data-field="mainText"></div>`);
-    make('RightBlock', 'ar-right-block', '0.115, 0.025, 0', '-90, -16, 0', '0.00048', `<img class="ar-panel-image" data-field="imageSrc" alt="" /><div class="ar-panel-help" data-field="imageCaption"></div>`);
-    make('ButtonsBlock', 'ar-buttons-block', '0, -0.085, 0', '-90, 0, 0', '0.0005', '<div class="ar-quest-body" data-field="buttons"></div>');
+    make('LeftHelpBlock', 'ar-left-help-block',
+        '-0.115, 0.025, 0', '-90, 16, 0', '0.00048',
+        '<div class="ar-panel-help" data-field="help"></div>');
+
+    make('MainBlock', 'ar-main-block',
+        '0, 0.04, 0', '-90, 0, 0', '0.0005',
+        `<div class="ar-panel-title" data-field="title"></div>
+       <div class="ar-panel-question" data-field="question"></div>
+       <div class="ar-panel-maintext" data-field="mainText"></div>`);
+
+    make('RightBlock', 'ar-right-block',
+        '0.115, 0.025, 0', '-90, -16, 0', '0.00048',
+        `<img class="ar-panel-image" data-field="imageSrc" alt="" />
+       <div class="ar-panel-help" data-field="imageCaption"></div>`);
+
+    // ButtonsBlock чуть выше, чтобы не уходил под пол и лучше кликался
+    make('ButtonsBlock', 'ar-buttons-block',
+        '0, -0.07, 0', '-90, 0, 0', '0.0005',
+        '<div class="ar-quest-body" data-field="buttons"></div>');
 
     return root;
   }
+
+  // ────────────────────────────────────────────────
+  // === ZONE: Panel filling ===
+  // ────────────────────────────────────────────────
 
   _fillPanel(el, name, data, onAnswer, ui, arInput) {
     const setText = (selector, value) => {
@@ -193,7 +280,9 @@ export class ModelFactory {
       setText('[data-field="title"]', data.title);
       setText('[data-field="question"]', data.question);
       setText('[data-field="mainText"]', data.mainText);
-      if (!data.title && !data.question && !data.mainText) el.classList.add('ar-panel-empty');
+      if (!data.title && !data.question && !data.mainText) {
+        el.classList.add('ar-panel-empty');
+      }
     }
 
     if (name === 'RightBlock') {
@@ -217,9 +306,12 @@ export class ModelFactory {
     }
   }
 
+  // ────────────────────────────────────────────────
+  // === ZONE: Interactive body ===
+  // ────────────────────────────────────────────────
+
   _buildQuestionBody(bodyEl, data, onAnswer, ui, arInput) {
     bodyEl.innerHTML = '';
-
     const type = data.answerType || 'Slide';
     const options = data.options || [];
 
@@ -233,11 +325,9 @@ export class ModelFactory {
         btn.type = 'button';
         btn.className = 'ar-quest-btn';
         btn.textContent = opt.text || `Вариант ${idx + 1}`;
-
         arInput.bindInteractiveEvent(btn, `OptionButton_${idx + 1}`, () => onAnswer(idx + 1));
         grid.appendChild(btn);
       });
-
       bodyEl.appendChild(grid);
 
     } else if (type === 'InputField') {
@@ -249,13 +339,12 @@ export class ModelFactory {
       input.type = 'text';
       input.className = 'ar-quest-input';
       input.placeholder = 'Введите ответ...';
-
       arInput.bindInputField(input);
 
       input.addEventListener('keydown', (e) => {
         e.stopPropagation();
         if (e.key === 'Enter') {
-          if (ui) ui.log(`[Input Submit] Enter pressed with value: '${input.value}'`, 'ok');
+          if (ui) ui.log(`[Input Submit] '${input.value}'`, 'ok');
           playSound('click');
           onAnswer(input.value);
         }
@@ -265,7 +354,6 @@ export class ModelFactory {
       submitBtn.type = 'button';
       submitBtn.className = 'ar-quest-submit-btn';
       submitBtn.textContent = 'OK';
-
       arInput.bindInteractiveEvent(submitBtn, 'InputSubmitButton', () => onAnswer(input.value));
 
       wrap.appendChild(input);
@@ -277,7 +365,6 @@ export class ModelFactory {
       btn.type = 'button';
       btn.className = 'ar-quest-submit-btn ar-quest-ok-btn';
       btn.textContent = 'OK';
-
       arInput.bindInteractiveEvent(btn, 'ArtOKButton', () => onAnswer(true));
       bodyEl.appendChild(btn);
 
@@ -312,7 +399,6 @@ export class ModelFactory {
         idx = (idx - 1 + total) % total;
         update();
       });
-
       arInput.bindInteractiveEvent(next, 'SliderNext', () => {
         idx = (idx + 1) % total;
         update();
@@ -327,11 +413,14 @@ export class ModelFactory {
       okBtn.type = 'button';
       okBtn.className = 'ar-quest-submit-btn ar-quest-ok-btn';
       okBtn.textContent = 'OK';
-
       arInput.bindInteractiveEvent(okBtn, 'SliderOK', () => onAnswer(idx + 1));
       bodyEl.appendChild(okBtn);
     }
   }
+
+  // ────────────────────────────────────────────────
+  // === ZONE: Helpers ===
+  // ────────────────────────────────────────────────
 
   _createSphere() {
     const geo = new THREE.SphereGeometry(0.0075, 24, 24);
@@ -348,8 +437,64 @@ export class ModelFactory {
     const parts = String(str).split(',').map((s) => parseFloat(s.trim()));
     return parts.length === 3 && parts.every(Number.isFinite) ? parts : fallback.slice();
   }
+
+  // ────────────────────────────────────────────────
+  // === ZONE: Debug save ===
+  // ────────────────────────────────────────────────
+
+  _ensureDebugSaveButton(group, ui) {
+    if (this._debugSaveBtn) return;
+
+    const btn = document.createElement('button');
+    btn.id = 'ar-debug-save-btn';
+    btn.textContent = 'Save AR Target (Debug)';
+    btn.style.cssText = `
+      position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+      z-index: 9999; padding: 10px 18px; font-size: 13px; font-weight: 600;
+      background: rgba(0, 40, 30, 0.92); color: #00ffaa;
+      border: 2px solid #00ffaa; border-radius: 10px; cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.45);
+    `;
+    btn.addEventListener('click', () => this._saveTargetDebug(group, ui));
+    document.body.appendChild(btn);
+    this._debugSaveBtn = btn;
+  }
+
+  _saveTargetDebug(group, ui) {
+    const ud = group.userData || {};
+    const snapshot = {
+      name: group.name,
+      groupName: ud.groupName,
+      answerType: ud.answerType,
+      normalized: ud.normalized,
+      panels: {}
+    };
+
+    for (const [key, obj] of Object.entries(ud)) {
+      if (obj && obj.isCSS3DObject && obj.element) {
+        snapshot.panels[key] = {
+          position: obj.position.toArray(),
+          rotation: obj.rotation.toArray().map(r => +(r * 180 / Math.PI).toFixed(1)),
+          scale: obj.scale.x,
+          html: obj.element.outerHTML
+        };
+      }
+    }
+
+    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `artarget_${ud.groupName || 'debug'}_${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    if (ui) ui.log(`[Debug] Saved: ${a.download}`, 'ok');
+    console.log('[ModelFactory] Debug snapshot', snapshot);
+  }
 }
 
+// ────────────────────────────────────────────────
 const defaultFactory = new ModelFactory();
 
 export function createArTargetSync(targetData, options = {}) {
