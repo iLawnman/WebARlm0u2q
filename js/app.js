@@ -2,7 +2,7 @@
 import { UI } from './ui.js';
 import { ImageRecognition } from './recognition.js';
 import { ARScene } from './arscene.js';
-import { playSound } from "./audio.js";
+import { playSound } from './audio.js';
 import { Settings } from './settings.js';
 import { ARSettings } from './arsettings.js';
 
@@ -52,7 +52,7 @@ export class App {
       this.ui.log('Settings failed to load, using defaults (unique_targets=0)', 'warn');
     }
 
-    // 2. Recognition
+    // 2. Recognition (MediaPipeReco создаётся внутри ImageRecognition)
     this.recognition = new ImageRecognition(this.ui, this.settings);
     await this.recognition.init();
 
@@ -116,7 +116,7 @@ export class App {
         this.ui.enableArButton();
         return;
       }
-      playSound("click");
+      playSound('click');
     }
 
     await this.arScene.renderer.xr.setSession(this.xrSession);
