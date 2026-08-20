@@ -1,4 +1,3 @@
-// js/arscene.js
 import * as THREE from 'three';
 import { CSS3DRenderer } from 'three/addons/renderers/CSS3DRenderer.js';
 

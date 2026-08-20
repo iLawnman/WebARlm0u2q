@@ -1,4 +1,3 @@
-// js/app.js
 import { UI } from './ui.js';
 import { ImageRecognition } from './recognition.js';
 import { ARScene } from './arscene.js';
@@ -86,7 +85,7 @@ export class App {
       return;
     }
 
-    // 1. Создаем общий контейнер-корень для WebXR Overlay
+    // 1. Подготавливаем Overlay Root без разрушения исходной структуры DOM
     let overlayRoot = document.getElementById('xr-overlay-container');
     if (!overlayRoot) {
       overlayRoot = document.createElement('div');
@@ -101,33 +100,28 @@ export class App {
       document.body.appendChild(overlayRoot);
     }
 
-    // 2. Переносим CSS3D рендерер и элементы UI в root-контейнер overlay
-    if (this.arScene.cssRenderer.domElement) {
+    // Переносим слой 3D CSS рендерера в overlay Root
+    if (this.arScene.cssRenderer.domElement && this.arScene.cssRenderer.domElement.parentNode !== overlayRoot) {
       overlayRoot.appendChild(this.arScene.cssRenderer.domElement);
     }
 
-    // Моделируем перенос UI элементов, чтобы они не пропадали во время AR сессии
-    const uiElements = document.querySelectorAll(
-      '.ui-root, #ui-container, #app-ui, .ar-ui, #log-panel, #logs, .log-container'
-    );
-    uiElements.forEach((el) => {
-      el.style.pointerEvents = 'auto'; // Разрешаем клики по UI
-      overlayRoot.appendChild(el);
-    });
+    // Гарантируем видимость основных UI-узлов
+    const uiMainContainer = document.getElementById('ui-container') || document.querySelector('.ui-root') || document.body;
+    uiMainContainer.style.pointerEvents = 'auto';
 
-    // Включаем отслеживание ввода UI
+    // Включаем модуль перехвата ввода UI
     this.uiInput.attach();
 
     const sessionInit = {
       requiredFeatures: ['local-floor'],
       optionalFeatures: ['image-tracking', 'dom-overlay', 'anchors'],
       trackedImages,
-      domOverlay: { root: overlayRoot }
+      domOverlay: { root: document.body } // Передаем body как корень, чтобы браузер не скрывал UI
     };
 
     try {
       this.xrSession = await navigator.xr.requestSession('immersive-ar', sessionInit);
-      this.ui.log('WebXR Session initialized with Overlay Root', 'ok');
+      this.ui.log('WebXR Session initialized with DOM Overlay', 'ok');
     } catch (e) {
       this.ui.log('DOM Overlay failed, fallback session: ' + e.message, 'warn');
       try {
@@ -161,9 +155,6 @@ export class App {
       this.ui.log('Session ended', 'warn');
 
       this.uiInput.detach();
-
-      // Возвращаем UI элементы обратно в body при завершении
-      uiElements.forEach((el) => document.body.appendChild(el));
 
       this.imageTrackingEnabled = false;
       this.recognition.detachInput();
