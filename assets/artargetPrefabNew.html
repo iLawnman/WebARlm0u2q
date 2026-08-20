@@ -20,30 +20,26 @@
       gap: 8px;
       box-shadow: 0 8px 24px rgba(0,0,0,0.45);
     }
-
     .ar-left-help-block,
     .ar-right-block {
       width: 170px;
       min-height: 150px;
       max-height: 220px;
     }
-
     .ar-main-block {
       width: 240px;
       min-height: 180px;
       max-height: 280px;
       overflow-y: auto;
     }
-
     .ar-buttons-block {
-      width: 210px;
-      min-height: 64px;
-      max-height: 150px;
+      width: 220px;
+      min-height: 70px;
+      max-height: 160px;
       justify-content: center;
       align-items: center;
-      z-index: 30;
+      z-index: 100;
     }
-
     .ar-panel-title {
       font-size: 13px;
       font-weight: 700;
@@ -53,7 +49,6 @@
       line-height: 1.25;
       word-break: break-word;
     }
-
     .ar-panel-question,
     .ar-panel-maintext,
     .ar-panel-help {
@@ -62,12 +57,7 @@
       word-break: break-word;
       white-space: pre-wrap;
     }
-
-    .ar-panel-help {
-      color: #a8b8d0;
-      flex: 1;
-    }
-
+    .ar-panel-help { color: #a8b8d0; flex: 1; }
     .ar-panel-image {
       display: block;
       width: 100%;
@@ -77,12 +67,8 @@
       border-radius: 8px;
       background: rgba(0,0,0,0.3);
     }
-
     .ar-panel-image:not([src]),
-    .ar-panel-image[src=""] {
-      display: none;
-    }
-
+    .ar-panel-image[src=""] { display: none; }
     .ar-quest-body {
       width: 100%;
       display: flex;
@@ -90,7 +76,6 @@
       gap: 8px;
       align-items: center;
     }
-
     .ar-quest-options-grid {
       display: flex;
       flex-wrap: wrap;
@@ -98,7 +83,6 @@
       justify-content: center;
       width: 100%;
     }
-
     .ar-quest-btn,
     .ar-quest-submit-btn,
     .ar-slide-nav {
@@ -114,30 +98,28 @@
       line-height: 1.2;
       pointer-events: auto;
       touch-action: manipulation;
+      min-width: 48px;
+      min-height: 40px;
     }
-
     .ar-quest-btn:hover,
     .ar-quest-submit-btn:hover,
     .ar-slide-nav:hover {
       background: rgba(0, 70, 50, 0.98);
       border-color: #00ffaa;
     }
-
     .ar-quest-ok-btn {
       background: linear-gradient(180deg, #00c878 0%, #00995a 100%);
       border-color: #00ffaa;
       color: #fff;
       font-weight: 700;
-      min-width: 90px;
+      min-width: 100px;
     }
-
     .ar-quest-input-block {
       display: flex;
       gap: 6px;
       width: 100%;
       align-items: center;
     }
-
     .ar-quest-input {
       flex: 1;
       min-width: 0;
@@ -148,14 +130,12 @@
       color: #fff;
       font-size: 13px;
     }
-
     .ar-quest-slider {
       display: flex;
       align-items: center;
       gap: 6px;
       width: 100%;
     }
-
     .ar-slide-content {
       flex: 1;
       text-align: center;
@@ -164,13 +144,11 @@
       min-height: 32px;
       word-break: break-word;
     }
-
     .ar-slide-nav {
       flex-shrink: 0;
-      width: 32px;
-      padding: 5px 0;
+      width: 36px;
+      padding: 6px 0;
     }
-
     .ar-panel-empty .ar-panel-help,
     .ar-panel-empty .ar-panel-title,
     .ar-panel-empty .ar-panel-question {
@@ -180,19 +158,19 @@
 </head>
 <body>
 <template id="ar-target">
-  <!-- LeftHelpBlock -->
+  <!-- LeftHelpBlock — чуть вперёд -->
   <div class="ar-css3d-panel ar-left-help-block"
        data-name="LeftHelpBlock"
-       data-position="-0.115, 0.025, 0"
-       data-rotation="-90, 16, 0"
+       data-position="-0.12, 0.03, 0.025"
+       data-rotation="-90, 18, 0"
        data-scale="0.00048">
     <div class="ar-panel-help" data-field="help"></div>
   </div>
 
-  <!-- MainBlock -->
+  <!-- MainBlock — центр -->
   <div class="ar-css3d-panel ar-main-block"
        data-name="MainBlock"
-       data-position="0, 0.04, 0"
+       data-position="0, 0.05, 0"
        data-rotation="-90, 0, 0"
        data-scale="0.0005">
     <div class="ar-panel-title" data-field="title"></div>
@@ -200,22 +178,22 @@
     <div class="ar-panel-maintext" data-field="mainText"></div>
   </div>
 
-  <!-- RightBlock (карточка с картинкой) -->
+  <!-- RightBlock — чуть вперёд -->
   <div class="ar-css3d-panel ar-right-block"
        data-name="RightBlock"
-       data-position="0.115, 0.025, 0"
-       data-rotation="-90, -16, 0"
+       data-position="0.12, 0.03, 0.025"
+       data-rotation="-90, -18, 0"
        data-scale="0.00048">
     <img class="ar-panel-image" data-field="imageSrc" alt="" />
     <div class="ar-panel-help" data-field="imageCaption"></div>
   </div>
 
-  <!-- ButtonsBlock — кликабельная зона -->
+  <!-- ButtonsBlock — ещё вперёд и крупнее -->
   <div class="ar-css3d-panel ar-buttons-block"
        data-name="ButtonsBlock"
-       data-position="0, -0.07, 0"
+       data-position="0, -0.09, 0.055"
        data-rotation="-90, 0, 0"
-       data-scale="0.0005">
+       data-scale="0.00085">
     <div class="ar-quest-body" data-field="buttons"></div>
   </div>
 </template>
