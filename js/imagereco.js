@@ -23,7 +23,7 @@ export class ImageReco {
     this.targetBitmaps = [];
 
     try {
-      const response = await fetch('./assets/recoimages/recognitionimages.json');
+      const response = await fetch('./assets/recognitionimages.json');
       if (!response.ok) {
         throw new Error(`Failed to fetch recognitionimages.json: ${response.status} ${response.statusText}`);
       }
