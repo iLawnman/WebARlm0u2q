@@ -1,7 +1,6 @@
 import { UI } from './ui.js';
 import { ImageRecognition } from './recognition.js';
 import { ARScene } from './arscene.js';
-import { playSound } from './audio.js';
 import { Settings } from './settings.js';
 import { ARSettings } from './arsettings.js';
 
