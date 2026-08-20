@@ -2,7 +2,6 @@ import * as THREE from 'three';
 
 export class ImageReco {
   static SMOOTH_FACTOR = 0.2;
-
   /**
    * @param {import('./ui.js').UI} ui
    * @param {import('./settings.js').Settings} settings
