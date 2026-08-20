@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 export class ImageReco {
   static SMOOTH_FACTOR = 0.2;
+
   /**
    * @param {import('./ui.js').UI} ui
    * @param {import('./settings.js').Settings} settings
@@ -19,24 +20,43 @@ export class ImageReco {
   }
 
   async init() {
-    // Инициализация графических таргетов / битмапов
-    // Например, загрузка изображений для трекинга из настроек или квестов
-    const targets = this.settings.targets || [];
     this.targetBitmaps = [];
 
-    for (const target of targets) {
-      try {
-        const res = await fetch(target.src);
-        const blob = await res.blob();
-        const bitmap = await createImageBitmap(blob);
-        this.targetBitmaps.push({
-          name: target.name,
-          src: target.src,
-          bitmap
-        });
-      } catch (err) {
-        console.error(`Failed to load target bitmap ${target.name}:`, err);
+    try {
+      // 1. Загружаем JSON-конфиг с маркерами из assets
+      const response = await fetch('./assets/recogniionimages.json');
+      if (!response.ok) {
+        throw new Error(`Failed to fetch recogniionimages.json: ${response.statusText}`);
       }
+
+      const imagesConfig = await response.json(); 
+      // Ожидается массив объектов вида: [{ name: 'marker1', src: 'path/to/img.png' }, ...]
+
+      // 2. Загружаем ImageBitmap для каждого маркера из полученного списка
+      for (const item of imagesConfig) {
+        if (!item.src) continue;
+
+        try {
+          const imgRes = await fetch(item.src);
+          if (!imgRes.ok) continue;
+
+          const blob = await imgRes.blob();
+          const bitmap = await createImageBitmap(blob);
+
+          this.targetBitmaps.push({
+            name: item.name || item.src,
+            src: item.src,
+            bitmap
+          });
+        } catch (imgErr) {
+          console.error(`[ImageReco] Error loading bitmap for ${item.src}:`, imgErr);
+        }
+      }
+
+      this.ui.log(`Loaded ${this.targetBitmaps.length} recognition image targets`, 'ok');
+    } catch (err) {
+      console.error('[ImageReco] Error initializing recognition images:', err);
+      this.ui.log('Failed to load recognition images config', 'warn');
     }
   }
 
