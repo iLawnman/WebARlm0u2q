@@ -4,7 +4,7 @@ import { playSound } from './audio.js';
 import { QuestManager } from './quests.js';
 import { Policies } from './policies.js';
 import { MediaPipeReco } from './mediapipe.js';
-import { ImageRecognition } from './imagereco.js';
+import { ImageReco } from './imagereco.js';
 
 export class Recognition {
   /**
@@ -18,7 +18,7 @@ export class Recognition {
     this.questManager = new QuestManager();
     this.policies = new Policies(settings, this.questManager);
 
-    this.imageReco = new Recognition(ui, settings, this.questManager, this.policies);
+    this.imageReco = new ImageReco(ui, settings, this.questManager, this.policies);
     this.mediaPipeReco = new MediaPipeReco(ui);
 
     this.state = 'waitingImage';
