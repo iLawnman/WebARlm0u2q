@@ -23,42 +23,42 @@ export class ImageReco {
     this.targetBitmaps = [];
 
     try {
-      const response = await fetch('./assets/recognitionimages.json');
+      const response = await fetch('./assets/recoimages/recognitionimages.json');
       if (!response.ok) {
         throw new Error(`Failed to fetch recognitionimages.json: ${response.status} ${response.statusText}`);
       }
 
-      const json = await response.json();
-      // Обрабатываем случай, если в JSON массив напрямую или объект с полем images/targets
-      const imagesConfig = Array.isArray(json) ? json : (json.images || json.targets || []);
+      const fileList = await response.json();
 
-      for (const item of imagesConfig) {
-        // Поддерживаем разные названия полей: src, image, url
-        const srcPath = item.src || item.image || item.url;
-        if (!srcPath) continue;
+      // Проверяем, что пришел массив строк
+      if (Array.isArray(fileList)) {
+        for (const fileName of fileList) {
+          if (typeof fileName !== 'string') continue;
 
-        // Преобразуем относительный путь от корня сайта, если путь не абсолютный
-        const fullSrc = srcPath.startsWith('http') || srcPath.startsWith('/')
-            ? srcPath
-            : `./${srcPath.replace(/^\.\//, '')}`;
+          // Формируем путь к файлу картинки внутри папки assets
+          const imgPath = `./assets/recoimages/${fileName.replace(/^\.\//, '')}`;
 
-        try {
-          const imgRes = await fetch(fullSrc);
-          if (!imgRes.ok) {
-            console.warn(`[ImageReco] Failed to fetch image: ${fullSrc} (${imgRes.status})`);
-            continue;
+          try {
+            const imgRes = await fetch(imgPath);
+            if (!imgRes.ok) {
+              console.warn(`[ImageReco] Failed to fetch image: ${imgPath} (${imgRes.status})`);
+              continue;
+            }
+
+            const blob = await imgRes.blob();
+            const bitmap = await createImageBitmap(blob);
+
+            // Имя маркерa отсекает расширение (например, "T1.jpg" -> "T1")
+            const markerName = fileName.substring(0, fileName.lastIndexOf('.')) || fileName;
+
+            this.targetBitmaps.push({
+              name: markerName,
+              src: imgPath,
+              bitmap
+            });
+          } catch (imgErr) {
+            console.error(`[ImageReco] Error loading bitmap for ${imgPath}:`, imgErr);
           }
-
-          const blob = await imgRes.blob();
-          const bitmap = await createImageBitmap(blob);
-
-          this.targetBitmaps.push({
-            name: item.name || item.id || fullSrc,
-            src: fullSrc,
-            bitmap
-          });
-        } catch (imgErr) {
-          console.error(`[ImageReco] Error loading bitmap for ${fullSrc}:`, imgErr);
         }
       }
 
