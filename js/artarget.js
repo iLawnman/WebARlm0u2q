@@ -8,11 +8,6 @@ const DEFAULT_PREFAB_URL = './assets/artargetprefab.html';
  *   сфера-маркер (WebGL) + 4 CSS3D-панели из prefab:
  *     LeftHelpBlock | MainBlock | RightBlock
  *                   | ButtonsBlock
- *
- * Все панели создаются всегда (даже при пустых данных).
- * Структура панелей и позиции — в artargetprefab.html.
- * Входные данные: любой объект с полями answers.json / questtable
- * или упрощённый { title, question, mainText, help, imageSrc, options, answerType }.
  */
 export class ModelFactory {
     /**
@@ -66,6 +61,15 @@ export class ModelFactory {
             const name = src.dataset.name || 'panel';
             const el = src.cloneNode(true);
 
+            // Явное включение событий мыши/тача для элементов CSS3D
+            el.style.pointerEvents = 'auto';
+
+            // Изоляция от жестких сбросов WebXR DOM Overlay
+            const stopEvents = ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'mousedown', 'mouseup'];
+            stopEvents.forEach(evt => {
+                el.addEventListener(evt, (e) => e.stopPropagation());
+            });
+
             // заполнение полей
             this._fillPanel(el, name, data, handleAnswer);
 
@@ -95,7 +99,6 @@ export class ModelFactory {
             normalized: data,
             sphere,
             ...panels,
-            // legacy
             panelEl: panels.MainBlock?.element || null,
             cssObject: panels.MainBlock || null,
             onAnswer,
@@ -105,16 +108,6 @@ export class ModelFactory {
         return group;
     }
 
-    // ─── normalize any input shape ─────────────────────────────────────────────
-
-    /**
-     * Приводит произвольный targetData к единому виду.
-     * Поддерживает:
-     *  - строку / число
-     *  - answers.json-строку (TitleText_Text, MainTxt_Text, HelpUpText_Text, …)
-     *  - questtable-поля
-     *  - упрощённый объект { title, question, mainText, help, imageSrc, options, answerType }
-     */
     _normalizeTargetData(targetData) {
         const raw =
             typeof targetData === 'object' && targetData !== null
@@ -137,7 +130,6 @@ export class ModelFactory {
             pick('Question', 'question', 'MainTxt_Text', 'mainText') || ''
         );
 
-        // mainText отдельно, если отличается от question
         let mainText = String(pick('MainTxt_Text', 'mainText') || '');
         if (mainText === question) mainText = '';
 
@@ -153,7 +145,6 @@ export class ModelFactory {
             ) || ''
         );
 
-        // если есть оба help — склеиваем
         const helpUp = String(pick('HelpUpText_Text', 'helpUp', 'HelpUp') || '');
         const helpDown = String(pick('HelpDownText_Text', 'helpDown', 'HelpDown') || '');
         const helpCombined =
@@ -179,7 +170,6 @@ export class ModelFactory {
             pick('AnswerType', 'answerType', 'type') || 'Slide'
         );
 
-        // options: массив { text } или строки
         let options = raw.options || raw.Options || [];
         if (!Array.isArray(options)) options = [];
         options = options.map((o, i) => {
@@ -187,9 +177,6 @@ export class ModelFactory {
             if (o && typeof o === 'object') return { text: o.text ?? o.MainTxt_Text ?? String(o) };
             return { text: `Вариант ${i + 1}` };
         });
-
-        // AnswerList из quest (A01, A02…) — не разворачиваем здесь, ожидаем готовые options
-        // либо caller передаёт уже подготовленный options
 
         const groupName = String(
             pick('questId', 'QuestID', 'id', 'AnswerID', 'title', 'name') || 'target'
@@ -211,8 +198,6 @@ export class ModelFactory {
         };
     }
 
-    // ─── prefab load / fallback ────────────────────────────────────────────────
-
     async _ensurePrefab(url) {
         if (this._prefabCache) return;
         try {
@@ -223,12 +208,17 @@ export class ModelFactory {
             const tpl = doc.querySelector('#ar-target') || doc.querySelector('template');
             if (!tpl) throw new Error('No <template id="ar-target">');
 
-            // инжектим стили из prefab один раз
             const styleEl = doc.querySelector('style');
             if (styleEl && !document.getElementById('ar-target-prefab-styles')) {
                 const s = document.createElement('style');
                 s.id = 'ar-target-prefab-styles';
-                s.textContent = styleEl.textContent;
+                // Принудительно устанавливаем pointer-events и предотвращаем блокировку в WebXR DOM Overlay
+                s.textContent = styleEl.textContent + `
+                    .ar-css3d-panel, .ar-css3d-panel * {
+                        pointer-events: auto !important;
+                        touch-action: manipulation !important;
+                    }
+                `;
                 document.head.appendChild(s);
             }
 
@@ -243,18 +233,17 @@ export class ModelFactory {
         if (this._prefabCache) {
             return Array.from(this._prefabCache.querySelectorAll('[data-name]'));
         }
-        // sync-path без await — fallback
         this._prefabCache = this._buildFallbackPrefab();
         return Array.from(this._prefabCache.querySelectorAll('[data-name]'));
     }
 
-    /** Минимальная разметка, если prefab не загрузился */
     _buildFallbackPrefab() {
         const root = document.createDocumentFragment();
 
         const make = (name, className, pos, rot, scale, innerHTML) => {
             const div = document.createElement('div');
             div.className = `ar-css3d-panel ${className}`;
+            div.style.pointerEvents = 'auto';
             div.dataset.name = name;
             div.dataset.position = pos;
             div.dataset.rotation = rot;
@@ -302,8 +291,6 @@ export class ModelFactory {
         return root;
     }
 
-    // ─── fill panel content ────────────────────────────────────────────────────
-
     _fillPanel(el, name, data, onAnswer) {
         const setText = (selector, value) => {
             const node = el.querySelector(selector);
@@ -346,42 +333,59 @@ export class ModelFactory {
         }
     }
 
-    // ─── interactive body (без регрессий) ──────────────────────────────────────
-
     _buildQuestionBody(bodyEl, data, onAnswer) {
         bodyEl.innerHTML = '';
 
         const type = data.answerType || 'Slide';
         const options = data.options || [];
 
+        const bindInteractiveEvent = (element, callback) => {
+            element.style.pointerEvents = 'auto';
+            element.style.touchAction = 'manipulation';
+            
+            const handler = (e) => {
+                e.stopPropagation();
+                if (e.cancelable) e.preventDefault();
+                callback(e);
+            };
+
+            element.addEventListener('click', handler);
+            element.addEventListener('touchend', handler);
+        };
+
         if (type === 'Button') {
             const grid = document.createElement('div');
             grid.className = 'ar-quest-options-grid';
+            grid.style.pointerEvents = 'auto';
 
             options.forEach((opt, idx) => {
                 const btn = document.createElement('button');
                 btn.type = 'button';
                 btn.className = 'ar-quest-btn';
                 btn.textContent = opt.text || `Вариант ${idx + 1}`;
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    onAnswer(idx + 1);
-                });
+                
+                bindInteractiveEvent(btn, () => onAnswer(idx + 1));
                 grid.appendChild(btn);
             });
 
-            // если options пуст — всё равно показываем блок (пустая сетка)
             bodyEl.appendChild(grid);
 
         } else if (type === 'InputField') {
             const wrap = document.createElement('div');
             wrap.className = 'ar-quest-input-block';
+            wrap.style.pointerEvents = 'auto';
 
             const input = document.createElement('input');
             input.type = 'text';
             input.className = 'ar-quest-input';
             input.placeholder = 'Введите ответ...';
-            input.addEventListener('click', (e) => e.stopPropagation());
+            input.style.pointerEvents = 'auto';
+
+            const stopPropagation = (e) => e.stopPropagation();
+            input.addEventListener('click', stopPropagation);
+            input.addEventListener('pointerdown', stopPropagation);
+            input.addEventListener('touchstart', stopPropagation);
+            
             input.addEventListener('keydown', (e) => {
                 e.stopPropagation();
                 if (e.key === 'Enter') onAnswer(input.value);
@@ -391,10 +395,8 @@ export class ModelFactory {
             submitBtn.type = 'button';
             submitBtn.className = 'ar-quest-submit-btn';
             submitBtn.textContent = 'OK';
-            submitBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                onAnswer(input.value);
-            });
+            
+            bindInteractiveEvent(submitBtn, () => onAnswer(input.value));
 
             wrap.appendChild(input);
             wrap.appendChild(submitBtn);
@@ -405,10 +407,8 @@ export class ModelFactory {
             btn.type = 'button';
             btn.className = 'ar-quest-submit-btn ar-quest-ok-btn';
             btn.textContent = 'OK';
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                onAnswer(true);
-            });
+            
+            bindInteractiveEvent(btn, () => onAnswer(true));
             bodyEl.appendChild(btn);
 
         } else {
@@ -418,6 +418,7 @@ export class ModelFactory {
 
             const slider = document.createElement('div');
             slider.className = 'ar-quest-slider';
+            slider.style.pointerEvents = 'auto';
 
             const prev = document.createElement('button');
             prev.type = 'button';
@@ -439,13 +440,12 @@ export class ModelFactory {
                     options[idx]?.text || data.mainText || data.question || '';
             };
 
-            prev.addEventListener('click', (e) => {
-                e.stopPropagation();
+            bindInteractiveEvent(prev, () => {
                 idx = (idx - 1 + total) % total;
                 update();
             });
-            next.addEventListener('click', (e) => {
-                e.stopPropagation();
+
+            bindInteractiveEvent(next, () => {
                 idx = (idx + 1) % total;
                 update();
             });
@@ -459,15 +459,11 @@ export class ModelFactory {
             okBtn.type = 'button';
             okBtn.className = 'ar-quest-submit-btn ar-quest-ok-btn';
             okBtn.textContent = 'OK';
-            okBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                onAnswer(idx + 1);
-            });
+            
+            bindInteractiveEvent(okBtn, () => onAnswer(idx + 1));
             bodyEl.appendChild(okBtn);
         }
     }
-
-    // ─── helpers ───────────────────────────────────────────────────────────────
 
     _createSphere() {
         const geo = new THREE.SphereGeometry(0.0075, 24, 24);

@@ -1,4 +1,3 @@
-// ===================== app.js =====================
 import { UI } from './ui.js';
 import { ImageRecognition } from './recognition.js';
 import { ARScene } from './arscene.js';
