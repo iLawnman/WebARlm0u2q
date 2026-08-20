@@ -1,7 +1,6 @@
 // js/arscene.js
 import * as THREE from 'three';
 import { CSS3DRenderer } from 'three/addons/renderers/CSS3DRenderer.js';
-import { playSound } from './audio.js';
 
 export class ARScene {
   constructor(ui) {
@@ -27,7 +26,7 @@ export class ARScene {
     this.cssRenderer.domElement.style.position = 'absolute';
     this.cssRenderer.domElement.style.top = '0px';
     this.cssRenderer.domElement.style.left = '0px';
-    
+
     // Сквозная интерактивность для сцены
     this.cssRenderer.domElement.style.pointerEvents = 'none';
     this.cssRenderer.domElement.style.zIndex = '10';
@@ -37,20 +36,8 @@ export class ARScene {
 
     this.setupLighting();
     this.setupStaticFloor();
-    this.setupGlobalClickTracker();
 
     window.addEventListener('resize', () => this.onResize());
-  }
-
-  setupGlobalClickTracker() {
-    // Отслеживание клика мимо кнопок (по фону)
-    window.addEventListener('click', (e) => {
-      const isButton = e.target.closest('button, input, .ar-css3d-panel');
-      if (!isButton) {
-        if (this.ui) this.ui.log(`[Global Miss] Click at (${e.clientX}, ${e.clientY}) on tag: ${e.target.tagName}`, 'warn');
-        playSound('miss');
-      }
-    });
   }
 
   onResize() {

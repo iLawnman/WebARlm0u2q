@@ -1,376 +1,365 @@
+// js/modelfactory.js
 import * as THREE from 'three';
+import { CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
+import { playSound } from './audio.js';
+import { ARInput } from './arinput.js';
 
-const DEFAULT_TEMPLATE_URL = '/assets/artarget.html';
+const DEFAULT_PREFAB_URL = './assets/artargetprefab.html';
 
-/**
- * ModelFactory — central builder for AR target objects.
- * HTML templates remain the single source of truth for panel content, size and placement.
- * Procedural (canvas) fallback is available for offline / no-foreignObject environments.
- */
 export class ModelFactory {
-  /**
-   * @param {object} [defaults]
-   * @param {string} [defaults.templateUrl]
-   */
   constructor(defaults = {}) {
-    this.templateUrl = defaults.templateUrl || DEFAULT_TEMPLATE_URL;
+    this.prefabUrl = defaults.prefabUrl || DEFAULT_PREFAB_URL;
+    this._prefabCache = null;
   }
 
-  /**
-   * Abstract AR object: panels + layout come from declarative HTML.
-   * @param {string|object} [targetData=''] Target identifier or data object
-   * @param {object} [options]
-   * @param {Function|null} [options.onOk]
-   * @param {string} [options.templateUrl]
-   * @param {object} [options.vars] Additional variables for template substitution
-   * @returns {Promise<THREE.Group>}
-   */
   async createArTarget(targetData = '', options = {}) {
-    const { onOk = null, templateUrl = this.templateUrl, vars: extraVars = {} } = options;
-
-    const targetInfo = typeof targetData === 'object' && targetData !== null
-      ? targetData
-      : { title: String(targetData) };
-
-    const title = targetInfo.title ?? targetInfo.name ?? String(targetData ?? '');
-    const groupName = targetInfo.id || title || 'target';
-
-    const group = new THREE.Group();
-    group.name = `arTarget_${groupName}`;
-
-    const sphere = this._createSphere();
-    group.add(sphere);
-
-    const template = await this._loadTemplate(templateUrl);
-    const panels = template.querySelectorAll('panel');
-
-    const templateVars = {
-      title: title,
-      textLabel: targetInfo.textLabel ?? 'MARKER',
-      imgLabel: targetInfo.imgLabel ?? 'IMAGE',
-      subtitle: targetInfo.subtitle ?? 'AR Target',
-      okText: targetInfo.okText ?? 'OK',
-      markerName: title, // Backward compatibility
-      ...extraVars
-    };
-
-    const userData = {
-      targetInfo,
-      markerName: title, // Legacy backward compatibility
-      sphere,
-      onOk,
-      panels: {}
-    };
-
-    for (const panelEl of panels) {
-      const mesh = await this._createPanelFromHtml(panelEl, templateVars);
-      group.add(mesh);
-      userData.panels[mesh.name] = mesh;
-      userData[mesh.name] = mesh; // legacy direct access
-      if (mesh.userData.texture) {
-        userData[`${mesh.name}Texture`] = mesh.userData.texture;
-      }
-    }
-
-    group.position.z = 0.02;
-    group.userData = userData;
-
-    return group;
+    const prefabUrl = options.prefabUrl || this.prefabUrl;
+    await this._ensurePrefab(prefabUrl);
+    return this.createArTargetSync(targetData, options);
   }
 
-  /**
-   * Pure-canvas fallback (no network / no foreignObject) — for offline use.
-   * @param {string|object} [targetData=''] Target identifier or data object
-   * @param {object} [options]
-   * @param {Function|null} [options.onOk]
-   * @returns {THREE.Group}
-   */
   createArTargetSync(targetData = '', options = {}) {
-    const { onOk = null } = options;
-
-    const targetInfo = typeof targetData === 'object' && targetData !== null
-      ? targetData
-      : { title: String(targetData) };
-
-    const title = targetInfo.title ?? targetInfo.name ?? String(targetData ?? '');
-    const textLabel = targetInfo.textLabel ?? 'MARKER';
-    const imgLabel = targetInfo.imgLabel ?? 'IMAGE';
-    const subtitle = targetInfo.subtitle ?? 'AR Target';
-    const okText = targetInfo.okText ?? 'OK';
-    const groupName = targetInfo.id || title || 'target';
+    const { onAnswer = null, ui = null } = options;
+    const data = this._normalizeTargetData(targetData);
+    const arInput = new ARInput(ui);
 
     const group = new THREE.Group();
-    group.name = `arTarget_${groupName}`;
+    group.name = `arTarget_${data.groupName}`;
 
     const sphere = this._createSphere();
     group.add(sphere);
 
-    const textPanel = this._makeCanvasPanel({
-      name: 'textPanel',
-      w: 0.12, h: 0.18,
-      pos: [-0.12, 0, 0.02],
-      rot: [-Math.PI / 2, (20 * Math.PI) / 180, 0],
-      draw: (ctx, cw, ch) => {
-        ctx.fillStyle = 'rgba(10, 10, 30, 0.92)';
-        ctx.fillRect(0, 0, cw, ch);
-        ctx.strokeStyle = '#00ffaa';
-        ctx.lineWidth = 8;
-        ctx.strokeRect(4, 4, cw - 8, ch - 8);
-        ctx.fillStyle = '#00ffaa';
-        ctx.font = 'bold 28px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(textLabel, cw / 2, 60);
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 36px sans-serif';
-        ctx.fillText(title, cw / 2, 200);
-        ctx.fillStyle = '#aaaaaa';
-        ctx.font = '20px sans-serif';
-        ctx.fillText(subtitle, cw / 2, 280);
-      }
-    });
-    group.add(textPanel);
-
-    const imgPanel = this._makeCanvasPanel({
-      name: 'imgPanel',
-      w: 0.12, h: 0.18,
-      pos: [0.12, 0, 0.02],
-      rot: [-Math.PI / 2, (-20 * Math.PI) / 180, 0],
-      draw: (ctx, cw, ch) => {
-        const grad = ctx.createLinearGradient(0, 0, 0, ch);
-        grad.addColorStop(0, '#1a0033');
-        grad.addColorStop(1, '#003344');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, cw, ch);
-        for (let i = 0; i < 12; i++) {
-          ctx.beginPath();
-          ctx.arc(40 + Math.random() * 176, 40 + Math.random() * 304, 8 + Math.random() * 24, 0, Math.PI * 2);
-          ctx.fillStyle = `hsla(${200 + Math.random() * 80}, 70%, 55%, 0.7)`;
-          ctx.fill();
-        }
-        ctx.strokeStyle = '#ff66cc';
-        ctx.lineWidth = 8;
-        ctx.strokeRect(4, 4, cw - 8, ch - 8);
-        ctx.fillStyle = '#ff66cc';
-        ctx.font = 'bold 22px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(imgLabel, cw / 2, 50);
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '18px sans-serif';
-        ctx.fillText(title, cw / 2, 340);
-      }
-    });
-    group.add(imgPanel);
-
-    const okPanel = this._makeCanvasPanel({
-      name: 'okButton',
-      w: 0.16, h: 0.06,
-      pos: [0, -0.22, 0.02],
-      rot: [-Math.PI / 2, 0, 0],
-      canvasW: 256, canvasH: 96,
-      draw: (ctx, cw, ch) => {
-        ctx.fillStyle = 'rgba(0, 40, 20, 0.95)';
-        ctx.fillRect(0, 0, cw, ch);
-        ctx.fillStyle = '#00cc66';
-        this._roundRectPath(ctx, 24, 16, 208, 64, 12);
-        ctx.fill();
-        ctx.strokeStyle = '#00ff99';
-        ctx.lineWidth = 4;
-        ctx.stroke();
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 40px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(okText, cw / 2, ch / 2);
-      }
-    });
-    group.add(okPanel);
-
-    group.position.z = 0.02;
-    group.userData = {
-      targetInfo,
-      markerName: title, // Legacy backward compatibility
-      sphere,
-      textPanel,
-      imgPanel,
-      okPanel,
-      textTexture: textPanel.userData.texture,
-      imgTexture: imgPanel.userData.texture,
-      okTexture: okPanel.userData.texture,
-      onOk
+    const handleAnswer = (value) => {
+      if (ui) ui.log(`[Target:${data.groupName}] Answer triggered with value: ${value}`, 'ok');
+      playSound('click');
+      if (typeof onAnswer === 'function') onAnswer(value);
     };
+
+    const panelNodes = this._getPanelNodes();
+    const panels = {};
+
+    for (const src of panelNodes) {
+      const name = src.dataset.name || 'panel';
+      const el = src.cloneNode(true);
+
+      // Привязка событий уровня панели через ARInput
+      arInput.bindPanelEvents(el, name);
+
+      this._fillPanel(el, name, data, handleAnswer, ui, arInput);
+
+      const pos = this._parseVec3(el.dataset.position, [0, 0, 0]);
+      const rotDeg = this._parseVec3(el.dataset.rotation, [-90, 0, 0]);
+      const rot = rotDeg.map((d) => (d * Math.PI) / 180);
+      const scale = parseFloat(el.dataset.scale) || 0.0005;
+
+      el.removeAttribute('data-name');
+      el.removeAttribute('data-position');
+      el.removeAttribute('data-rotation');
+      el.removeAttribute('data-scale');
+
+      const cssObject = new CSS3DObject(el);
+      cssObject.name = name;
+      cssObject.scale.set(scale, scale, scale);
+      cssObject.position.set(...pos);
+      cssObject.rotation.set(...rot);
+
+      group.add(cssObject);
+      panels[name] = cssObject;
+    }
+
+    group.userData = {
+      targetInfo: data.raw,
+      normalized: data,
+      sphere,
+      ...panels,
+      panelEl: panels.MainBlock?.element || null,
+      cssObject: panels.MainBlock || null,
+      onAnswer,
+      answerType: data.answerType
+    };
+
     return group;
   }
 
-  // ─── private: HTML → THREE ─────────────────────────────────────────────────
+  _normalizeTargetData(targetData) {
+    const raw = typeof targetData === 'object' && targetData !== null ? targetData : { title: String(targetData ?? '') };
+    const pick = (...keys) => {
+      for (const k of keys) {
+        const v = raw[k];
+        if (v !== undefined && v !== null && String(v).trim() !== '') return v;
+      }
+      return '';
+    };
 
-  async _loadTemplate(url) {
-    const res = await fetch(url);
-    const html = await res.text();
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const template = doc.querySelector('#ar-target') || doc.querySelector('template');
-    if (!template) throw new Error(`No <template id="ar-target"> in ${url}`);
+    const title = String(pick('TitleText_Text', 'title', 'name', 'Title') || '');
+    const question = String(pick('Question', 'question', 'MainTxt_Text', 'mainText') || '');
+    let mainText = String(pick('MainTxt_Text', 'mainText') || '');
+    if (mainText === question) mainText = '';
 
-    const styleEl = doc.querySelector('style');
-    if (styleEl) {
-      template.dataset.style = styleEl.textContent;
-    }
-    return template;
-  }
+    const help = String(pick('HelpUpText_Text', 'HelpDownText_Text', 'help', 'helpUp', 'helpDown', 'HelpUp', 'HelpDown') || '');
+    const helpUp = String(pick('HelpUpText_Text', 'helpUp', 'HelpUp') || '');
+    const helpDown = String(pick('HelpDownText_Text', 'helpDown', 'HelpDown') || '');
+    const helpCombined = help || [helpUp, helpDown].filter(Boolean).join('\n\n') || '';
 
-  /**
-   * Create a PlaneGeometry mesh from a <panel> element.
-   * data-width / data-height  → geometry size (metres)
-   * data-position="x,y,z"     → position
-   * data-rotation="rx,ry,rz"  → degrees → radians
-   * Inner HTML is rendered to CanvasTexture via SVG foreignObject.
-   */
-  async _createPanelFromHtml(panelEl, vars = {}) {
-    const name = panelEl.getAttribute('name') || 'panel';
-    const w = parseFloat(panelEl.dataset.width) || 0.12;
-    const h = parseFloat(panelEl.dataset.height) || 0.18;
-    const pos = this._parseVec3(panelEl.dataset.position, [0, 0, 0.02]);
-    const rot = this._parseVec3(panelEl.dataset.rotation, [-90, 0, 0]).map(d => d * Math.PI / 180);
+    const imageSrc = String(pick('imageSrc', 'AnswerPicture_Image', 'AdditionalImg_Image', 'image', 'img') || '');
+    const imageCaption = String(pick('imageCaption', 'imgLabel', 'AnswerPictureCaption') || '');
+    const answerType = String(pick('AnswerType', 'answerType', 'type') || 'Slide');
 
-    let inner = panelEl.innerHTML;
-    for (const [k, v] of Object.entries(vars)) {
-      inner = inner.replaceAll(`{{${k}}}`, String(v ?? ''));
-    }
-
-    const { cssW, cssH } = this._measurePanelCss(panelEl);
-
-    const texture = await this._htmlToTexture(
-      inner,
-      cssW,
-      cssH,
-      panelEl.closest('template')?.dataset?.style || ''
-    );
-
-    const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(w, h),
-      new THREE.MeshBasicMaterial({
-        map: texture,
-        transparent: true,
-        side: THREE.DoubleSide
-      })
-    );
-    mesh.name = name;
-    mesh.position.set(...pos);
-    mesh.rotation.set(...rot);
-    mesh.userData.texture = texture;
-
-    return mesh;
-  }
-
-  _measurePanelCss(panelEl) {
-    const root = panelEl.querySelector('.panel') || panelEl.firstElementChild;
-    if (!root) return { cssW: 256, cssH: 384 };
-
-    const style = root.getAttribute('style') || '';
-    const wMatch = style.match(/width:\s*([\d.]+)px/);
-    const hMatch = style.match(/height:\s*([\d.]+)px/);
-
-    let cssW = wMatch ? parseFloat(wMatch[1]) : 256;
-    let cssH = hMatch ? parseFloat(hMatch[1]) : 384;
-
-    if (root.classList.contains('ok-panel')) {
-      cssW = 256;
-      cssH = 96;
-    }
-    return { cssW, cssH };
-  }
-
-  /**
-   * Render arbitrary HTML + CSS into a CanvasTexture (SVG foreignObject).
-   */
-  _htmlToTexture(html, width, height, cssText = '') {
-    return new Promise((resolve, reject) => {
-      const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
-      <foreignObject width="100%" height="100%">
-      <div xmlns="http://www.w3.org/1999/xhtml" style="width:${width}px;height:${height}px;margin:0;padding:0;overflow:hidden;">
-      <style>${cssText}</style>
-      ${html}
-      </div>
-      </foreignObject>
-      </svg>`.trim();
-
-      const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        URL.revokeObjectURL(url);
-
-        const tex = new THREE.CanvasTexture(canvas);
-        tex.colorSpace = THREE.SRGBColorSpace;
-        tex.needsUpdate = true;
-        resolve(tex);
-      };
-      img.onerror = (e) => {
-        URL.revokeObjectURL(url);
-        reject(e);
-      };
-      img.src = url;
+    let options = raw.options || raw.Options || [];
+    if (!Array.isArray(options)) options = [];
+    options = options.map((o, i) => {
+      if (typeof o === 'string') return { text: o };
+      if (o && typeof o === 'object') return { text: o.text ?? o.MainTxt_Text ?? String(o) };
+      return { text: `Вариант ${i + 1}` };
     });
+
+    const groupName = String(pick('questId', 'QuestID', 'id', 'AnswerID', 'title', 'name') || 'target');
+
+    return { raw, title, question, mainText, help: helpCombined, helpUp, helpDown, imageSrc, imageCaption, answerType, options, groupName };
   }
 
-  // ─── private: helpers ──────────────────────────────────────────────────────
+  async _ensurePrefab(url) {
+    if (this._prefabCache) return;
+    try {
+      const res = await fetch(url, { cache: 'no-cache' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const html = await res.text();
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const tpl = doc.querySelector('#ar-target') || doc.querySelector('template');
+      if (!tpl) throw new Error('No <template id="ar-target">');
+
+      const styleEl = doc.querySelector('style');
+      if (styleEl && !document.getElementById('ar-target-prefab-styles')) {
+        const s = document.createElement('style');
+        s.id = 'ar-target-prefab-styles';
+        s.textContent = styleEl.textContent + `
+          .ar-css3d-panel, .ar-css3d-panel * {
+            pointer-events: auto !important;
+            touch-action: manipulation !important;
+          }
+        `;
+        document.head.appendChild(s);
+      }
+
+      this._prefabCache = tpl.content || tpl;
+    } catch (e) {
+      console.warn('[ModelFactory] prefab load failed, using fallback', url, e);
+      this._prefabCache = this._buildFallbackPrefab();
+    }
+  }
+
+  _getPanelNodes() {
+    if (this._prefabCache) {
+      return Array.from(this._prefabCache.querySelectorAll('[data-name]'));
+    }
+    this._prefabCache = this._buildFallbackPrefab();
+    return Array.from(this._prefabCache.querySelectorAll('[data-name]'));
+  }
+
+  _buildFallbackPrefab() {
+    const root = document.createDocumentFragment();
+
+    const make = (name, className, pos, rot, scale, innerHTML) => {
+      const div = document.createElement('div');
+      div.className = `ar-css3d-panel ${className}`;
+      div.style.pointerEvents = 'auto';
+      div.dataset.name = name;
+      div.dataset.position = pos;
+      div.dataset.rotation = rot;
+      div.dataset.scale = scale;
+      div.innerHTML = innerHTML;
+      root.appendChild(div);
+    };
+
+    make('LeftHelpBlock', 'ar-left-help-block', '-0.115, 0.025, 0', '-90, 16, 0', '0.00048', '<div class="ar-panel-help" data-field="help"></div>');
+    make('MainBlock', 'ar-main-block', '0, 0.04, 0', '-90, 0, 0', '0.0005', `<div class="ar-panel-title" data-field="title"></div><div class="ar-panel-question" data-field="question"></div><div class="ar-panel-maintext" data-field="mainText"></div>`);
+    make('RightBlock', 'ar-right-block', '0.115, 0.025, 0', '-90, -16, 0', '0.00048', `<img class="ar-panel-image" data-field="imageSrc" alt="" /><div class="ar-panel-help" data-field="imageCaption"></div>`);
+    make('ButtonsBlock', 'ar-buttons-block', '0, -0.085, 0', '-90, 0, 0', '0.0005', '<div class="ar-quest-body" data-field="buttons"></div>');
+
+    return root;
+  }
+
+  _fillPanel(el, name, data, onAnswer, ui, arInput) {
+    const setText = (selector, value) => {
+      const node = el.querySelector(selector);
+      if (!node) return;
+      node.textContent = value || '';
+    };
+
+    if (name === 'LeftHelpBlock') {
+      setText('[data-field="help"]', data.help);
+      if (!data.help) el.classList.add('ar-panel-empty');
+    }
+
+    if (name === 'MainBlock') {
+      setText('[data-field="title"]', data.title);
+      setText('[data-field="question"]', data.question);
+      setText('[data-field="mainText"]', data.mainText);
+      if (!data.title && !data.question && !data.mainText) el.classList.add('ar-panel-empty');
+    }
+
+    if (name === 'RightBlock') {
+      const img = el.querySelector('[data-field="imageSrc"]');
+      if (img) {
+        if (data.imageSrc) {
+          img.src = data.imageSrc;
+          img.alt = data.imageCaption || data.title || '';
+        } else {
+          img.removeAttribute('src');
+          img.alt = '';
+        }
+      }
+      setText('[data-field="imageCaption"]', data.imageCaption);
+      if (!data.imageSrc && !data.imageCaption) el.classList.add('ar-panel-empty');
+    }
+
+    if (name === 'ButtonsBlock') {
+      const body = el.querySelector('[data-field="buttons"]') || el;
+      this._buildQuestionBody(body, data, onAnswer, ui, arInput);
+    }
+  }
+
+  _buildQuestionBody(bodyEl, data, onAnswer, ui, arInput) {
+    bodyEl.innerHTML = '';
+
+    const type = data.answerType || 'Slide';
+    const options = data.options || [];
+
+    if (type === 'Button') {
+      const grid = document.createElement('div');
+      grid.className = 'ar-quest-options-grid';
+      grid.style.pointerEvents = 'auto';
+
+      options.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'ar-quest-btn';
+        btn.textContent = opt.text || `Вариант ${idx + 1}`;
+
+        arInput.bindInteractiveEvent(btn, `OptionButton_${idx + 1}`, () => onAnswer(idx + 1));
+        grid.appendChild(btn);
+      });
+
+      bodyEl.appendChild(grid);
+
+    } else if (type === 'InputField') {
+      const wrap = document.createElement('div');
+      wrap.className = 'ar-quest-input-block';
+      wrap.style.pointerEvents = 'auto';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'ar-quest-input';
+      input.placeholder = 'Введите ответ...';
+
+      arInput.bindInputField(input);
+
+      input.addEventListener('keydown', (e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') {
+          if (ui) ui.log(`[Input Submit] Enter pressed with value: '${input.value}'`, 'ok');
+          playSound('click');
+          onAnswer(input.value);
+        }
+      });
+
+      const submitBtn = document.createElement('button');
+      submitBtn.type = 'button';
+      submitBtn.className = 'ar-quest-submit-btn';
+      submitBtn.textContent = 'OK';
+
+      arInput.bindInteractiveEvent(submitBtn, 'InputSubmitButton', () => onAnswer(input.value));
+
+      wrap.appendChild(input);
+      wrap.appendChild(submitBtn);
+      bodyEl.appendChild(wrap);
+
+    } else if (type === 'Art' || type === 'AntiArt') {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ar-quest-submit-btn ar-quest-ok-btn';
+      btn.textContent = 'OK';
+
+      arInput.bindInteractiveEvent(btn, 'ArtOKButton', () => onAnswer(true));
+      bodyEl.appendChild(btn);
+
+    } else {
+      // Slide
+      let idx = 0;
+      const total = Math.max(options.length, 1);
+
+      const slider = document.createElement('div');
+      slider.className = 'ar-quest-slider';
+      slider.style.pointerEvents = 'auto';
+
+      const prev = document.createElement('button');
+      prev.type = 'button';
+      prev.className = 'ar-slide-nav prev';
+      prev.textContent = '◄';
+
+      const slideContent = document.createElement('div');
+      slideContent.className = 'ar-slide-content';
+      slideContent.textContent = options[0]?.text || data.mainText || data.question || '';
+
+      const next = document.createElement('button');
+      next.type = 'button';
+      next.className = 'ar-slide-nav next';
+      next.textContent = '►';
+
+      const update = () => {
+        slideContent.textContent = options[idx]?.text || data.mainText || data.question || '';
+      };
+
+      arInput.bindInteractiveEvent(prev, 'SliderPrev', () => {
+        idx = (idx - 1 + total) % total;
+        update();
+      });
+
+      arInput.bindInteractiveEvent(next, 'SliderNext', () => {
+        idx = (idx + 1) % total;
+        update();
+      });
+
+      slider.appendChild(prev);
+      slider.appendChild(slideContent);
+      slider.appendChild(next);
+      bodyEl.appendChild(slider);
+
+      const okBtn = document.createElement('button');
+      okBtn.type = 'button';
+      okBtn.className = 'ar-quest-submit-btn ar-quest-ok-btn';
+      okBtn.textContent = 'OK';
+
+      arInput.bindInteractiveEvent(okBtn, 'SliderOK', () => onAnswer(idx + 1));
+      bodyEl.appendChild(okBtn);
+    }
+  }
 
   _createSphere() {
-    const geo = new THREE.SphereGeometry(0.01, 24, 24);
+    const geo = new THREE.SphereGeometry(0.0075, 24, 24);
     const mat = new THREE.MeshStandardMaterial({
-      color: 0xff00ff,
-      metalness: 0.3,
-      roughness: 0.4,
-      emissive: 0xff00ff,
-      emissiveIntensity: 0.15
+      color: 0x00ffaa,
+      emissive: 0x00ffaa,
+      emissiveIntensity: 0.5
     });
     return new THREE.Mesh(geo, mat);
   }
 
   _parseVec3(str, fallback) {
     if (!str) return fallback.slice();
-    const parts = str.split(',').map(s => parseFloat(s.trim()));
+    const parts = String(str).split(',').map((s) => parseFloat(s.trim()));
     return parts.length === 3 && parts.every(Number.isFinite) ? parts : fallback.slice();
   }
-
-  _makeCanvasPanel({ name, w, h, pos, rotX, rot = [rotX ?? -Math.PI / 2, 0, 0], canvasW = 256, canvasH = 384, draw }) {
-    const canvas = document.createElement('canvas');
-    canvas.width = canvasW;
-    canvas.height = canvasH;
-    const ctx = canvas.getContext('2d');
-    draw(ctx, canvasW, canvasH);
-
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.needsUpdate = true;
-
-    const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(w, h),
-      new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide })
-    );
-    mesh.name = name;
-    mesh.position.set(...pos);
-    mesh.rotation.set(...rot);
-    mesh.userData.texture = tex;
-    return mesh;
-  }
-
-  _roundRectPath(ctx, x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + w - r, y);
-    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-    ctx.lineTo(x + w, y + h - r);
-    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-    ctx.lineTo(x + r, y + h);
-    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-    ctx.lineTo(x, y + r);
-    ctx.quadraticCurveTo(x, y, x + r, y);
-    ctx.closePath();
-  }
 }
+
+const defaultFactory = new ModelFactory();
+
+export function createArTargetSync(targetData, options = {}) {
+  return defaultFactory.createArTargetSync(targetData, options);
+}
+
+export async function createArTarget(targetData, options = {}) {
+  return defaultFactory.createArTarget(targetData, options);
+}
+
+export { ModelFactory as default };

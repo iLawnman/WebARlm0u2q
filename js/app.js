@@ -1,9 +1,11 @@
+// js/app.js
 import { UI } from './ui.js';
 import { ImageRecognition } from './recognition.js';
 import { ARScene } from './arscene.js';
 import { playSound } from './audio.js';
 import { Settings } from './settings.js';
 import { ARSettings } from './arsettings.js';
+import { UIInput } from './uiinput.js';
 
 export class App {
   constructor() {
@@ -12,6 +14,7 @@ export class App {
     this.arSettings = new ARSettings();
     this.recognition = null;
     this.arScene = new ARScene(this.ui);
+    this.uiInput = new UIInput(this.ui);
 
     this.xrSession = null;
     this.imageTrackingEnabled = false;
@@ -30,8 +33,8 @@ export class App {
     try {
       await this.arSettings.init();
       this.ui.log(
-          `AR themes ready | count=${this.arSettings.getThemes().length} active=${this.arSettings.getActiveThemeId()}`,
-          'ok'
+        `AR themes ready | count=${this.arSettings.getThemes().length} active=${this.arSettings.getActiveThemeId()}`,
+        'ok'
       );
     } catch (e) {
       this.ui.log('AR themes failed: ' + (e && e.message ? e.message : e), 'warn');
@@ -104,22 +107,16 @@ export class App {
     }
 
     // Моделируем перенос UI элементов, чтобы они не пропадали во время AR сессии
-    const uiElements = document.querySelectorAll('.ui-root, #ui-container, #app-ui, .ar-ui, #log-panel, #logs, .log-container');
-    uiElements.forEach(el => {
+    const uiElements = document.querySelectorAll(
+      '.ui-root, #ui-container, #app-ui, .ar-ui, #log-panel, #logs, .log-container'
+    );
+    uiElements.forEach((el) => {
       el.style.pointerEvents = 'auto'; // Разрешаем клики по UI
       overlayRoot.appendChild(el);
     });
 
-    // Добавляем глобальный захват касаний для диагностики до прохождения в Canvas/WebXR
-    this._touchHandler = (e) => {
-      const touch = e.touches[0];
-      if (touch) {
-        const target = document.elementFromPoint(touch.clientX, touch.clientY);
-        const tag = target ? `${target.tagName}.${target.className}` : 'null';
-        this.ui.log(`[TouchStart] (${Math.round(touch.clientX)},${Math.round(touch.clientY)}) -> ${tag}`, 'info');
-      }
-    };
-    window.addEventListener('touchstart', this._touchHandler, { capture: true, passive: true });
+    // Включаем отслеживание ввода UI
+    this.uiInput.attach();
 
     const sessionInit = {
       requiredFeatures: ['local-floor'],
@@ -162,13 +159,11 @@ export class App {
 
     this.xrSession.addEventListener('end', () => {
       this.ui.log('Session ended', 'warn');
-      
-      if (this._touchHandler) {
-        window.removeEventListener('touchstart', this._touchHandler, { capture: true });
-      }
+
+      this.uiInput.detach();
 
       // Возвращаем UI элементы обратно в body при завершении
-      uiElements.forEach(el => document.body.appendChild(el));
+      uiElements.forEach((el) => document.body.appendChild(el));
 
       this.imageTrackingEnabled = false;
       this.recognition.detachInput();
