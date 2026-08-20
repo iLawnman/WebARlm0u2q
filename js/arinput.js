@@ -7,65 +7,92 @@ export class ARInput {
   }
 
   /**
-   * Настраивает обработку интерактивных событий на DOM-элементе AR-панели.
-   * @param {HTMLElement} element 
-   * @param {string} panelName 
+   * Обработка событий на панели.
+   * stopPropagation срабатывает ТОЛЬКО если клик НЕ по интерактивному элементу внутри.
    */
   bindPanelEvents(element, panelName) {
     element.style.pointerEvents = 'auto';
+    element.style.touchAction = 'manipulation';
 
-    const stopEvents = ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'click'];
-    stopEvents.forEach((evt) => {
-      element.addEventListener(evt, (e) => {
-        if (this.ui) {
-          this.ui.log(`[ARInput Panel Event] Panel '${panelName}' received: ${evt}`, 'info');
-        }
+    const interactiveSelector = 'button, input, textarea, select, a, .ar-quest-btn, .ar-quest-submit-btn, .ar-slide-nav, .ar-quest-input';
+
+    const handler = (e) => {
+      const isInteractive = e.target.closest(interactiveSelector);
+
+      if (this.ui) {
+        this.ui.log(
+            `[ARInput Panel Event] Panel '${panelName}' received: ${e.type}` +
+            (isInteractive ? ` (interactive: ${e.target.tagName})` : ''),
+            isInteractive ? 'ok' : 'info'
+        );
+      }
+
+      // Останавливаем всплытие только для "пустых" кликов по панели
+      if (!isInteractive) {
         e.stopPropagation();
-      });
+      }
+    };
+
+    ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'click'].forEach((evt) => {
+      element.addEventListener(evt, handler, { passive: false });
     });
   }
 
   /**
-   * Настраивает события для интерактивных кнопок и элементов управления AR.
-   * @param {HTMLElement} element 
-   * @param {string} btnName 
-   * @param {Function} callback 
+   * Интерактивные кнопки / элементы управления.
    */
   bindInteractiveEvent(element, btnName, callback) {
+    if (!element) return;
+
     element.style.pointerEvents = 'auto';
     element.style.touchAction = 'manipulation';
+    element.style.cursor = 'pointer';
+
+    // Увеличиваем хит-зону на маленьких кнопках
+    element.style.minWidth = element.style.minWidth || '44px';
+    element.style.minHeight = element.style.minHeight || '36px';
 
     const handler = (e) => {
-      if (this.ui) {
-        this.ui.log(`[ARInput Button Pressed] '${btnName}' via event: ${e.type}`, 'ok');
-      }
-      playSound('click');
       e.stopPropagation();
       if (e.cancelable) e.preventDefault();
+
+      if (this.ui) {
+        this.ui.log(`[ARInput Button Pressed] '${btnName}' via ${e.type}`, 'ok');
+      }
+      playSound('click');
       callback(e);
     };
 
+    // Слушаем и click, и pointerup (для надёжности в AR/CSS3D)
     element.addEventListener('click', handler);
+    element.addEventListener('pointerup', (e) => {
+      // только если это был именно клик, а не drag
+      if (e.button === 0) handler(e);
+    });
+
+    // Блокируем всплытие на ранних стадиях
     element.addEventListener('pointerdown', (e) => e.stopPropagation());
-    element.addEventListener('touchstart', (e) => e.stopPropagation());
+    element.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: false });
   }
 
   /**
-   * Настраивает логирование и предотвращение всплытия для полей ввода AR.
-   * @param {HTMLInputElement} inputElement 
+   * Поля ввода
    */
   bindInputField(inputElement) {
-    inputElement.style.pointerEvents = 'auto';
+    if (!inputElement) return;
 
-    const stopPropagation = (e) => {
+    inputElement.style.pointerEvents = 'auto';
+    inputElement.style.touchAction = 'manipulation';
+
+    const stop = (e) => {
       if (this.ui) {
         this.ui.log(`[ARInput Input Event] ${e.type}`, 'info');
       }
       e.stopPropagation();
     };
 
-    inputElement.addEventListener('click', stopPropagation);
-    inputElement.addEventListener('pointerdown', stopPropagation);
-    inputElement.addEventListener('touchstart', stopPropagation);
+    ['click', 'pointerdown', 'touchstart', 'focus'].forEach((evt) => {
+      inputElement.addEventListener(evt, stop);
+    });
   }
 }
