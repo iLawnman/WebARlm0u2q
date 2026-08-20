@@ -15,11 +15,6 @@ export class UI {
     this.questStartImg = document.getElementById('quest-start-img');
     this.questStartText = document.getElementById('quest-start-text');
 
-    this.questionPanel = document.getElementById('question-panel');
-    this.questionImg = document.getElementById('question-img');
-    this.questionText = document.getElementById('question-text');
-    this.questionBody = document.getElementById('question-body');
-
     this.resultPanel = document.getElementById('result-panel');
     this.resultSign = document.getElementById('result-sign');
     this.resultText = document.getElementById('result-text');
@@ -34,7 +29,6 @@ export class UI {
       this.logPanel.classList.toggle('collapsed', !this.logVisible);
     });
 
-    this._onQuestionSubmit = null;
     this._onResultClose = null;
 
     if (this.resultCloseBtn) {
@@ -44,6 +38,175 @@ export class UI {
         if (cb) cb();
       });
     }
+
+    // ── Рамка распознавания (создаём сами, без зависимости от HTML) ──
+    this._injectScanFrameStyles();
+    this.scanFrame = this._createScanFrame();
+    this._scanEffectTimer = null;
+  }
+
+  _injectScanFrameStyles() {
+    if (document.getElementById('ar-scan-frame-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'ar-scan-frame-styles';
+    style.textContent = `
+      #ar-scan-frame {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        width: min(70vw, 380px);
+        height: min(70vw, 380px);
+        transform: translate(-50%, -50%);
+        pointer-events: none;
+        z-index: 40;
+        display: none;
+        box-sizing: border-box;
+      }
+      #ar-scan-frame.visible { display: block; }
+
+      /* углы рамки */
+      #ar-scan-frame .corner {
+        position: absolute;
+        width: 28px;
+        height: 28px;
+        border-color: #00ffaa;
+        border-style: solid;
+        border-width: 0;
+      }
+      #ar-scan-frame .corner.tl { top: 0; left: 0; border-top-width: 3px; border-left-width: 3px; border-top-left-radius: 4px; }
+      #ar-scan-frame .corner.tr { top: 0; right: 0; border-top-width: 3px; border-right-width: 3px; border-top-right-radius: 4px; }
+      #ar-scan-frame .corner.bl { bottom: 0; left: 0; border-bottom-width: 3px; border-left-width: 3px; border-bottom-left-radius: 4px; }
+      #ar-scan-frame .corner.br { bottom: 0; right: 0; border-bottom-width: 3px; border-right-width: 3px; border-bottom-right-radius: 4px; }
+
+      /* мигание в режиме ожидания */
+      #ar-scan-frame.blink .corner {
+        animation: ar-scan-blink 1.1s ease-in-out infinite;
+      }
+      @keyframes ar-scan-blink {
+        0%, 100% { opacity: 0.35; border-color: #00ffaa88; }
+        50% { opacity: 1; border-color: #00ffaa; }
+      }
+
+      /* эффект распознавания 2с: сканирующая линия + пульс углов + заливка */
+      #ar-scan-frame .scan-line {
+        position: absolute;
+        left: 8%;
+        right: 8%;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, #00ffaa, #ffffff, #00ffaa, transparent);
+        box-shadow: 0 0 12px #00ffaa, 0 0 24px #00ffaa88;
+        opacity: 0;
+        top: 10%;
+        pointer-events: none;
+      }
+      #ar-scan-frame .scan-fill {
+        position: absolute;
+        inset: 6px;
+        background: radial-gradient(circle at center, rgba(0,255,170,0.18) 0%, transparent 70%);
+        opacity: 0;
+        pointer-events: none;
+      }
+      #ar-scan-frame.effect .scan-line {
+        opacity: 1;
+        animation: ar-scan-line 2s linear forwards;
+      }
+      #ar-scan-frame.effect .scan-fill {
+        animation: ar-scan-fill 2s ease-out forwards;
+      }
+      #ar-scan-frame.effect .corner {
+        animation: ar-scan-corner-pulse 0.5s ease-in-out infinite;
+        border-color: #00ffcc;
+      }
+      @keyframes ar-scan-line {
+        0% { top: 8%; opacity: 0; }
+        10% { opacity: 1; }
+        90% { opacity: 1; }
+        100% { top: 90%; opacity: 0; }
+      }
+      @keyframes ar-scan-fill {
+        0% { opacity: 0; transform: scale(0.85); }
+        40% { opacity: 1; transform: scale(1); }
+        100% { opacity: 0; transform: scale(1.05); }
+      }
+      @keyframes ar-scan-corner-pulse {
+        0%, 100% { opacity: 1; filter: drop-shadow(0 0 2px #00ffaa); }
+        50% { opacity: 0.6; filter: drop-shadow(0 0 10px #00ffaa); }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  _createScanFrame() {
+    const el = document.createElement('div');
+    el.id = 'ar-scan-frame';
+    el.innerHTML = `
+      <div class="corner tl"></div>
+      <div class="corner tr"></div>
+      <div class="corner bl"></div>
+      <div class="corner br"></div>
+      <div class="scan-fill"></div>
+      <div class="scan-line"></div>
+    `;
+    document.body.appendChild(el);
+    return el;
+  }
+
+  /** Показать рамку в режиме ожидания (мигание). */
+  showScanFrameBlink() {
+    if (!this.scanFrame) return;
+    if (this._scanEffectTimer) {
+      clearTimeout(this._scanEffectTimer);
+      this._scanEffectTimer = null;
+    }
+    this.scanFrame.classList.remove('effect');
+    this.scanFrame.classList.add('visible', 'blink');
+  }
+
+  /**
+   * Запуск 2-секундного эффекта распознавания.
+   * @param {Function} [onDone] вызывается после окончания эффекта
+   */
+  playScanEffect(onDone) {
+    if (!this.scanFrame) {
+      if (typeof onDone === 'function') onDone();
+      return;
+    }
+    if (this._scanEffectTimer) {
+      clearTimeout(this._scanEffectTimer);
+      this._scanEffectTimer = null;
+    }
+    this.scanFrame.classList.remove('blink');
+    this.scanFrame.classList.add('visible', 'effect');
+
+    // перезапуск CSS-анимаций
+    const line = this.scanFrame.querySelector('.scan-line');
+    const fill = this.scanFrame.querySelector('.scan-fill');
+    if (line) {
+      line.style.animation = 'none';
+      // force reflow
+      void line.offsetWidth;
+      line.style.animation = '';
+    }
+    if (fill) {
+      fill.style.animation = 'none';
+      void fill.offsetWidth;
+      fill.style.animation = '';
+    }
+
+    this._scanEffectTimer = setTimeout(() => {
+      this._scanEffectTimer = null;
+      this.hideScanFrame();
+      if (typeof onDone === 'function') onDone();
+    }, 2000);
+  }
+
+  hideScanFrame() {
+    if (!this.scanFrame) return;
+    if (this._scanEffectTimer) {
+      clearTimeout(this._scanEffectTimer);
+      this._scanEffectTimer = null;
+    }
+    this.scanFrame.classList.remove('visible', 'blink', 'effect');
   }
 
   log(msg, type = '') {
@@ -133,142 +296,6 @@ export class UI {
   hideQuestStart() {
     if (!this.questStartPanel) return;
     this.questStartPanel.classList.remove('open');
-  }
-
-  // ───────────────────────── Question panel ─────────────────────────
-
-  /**
-   * @param {object} data
-   * @param {string} [data.imageSrc] Картинка распознанного маркера
-   * @param {string} [data.question] Текст вопроса (Question из questtable.json)
-   * @param {string} [data.mainText] Текст ответа-заглушки (Slide без вариантов)
-   * @param {'Slide'|'Button'|'InputField'|'Art'|'AntiArt'} [data.answerType]
-   * @param {Array}  [data.options]
-   * @param {Function} onSubmit callback(value) — вызывается когда пользователь дал ответ
-   */
-  showQuestion(data, onSubmit) {
-    if (!this.questionPanel) return;
-    this._onQuestionSubmit = onSubmit || null;
-
-    if (this.questionImg) {
-      if (data.imageSrc) {
-        this.questionImg.src = data.imageSrc;
-        this.questionImg.style.display = 'block';
-      } else {
-        this.questionImg.style.display = 'none';
-      }
-    }
-    if (this.questionText) this.questionText.textContent = data.question || '';
-
-    this._renderQuestionBody(data);
-    this.questionPanel.classList.add('open');
-  }
-
-  hideQuestion() {
-    if (!this.questionPanel) return;
-    this.questionPanel.classList.remove('open');
-    if (this.questionBody) this.questionBody.innerHTML = '';
-    this._onQuestionSubmit = null;
-  }
-
-  _renderQuestionBody(data) {
-    if (!this.questionBody) return;
-    this.questionBody.innerHTML = '';
-
-    const type = data.answerType || 'Slide';
-    const options = data.options || [];
-
-    if (type === 'Button') {
-      const grid = document.createElement('div');
-      grid.className = 'quest-options-grid';
-      options.forEach((opt, idx) => {
-        const btn = document.createElement('button');
-        btn.className = 'quest-btn';
-        btn.textContent = opt.text || `Вариант ${idx + 1}`;
-        btn.addEventListener('click', () => this._submitAnswer(idx + 1));
-        grid.appendChild(btn);
-      });
-      this.questionBody.appendChild(grid);
-
-    } else if (type === 'InputField') {
-      const wrap = document.createElement('div');
-      wrap.className = 'quest-input-block';
-
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.className = 'quest-input';
-      input.placeholder = 'Введите ответ...';
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') this._submitAnswer(input.value);
-      });
-
-      const submitBtn = document.createElement('button');
-      submitBtn.className = 'quest-submit-btn';
-      submitBtn.textContent = 'OK';
-      submitBtn.addEventListener('click', () => this._submitAnswer(input.value));
-
-      wrap.appendChild(input);
-      wrap.appendChild(submitBtn);
-      this.questionBody.appendChild(wrap);
-
-    } else if (type === 'Art' || type === 'AntiArt') {
-      // Найден/не найден артефакт — только подтверждение
-      const btn = document.createElement('button');
-      btn.className = 'quest-submit-btn quest-ok-btn';
-      btn.textContent = 'OK';
-      btn.addEventListener('click', () => this._submitAnswer(true));
-      this.questionBody.appendChild(btn);
-
-    } else {
-      // Slide (по умолчанию)
-      let idx = 0;
-      const total = Math.max(options.length, 1);
-
-      const slideContent = document.createElement('div');
-      slideContent.className = 'slide-content';
-      slideContent.textContent = options[0]?.text || data.mainText || '';
-
-      const update = () => {
-        slideContent.textContent = options[idx]?.text || data.mainText || '';
-      };
-
-      const prev = document.createElement('button');
-      prev.className = 'slide-nav prev';
-      prev.textContent = '◄';
-      prev.addEventListener('click', () => {
-        idx = (idx - 1 + total) % total;
-        update();
-      });
-
-      const next = document.createElement('button');
-      next.className = 'slide-nav next';
-      next.textContent = '►';
-      next.addEventListener('click', () => {
-        idx = (idx + 1) % total;
-        update();
-      });
-
-      const slider = document.createElement('div');
-      slider.className = 'quest-slider';
-      slider.appendChild(prev);
-      slider.appendChild(slideContent);
-      slider.appendChild(next);
-      this.questionBody.appendChild(slider);
-
-      const okBtn = document.createElement('button');
-      okBtn.className = 'quest-submit-btn quest-ok-btn';
-      okBtn.textContent = 'OK';
-      okBtn.addEventListener('click', () => this._submitAnswer(idx + 1));
-      this.questionBody.appendChild(okBtn);
-    }
-  }
-
-  _submitAnswer(value) {
-    if (this._onQuestionSubmit) {
-      const cb = this._onQuestionSubmit;
-      this._onQuestionSubmit = null;
-      cb(value);
-    }
   }
 
   // ───────────────────────── Result panel ─────────────────────────
