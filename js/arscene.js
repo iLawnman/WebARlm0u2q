@@ -26,10 +26,9 @@ export class ARScene {
     this.cssRenderer.domElement.style.top = '0px';
     this.cssRenderer.domElement.style.left = '0px';
 
-    // Сквозная интерактивность для сцены
+    // Включаем проброс кликов для DOM/CSS3D элементов
     this.cssRenderer.domElement.style.pointerEvents = 'none';
     this.cssRenderer.domElement.style.zIndex = '10';
-    this.cssRenderer.domElement.style.touchAction = 'none';
 
     document.body.appendChild(this.cssRenderer.domElement);
 
