@@ -24,7 +24,7 @@ export class ImageReco {
 
     try {
       // 1. Загружаем JSON-конфиг с маркерами из assets
-      const response = await fetch('./assets/recogniionimages.json');
+      const response = await fetch('./assets/recognitionimages.json');
       if (!response.ok) {
         throw new Error(`Failed to fetch recogniionimages.json: ${response.statusText}`);
       }
