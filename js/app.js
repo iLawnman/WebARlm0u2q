@@ -1,5 +1,5 @@
 import { UI } from './ui.js';
-import { ImageRecognition } from './recognition.js';
+import { Recognition } from './recognition.js';
 import { ARScene } from './arscene.js';
 import { playSound } from "./audio.js";
 import { Settings } from './settings.js';
@@ -58,7 +58,7 @@ export class App {
     }
 
     // 2. Recognition
-    this.recognition = new ImageRecognition(this.ui, this.settings);
+    this.recognition = new Recognition(this.ui, this.settings);
     await this.recognition.init();
 
     this.ui.onStartAR(() => this.startAR());
