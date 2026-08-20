@@ -7,39 +7,48 @@ export class ARInput {
   }
 
   /**
-   * Обработка событий на панели.
-   * stopPropagation срабатывает ТОЛЬКО если клик НЕ по интерактивному элементу внутри.
+   * Панель: stopPropagation только если клик НЕ по интерактивному потомку.
    */
   bindPanelEvents(element, panelName) {
     element.style.pointerEvents = 'auto';
     element.style.touchAction = 'manipulation';
 
-    const interactiveSelector = 'button, input, textarea, select, a, .ar-quest-btn, .ar-quest-submit-btn, .ar-slide-nav, .ar-quest-input';
+    const interactiveSelector = [
+      'button',
+      'input',
+      'textarea',
+      'select',
+      'a',
+      '.ar-quest-btn',
+      '.ar-quest-submit-btn',
+      '.ar-slide-nav',
+      '.ar-quest-input',
+      '.ar-quest-ok-btn'
+    ].join(',');
 
     const handler = (e) => {
-      const isInteractive = e.target.closest(interactiveSelector);
+      const isInteractive = !!e.target.closest(interactiveSelector);
 
       if (this.ui) {
         this.ui.log(
             `[ARInput Panel Event] Panel '${panelName}' received: ${e.type}` +
-            (isInteractive ? ` (interactive: ${e.target.tagName})` : ''),
+            (isInteractive ? ` → INTERACTIVE (${e.target.tagName}/${e.target.className})` : ''),
             isInteractive ? 'ok' : 'info'
         );
       }
 
-      // Останавливаем всплытие только для "пустых" кликов по панели
       if (!isInteractive) {
         e.stopPropagation();
       }
     };
 
     ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'click'].forEach((evt) => {
-      element.addEventListener(evt, handler, { passive: false });
+      element.addEventListener(evt, handler, { passive: false, capture: false });
     });
   }
 
   /**
-   * Интерактивные кнопки / элементы управления.
+   * Кнопки / интерактив
    */
   bindInteractiveEvent(element, btnName, callback) {
     if (!element) return;
@@ -47,13 +56,14 @@ export class ARInput {
     element.style.pointerEvents = 'auto';
     element.style.touchAction = 'manipulation';
     element.style.cursor = 'pointer';
+    element.style.minWidth = '48px';
+    element.style.minHeight = '40px';
+    element.style.position = 'relative';
+    element.style.zIndex = '50';
 
-    // Увеличиваем хит-зону на маленьких кнопках
-    element.style.minWidth = element.style.minWidth || '44px';
-    element.style.minHeight = element.style.minHeight || '36px';
-
-    const handler = (e) => {
+    const fire = (e) => {
       e.stopPropagation();
+      e.stopImmediatePropagation();
       if (e.cancelable) e.preventDefault();
 
       if (this.ui) {
@@ -63,31 +73,27 @@ export class ARInput {
       callback(e);
     };
 
-    // Слушаем и click, и pointerup (для надёжности в AR/CSS3D)
-    element.addEventListener('click', handler);
+    element.addEventListener('click', fire);
     element.addEventListener('pointerup', (e) => {
-      // только если это был именно клик, а не drag
-      if (e.button === 0) handler(e);
+      if (e.button === 0) fire(e);
     });
 
-    // Блокируем всплытие на ранних стадиях
-    element.addEventListener('pointerdown', (e) => e.stopPropagation());
-    element.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: false });
+    // Ранняя блокировка всплытия
+    element.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+    });
+    element.addEventListener('touchstart', (e) => {
+      e.stopPropagation();
+    }, { passive: false });
   }
 
-  /**
-   * Поля ввода
-   */
   bindInputField(inputElement) {
     if (!inputElement) return;
-
     inputElement.style.pointerEvents = 'auto';
     inputElement.style.touchAction = 'manipulation';
 
     const stop = (e) => {
-      if (this.ui) {
-        this.ui.log(`[ARInput Input Event] ${e.type}`, 'info');
-      }
+      if (this.ui) this.ui.log(`[ARInput Input Event] ${e.type}`, 'info');
       e.stopPropagation();
     };
 
