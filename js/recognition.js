@@ -117,6 +117,13 @@ export class ImageRecognition {
     this.ui.hideDetectedObjectsInfo();
   }
 
+  _parseRichText(text) {
+    if (!text) return '';
+    return text
+      .replace(/<size=\+?(\d+)>/gi, '<span style="font-size: calc(1em + $1px)">')
+      .replace(/<\/size>/gi, '</span>');
+  }
+
   _onSelect(ev) {
     if (this.state !== 'waitingInput' || !this._arScene) return;
     this._pointerNdc.set(0, 0);
@@ -136,38 +143,19 @@ export class ImageRecognition {
 
   _tryHitOk() {
     if (!this._arScene) return;
-    const camera = this._arScene.camera;
-    if (!camera) return;
-    this._raycaster.setFromCamera(this._pointerNdc, camera);
 
-    for (const [, entry] of this.imageReco.trackedMarkers) {
-      if (!entry.arTarget || !entry.arTarget.visible || entry.dismissed) continue;
-      const ud = entry.arTarget.userData || {};
-      const okPanel = ud.okPanel || ud.okButton || (ud.panels && ud.panels.okPanel);
-      if (!okPanel) continue;
-      const hits = this._raycaster.intersectObject(okPanel, false);
-      if (hits.length > 0) {
+    // Сначала закрываем активную карточку при любом тапе вне или по кнопке
+    for (const [idx, entry] of this.imageReco.trackedMarkers) {
+      if (entry.arTarget && entry.arTarget.visible && !entry.dismissed) {
         this._handleOk(entry);
         return;
-      }
-    }
-
-    if (this.state === 'waitingInput') {
-      for (const [, entry] of this.imageReco.trackedMarkers) {
-        if (entry.arTarget && entry.arTarget.visible && !entry.dismissed) {
-          this._handleOk(entry);
-          return;
-        }
       }
     }
   }
 
   _handleOk(entry) {
     if (entry.dismissed) return;
-    const type = entry.questData?.answerType;
-    if (type === 'Art' || type === 'AntiArt' || !type) {
-      this._onQuestionAnswered(entry, true);
-    }
+    this._onQuestionAnswered(entry, true);
   }
 
   _onQuestionAnswered(entry, value) {
@@ -236,10 +224,11 @@ export class ImageRecognition {
           const bitmapEntry = this.imageReco.targetBitmaps.find(t => t.name === markerName);
           const questData = this.questManager.getArTargetData(markerName);
 
+          const rawMainText = questData?.mainText || '';
           const targetInfoData = {
             title: questData?.title || markerName,
             question: questData?.question || questData?.title || markerName,
-            mainText: questData?.mainText || '',
+            mainText: this._parseRichText(rawMainText),
             answerType: questData?.answerType || 'Slide',
             options: questData?.options || [],
             imageSrc: bitmapEntry ? bitmapEntry.src : '',
@@ -367,7 +356,7 @@ export class ImageRecognition {
         }
       }
     } catch (e) {
-      // Игнорируем регулярные кадры при потере
+      // Игнорируем ошибки кадра
     }
   }
 }
