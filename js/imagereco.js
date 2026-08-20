@@ -23,33 +23,42 @@ export class ImageReco {
     this.targetBitmaps = [];
 
     try {
-      // 1. Загружаем JSON-конфиг с маркерами из assets
       const response = await fetch('./assets/recognitionimages.json');
       if (!response.ok) {
-        throw new Error(`Failed to fetch recogniionimages.json: ${response.statusText}`);
+        throw new Error(`Failed to fetch recognitionimages.json: ${response.status} ${response.statusText}`);
       }
 
-      const imagesConfig = await response.json(); 
-      // Ожидается массив объектов вида: [{ name: 'marker1', src: 'path/to/img.png' }, ...]
+      const json = await response.json();
+      // Обрабатываем случай, если в JSON массив напрямую или объект с полем images/targets
+      const imagesConfig = Array.isArray(json) ? json : (json.images || json.targets || []);
 
-      // 2. Загружаем ImageBitmap для каждого маркера из полученного списка
       for (const item of imagesConfig) {
-        if (!item.src) continue;
+        // Поддерживаем разные названия полей: src, image, url
+        const srcPath = item.src || item.image || item.url;
+        if (!srcPath) continue;
+
+        // Преобразуем относительный путь от корня сайта, если путь не абсолютный
+        const fullSrc = srcPath.startsWith('http') || srcPath.startsWith('/')
+            ? srcPath
+            : `./${srcPath.replace(/^\.\//, '')}`;
 
         try {
-          const imgRes = await fetch(item.src);
-          if (!imgRes.ok) continue;
+          const imgRes = await fetch(fullSrc);
+          if (!imgRes.ok) {
+            console.warn(`[ImageReco] Failed to fetch image: ${fullSrc} (${imgRes.status})`);
+            continue;
+          }
 
           const blob = await imgRes.blob();
           const bitmap = await createImageBitmap(blob);
 
           this.targetBitmaps.push({
-            name: item.name || item.src,
-            src: item.src,
+            name: item.name || item.id || fullSrc,
+            src: fullSrc,
             bitmap
           });
         } catch (imgErr) {
-          console.error(`[ImageReco] Error loading bitmap for ${item.src}:`, imgErr);
+          console.error(`[ImageReco] Error loading bitmap for ${fullSrc}:`, imgErr);
         }
       }
 
