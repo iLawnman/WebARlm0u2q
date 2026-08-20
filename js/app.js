@@ -1,6 +1,7 @@
 import { UI } from './ui.js';
 import { ImageRecognition } from './recognition.js';
 import { ARScene } from './arscene.js';
+import { playSound } from './audio.js';
 import { Settings } from './settings.js';
 import { ARSettings } from './arsettings.js';
 
@@ -82,25 +83,43 @@ export class App {
       return;
     }
 
-    // Создаем или получаем изолированный контейнер для WebXR Overlay
+    // 1. Создаем общий контейнер-корень для WebXR Overlay
     let overlayRoot = document.getElementById('xr-overlay-container');
     if (!overlayRoot) {
       overlayRoot = document.createElement('div');
       overlayRoot.id = 'xr-overlay-container';
-      overlayRoot.style.position = 'absolute';
+      overlayRoot.style.position = 'fixed';
       overlayRoot.style.top = '0';
       overlayRoot.style.left = '0';
-      overlayRoot.style.width = '100%';
-      overlayRoot.style.height = '100%';
+      overlayRoot.style.width = '100vw';
+      overlayRoot.style.height = '100vh';
       overlayRoot.style.pointerEvents = 'none';
-      overlayRoot.style.zIndex = '999';
+      overlayRoot.style.zIndex = '99999';
       document.body.appendChild(overlayRoot);
     }
 
-    // Перемещаем элемент CSS3D рендерера в overlay Root
+    // 2. Переносим CSS3D рендерер и элементы UI в root-контейнер overlay
     if (this.arScene.cssRenderer.domElement) {
       overlayRoot.appendChild(this.arScene.cssRenderer.domElement);
     }
+
+    // Моделируем перенос UI элементов, чтобы они не пропадали во время AR сессии
+    const uiElements = document.querySelectorAll('.ui-root, #ui-container, #app-ui, .ar-ui, #log-panel, #logs, .log-container');
+    uiElements.forEach(el => {
+      el.style.pointerEvents = 'auto'; // Разрешаем клики по UI
+      overlayRoot.appendChild(el);
+    });
+
+    // Добавляем глобальный захват касаний для диагностики до прохождения в Canvas/WebXR
+    this._touchHandler = (e) => {
+      const touch = e.touches[0];
+      if (touch) {
+        const target = document.elementFromPoint(touch.clientX, touch.clientY);
+        const tag = target ? `${target.tagName}.${target.className}` : 'null';
+        this.ui.log(`[TouchStart] (${Math.round(touch.clientX)},${Math.round(touch.clientY)}) -> ${tag}`, 'info');
+      }
+    };
+    window.addEventListener('touchstart', this._touchHandler, { capture: true, passive: true });
 
     const sessionInit = {
       requiredFeatures: ['local-floor'],
@@ -111,9 +130,9 @@ export class App {
 
     try {
       this.xrSession = await navigator.xr.requestSession('immersive-ar', sessionInit);
-      this.ui.log('WebXR Session initialized with DOM Overlay root', 'ok');
+      this.ui.log('WebXR Session initialized with Overlay Root', 'ok');
     } catch (e) {
-      this.ui.log('DOM Overlay failed, fallback to standard session: ' + e.message, 'warn');
+      this.ui.log('DOM Overlay failed, fallback session: ' + e.message, 'warn');
       try {
         this.xrSession = await navigator.xr.requestSession('immersive-ar', {
           requiredFeatures: ['local-floor'],
@@ -128,20 +147,9 @@ export class App {
       }
     }
 
-    // Добавляем глобальный обработчик выбора WebXR (Select / Tap в AR)
-    this.xrSession.addEventListener('selectstart', (e) => {
-      this.ui.log('[XR Event] selectstart fired (Tap detected in AR)', 'info');
+    this.xrSession.addEventListener('selectstart', () => {
+      this.ui.log('[XR] selectstart fired', 'info');
     });
-
-    this.xrSession.addEventListener('select', (e) => {
-      this.ui.log('[XR Event] select fired', 'ok');
-    });
-
-    // Навешиваем прямое логирование тачей на уровень всего окна для проверки блокировок
-    window.addEventListener('touchstart', (e) => {
-      const target = e.touches[0] ? document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY) : null;
-      this.ui.log(`[Raw TouchStart] Target: ${target ? target.tagName + '.' + target.className : 'null'}`, 'info');
-    }, { capture: true, passive: true });
 
     await this.arScene.renderer.xr.setSession(this.xrSession);
 
@@ -154,6 +162,14 @@ export class App {
 
     this.xrSession.addEventListener('end', () => {
       this.ui.log('Session ended', 'warn');
+      
+      if (this._touchHandler) {
+        window.removeEventListener('touchstart', this._touchHandler, { capture: true });
+      }
+
+      // Возвращаем UI элементы обратно в body при завершении
+      uiElements.forEach(el => document.body.appendChild(el));
+
       this.imageTrackingEnabled = false;
       this.recognition.detachInput();
       this.recognition.reset(this.arScene);
