@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Генератор дизайн-превью — arprefabsdesign.json → ardesign.html</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@400;700&family=Cinzel:wght@600;700&display=swap');
+  @import url('https://cdnjs.cloudflare.com/ajax/libs/inter-ui/3.19.3/inter.css');
+
+  :root {
+    --gold: #FFD700; --gold2: #E9BF15; --gold3: #D19C27; --gold4: #DAA520;
+    --bg: #0b1120; --card: #111827; --border: rgba(148,163,184,.16);
+    --text: #f8fafc; --muted: #94a3b8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: radial-gradient(circle at 50% -20%, rgba(99,102,241,.12), transparent 45%), var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  /* ===== Панель управления ===== */
+  #toolbar {
+    max-width: 960px; margin: 0 auto 20px;
+    background: rgba(17,24,39,.92);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  #toolbar h1 { font-size: 1rem; color: #818cf8; font-weight: 700; letter-spacing: .5px; margin-right: auto; }
+  #toolbar label.file-btn {
+    background: rgba(99,102,241,.12); border: 1px solid rgba(99,102,241,.25);
+    color: #e2e8f0; padding: 8px 14px; border-radius: 8px; cursor: pointer;
+    font-size: 12px; font-weight: 600; transition: background .2s;
+  }
+  #toolbar label.file-btn:hover { background: linear-gradient(135deg, rgba(99,102,241,.85), rgba(6,182,212,.75)); color: #fff; }
+  #toolbar input[type=file] { display: none; }
+  #status { font-size: 12px; color: var(--muted); width: 100%; }
+
+  h1.page-title {
+    text-align: center; font-family: 'Cinzel', serif; color: var(--gold);
+    margin-bottom: 8px; font-size: 1.8rem; text-shadow: 0 0 12px rgba(255,215,0,0.4);
+  }
+  p.subtitle { text-align: center; color: #888; margin-bottom: 24px; font-size: 0.9rem; }
+
+  .tabs { display: flex; justify-content: center; gap: 12px; margin-bottom: 28px; flex-wrap: wrap; }
+  .tab {
+    padding: 10px 24px; background: #1a1a1a; border: 1px solid #333; border-radius: 8px;
+    cursor: pointer; color: #aaa; font-family: inherit; font-size: 0.95rem; transition: all 0.2s;
+  }
+  .tab.active { background: linear-gradient(135deg, #2a1a00, #3d2800); border-color: var(--gold4); color: var(--gold); box-shadow: 0 0 15px rgba(218,165,32,0.25); }
+  .tab:hover:not(.active) { border-color: #555; color: #ccc; }
+
+  .screen { display: none; max-width: 960px; margin: 0 auto; position: relative; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,215,0,0.15); }
+  .screen.active { display: block; }
+  .bg { position: absolute; inset: 0; background: linear-gradient(160deg, #0a0a12 0%, #1a0a0a 40%, #0d0d18 100%); z-index: 0; }
+  .bg-img { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0.35; z-index: 1; }
+  .content { position: relative; z-index: 2; padding: 24px 28px 32px; min-height: 620px; display: flex; flex-direction: column; }
+
+  .title-area { position: relative; text-align: center; padding: 14px 20px; margin-bottom: 18px; border-radius: 8px; border: 1px solid rgba(255,215,0,0.2); box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+  .title-text { font-family: 'Cinzel', serif; font-size: 1.6rem; font-weight: 700; letter-spacing: 0.04em; text-shadow: 0 0 10px rgba(255,215,0,0.5), 0 2px 4px rgba(0,0,0,0.8); }
+
+  .panels { display: grid; grid-template-columns: 180px 1fr 180px; gap: 16px; flex: 1; margin-bottom: 20px; }
+  .panel { position: relative; border-radius: 10px; border: 1px solid rgba(255,215,0,0.12); padding: 16px 14px; box-shadow: inset 0 0 30px rgba(0,0,0,0.4); min-height: 280px; }
+  .panel-corner { position: absolute; width: 36px; height: 36px; background-size: contain; background-repeat: no-repeat; opacity: 0.85; }
+  .panel-corner.tl { top: 4px; left: 4px; } .panel-corner.tr { top: 4px; right: 4px; transform: scaleX(-1); }
+  .panel-corner.bl { bottom: 4px; left: 4px; transform: scaleY(-1); } .panel-corner.br { bottom: 4px; right: 4px; transform: scale(-1); }
+
+  .main-panel { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 12px; }
+  .decor-line { width: 70%; height: 8px; background-size: contain; background-repeat: no-repeat; background-position: center; opacity: 0.8; }
+  .main-text { font-size: 1.15rem; line-height: 1.55; max-width: 90%; text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
+
+  .side-panel { display: flex; flex-direction: column; align-items: center; gap: 10px; font-size: 0.85rem; }
+  .side-panel .help { font-size: 0.8rem; opacity: 0.9; }
+  .side-empty { width: 64px; height: 64px; background-size: contain; background-repeat: no-repeat; background-position: center; opacity: 0.5; margin: 20px 0; }
+
+  .buttons-area { position: relative; border-radius: 10px; border: 1px solid rgba(255,215,0,0.15); padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 -4px 20px rgba(0,0,0,0.3); }
+  .buttons-row { display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap; }
+  .nav-btn { width: 48px; height: 48px; border-radius: 50%; border: 2px solid var(--gold4); background: rgba(20,15,0,0.8); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; box-shadow: 0 0 12px rgba(218,165,32,0.3); }
+  .nav-btn:hover { background: rgba(40,30,0,0.9); box-shadow: 0 0 18px rgba(218,165,32,0.5); transform: scale(1.05); }
+  .nav-btn .icon { width: 24px; height: 24px; filter: drop-shadow(0 0 4px rgba(218,165,32,0.6)); }
+
+  .input-wrap { position: relative; flex: 1; max-width: 320px; }
+  .input-field { width: 100%; padding: 12px 18px; background: rgba(20,15,5,0.9); border: 2px solid #6A550E; border-radius: 8px; color: #fff; font-family: 'Cinzel', serif; font-size: 1rem; text-align: center; outline: none; box-shadow: 0 4px 12px rgba(0,0,0,0.4), inset 0 0 8px rgba(0,0,0,0.3); }
+  .input-field::placeholder { color: #D19C27; opacity: 0.85; letter-spacing: 0.06em; }
+
+  .next-btn { padding: 12px 36px; background: linear-gradient(180deg, #c40a12 0%, #8a060c 100%); border: 2px solid #5B1919; border-radius: 8px; font-family: 'Cinzel', serif; font-size: 1.15rem; font-weight: 700; letter-spacing: 0.08em; cursor: pointer; text-shadow: 0 1px 3px rgba(0,0,0,0.8); box-shadow: 0 4px 16px rgba(250,6,23,0.35), inset 0 1px 0 rgba(255,255,255,0.15); transition: all 0.2s; }
+  .next-btn:hover { background: linear-gradient(180deg, #e00c16 0%, #a00810 100%); box-shadow: 0 6px 22px rgba(250,6,23,0.5); transform: translateY(-1px); }
+
+  .four-btns { display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; }
+  .four-btn { width: 56px; height: 56px; border-radius: 50%; border: 2px solid rgba(51,14,14,0.6); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 14px rgba(47,50,255,0.4), 0 0 0 3px rgba(0,0,0,0.3); transition: all 0.2s; }
+  .four-btn:hover { transform: scale(1.08); }
+  .four-btn span { font-family: 'Cinzel', serif; color: var(--gold2); font-size: 1.1rem; font-weight: 700; text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
+
+  .legend { max-width: 960px; margin: 36px auto 20px; background: #161616; border-radius: 10px; border: 1px solid #2a2a2a; padding: 20px 24px; }
+  .legend h2 { font-family: 'Cinzel', serif; color: var(--gold4); font-size: 1.1rem; margin-bottom: 14px; }
+  .res-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+  .res-item { background: #1e1e1e; border-radius: 6px; padding: 10px; text-align: center; border: 1px solid #2e2e2e; font-size: 0.75rem; }
+  .res-item .name { color: #ccc; word-break: break-all; margin-top: 6px; }
+  .res-preview { width: 48px; height: 48px; margin: 0 auto; background: #2a2a2a; border-radius: 4px; background-size: contain; background-repeat: no-repeat; background-position: center; }
+  .img-ph { background-color: #2a2a2a; }
+
+  .props-table { max-width: 960px; margin: 20px auto 40px; overflow-x: auto; }
+  .props-table h2 { font-family: 'Cinzel', serif; color: var(--gold4); margin-bottom: 12px; font-size: 1.1rem; }
+  .props-table table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  .props-table th, .props-table td { padding: 8px 12px; border: 1px solid #2a2a2a; text-align: left; }
+  .props-table th { background: #1a1a1a; color: var(--gold4); font-weight: 600; }
+  .props-table tr:nth-child(even) { background: #141414; }
+  .props-table td { color: #bbb; }
+  .props-table .val { color: #e0d0a0; font-family: monospace; }
+
+  @media (max-width: 720px) {
+    .panels { grid-template-columns: 1fr; }
+    .side-panel { min-height: 120px; }
+    .content { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <h1>Генератор дизайн-превью</h1>
+  <label class="file-btn">Загрузить JSON вручную
+    <input type="file" id="json-file" accept=".json">
+  </label>
+  <div id="status">Читаю ./arprefabsdesign.json …</div>
+</div>
+
+<h1 class="page-title">AR Prefabs Design</h1>
+<p class="subtitle">Строится автоматически из <code>arprefabsdesign.json</code> · ресурсы из <code>./assets/resources/</code></p>
+
+<div class="tabs" id="tabs"></div>
+<div id="screens"></div>
+<div class="legend" id="legend"></div>
+<div class="props-table" id="propsTable"></div>
+
+<script type="module">
+  import { generateDesignPreview, wireTabs } from './js/design-generator.js';
+
+  const statusEl = document.getElementById('status');
+  const setStatus = (msg) => { statusEl.textContent = msg; };
+
+  function render(jsonData, sourceLabel) {
+    let result;
+    try {
+      result = generateDesignPreview(jsonData);
+    } catch (err) {
+      setStatus('Ошибка разбора JSON: ' + err.message);
+      return;
+    }
+    document.getElementById('tabs').innerHTML = result.tabsHTML;
+    document.getElementById('screens').innerHTML = result.screensHTML;
+    document.getElementById('legend').innerHTML = `<h2>Ресурсы (./assets/resources/)</h2><div class="res-grid">${result.legendHTML}</div>`;
+    document.getElementById('propsTable').innerHTML = `<h2>Ключевые свойства (из JSON)</h2><table>${result.propsTableHTML}</table>`;
+    wireTabs(document);
+    setStatus(`Готово — ${sourceLabel}, экранов: ${result.rows.length}`);
+  }
+
+  async function init() {
+    try {
+      const res = await fetch('./arprefabsdesign.json', { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      render(data, 'загружено автоматически из arprefabsdesign.json');
+    } catch (err) {
+      setStatus('Не удалось автоматически загрузить ./arprefabsdesign.json (' + err.message + '). ' +
+                 'Если файл открыт напрямую с диска (file://), браузер блокирует такой fetch — ' +
+                 'выберите файл вручную кнопкой выше, либо откройте страницу через локальный веб-сервер.');
+    }
+  }
+
+  document.getElementById('json-file').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        render(data, 'файл: ' + file.name);
+      } catch (err) {
+        setStatus('Ошибка чтения JSON: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  init();
+</script>
+</body>
+</html>

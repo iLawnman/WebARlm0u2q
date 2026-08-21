@@ -1,0 +1,2363 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>R4AR Quest</title>
+<style>
+/* ===== RESET & BASE ===== */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+  width:100%; height:100%;
+  font-family: 'Segoe UI', 'Roboto Slab', Georgia, serif;
+  background:#050505;
+  color:#f0e6d2;
+  overflow:hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ===== VARIABLES ===== */
+:root {
+  --gold:#FFD700;
+  --gold-dim:#B8860B;
+  --pink:#FF69B4;
+  --red:#E90E1B;
+  --green:#00C851;
+  --panel-bg:rgba(7,7,7,0.93);
+  --panel-border:#6A550E;
+  --text-main:#f0e6d2;
+  --text-dim:#a09070;
+  --shadow-gold:0 0 12px rgba(255,215,0,0.25);
+}
+
+/* ===== BACKGROUND ===== */
+#bg-layer {
+  position:fixed; inset:0; z-index:0;
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(60,30,0,0.3) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 80%, rgba(30,0,60,0.2) 0%, transparent 60%),
+    linear-gradient(180deg, #0a0a0a 0%, #000 100%);
+}
+#bg-pattern {
+  position:fixed; inset:0; z-index:0; opacity:0.06;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0L35 25L60 30L35 35L30 60L25 35L0 30L25 25Z' fill='%23FFD700'/%3E%3C/svg%3E");
+  background-size: 80px 80px;
+  pointer-events:none;
+}
+
+/* ===== TIMER ===== */
+#timer-wrap {
+  position:fixed; top:0; left:0; width:100%; height:4px; z-index:100;
+  background:rgba(255,255,255,0.05);
+}
+#timer-bar {
+  height:100%; width:100%;
+  background:linear-gradient(90deg, var(--gold), var(--red));
+  transition:width 1s linear;
+  box-shadow:0 0 8px var(--gold);
+}
+
+/* ===== MAIN GRID ===== */
+#quest-root {
+  position:relative; z-index:1;
+  width:100%; height:100vh;
+  display:grid;
+  grid-template-areas:
+    "header header header"
+    "left   main   right"
+    "footer footer footer";
+  grid-template-columns: minmax(180px, 14%) 1fr minmax(180px, 14%);
+  grid-template-rows: auto 1fr auto;
+  gap:10px;
+  padding:12px 14px 10px;
+}
+@media (max-width:900px) {
+  #quest-root {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "header"
+      "main"
+      "footer";
+    padding:8px;
+  }
+  .side-panel { display:none !important; }
+}
+
+/* ===== HEADER / TITLE ===== */
+#title-bar {
+  grid-area:header;
+  background:var(--panel-bg);
+  border:1px solid var(--panel-border);
+  border-radius:10px;
+  padding:10px 18px;
+  display:flex; align-items:center; justify-content:center; gap:16px;
+  position:relative;
+  box-shadow:var(--shadow-gold);
+}
+#title-bar::before, #title-bar::after {
+  content:"❦"; color:var(--red); opacity:0.5; font-size:1.1rem;
+}
+#title-text {
+  font-size:clamp(1rem, 2vw, 1.35rem);
+  color:var(--gold);
+  text-align:center;
+  text-shadow:0 0 8px rgba(255,215,0,0.3);
+  font-weight:600;
+  letter-spacing:0.5px;
+}
+#quest-id-badge {
+  position:absolute; right:12px; top:50%; transform:translateY(-50%);
+  font-size:0.65rem; color:var(--text-dim); opacity:0.6;
+  border:1px solid var(--panel-border); padding:2px 6px; border-radius:4px;
+}
+
+/* ===== SIDE PANELS ===== */
+.side-panel {
+  display:flex; flex-direction:column; gap:10px;
+}
+#left-panel { grid-area:left; }
+#right-panel { grid-area:right; }
+
+.help-card {
+  background:var(--panel-bg);
+  border:1px solid var(--panel-border);
+  border-radius:8px;
+  padding:12px;
+  font-size:0.82rem;
+  line-height:1.5;
+  color:var(--pink);
+  flex:1;
+  display:flex; flex-direction:column; gap:6px;
+}
+.help-card h4 {
+  color:var(--gold); font-size:0.78rem; text-transform:uppercase;
+  letter-spacing:1px; border-bottom:1px solid var(--panel-border); padding-bottom:4px;
+}
+.help-card .help-icon { font-size:1.1rem; margin-right:4px; }
+
+.panel-decor {
+  height:60px; border:1px solid var(--panel-border); border-radius:6px;
+  display:flex; align-items:center; justify-content:center;
+  color:var(--gold-dim); font-size:1.5rem; opacity:0.4;
+}
+
+/* ===== MAIN PANEL ===== */
+#main-panel {
+  grid-area:main;
+  background:var(--panel-bg);
+  border:2px solid var(--panel-border);
+  border-radius:14px;
+  padding:22px 26px;
+  display:flex; flex-direction:column;
+  gap:14px;
+  position:relative;
+  overflow-y:auto;
+  box-shadow: inset 0 0 40px rgba(0,0,0,0.5), var(--shadow-gold);
+}
+
+/* Corner decorations */
+.corner {
+  position:absolute; width:28px; height:28px;
+  border-color:var(--gold-dim); opacity:0.35; pointer-events:none;
+}
+.corner.tl { top:10px; left:10px; border-top:2px solid; border-left:2px solid; border-radius:4px 0 0 0; }
+.corner.tr { top:10px; right:10px; border-top:2px solid; border-right:2px solid; border-radius:0 4px 0 0; }
+.corner.bl { bottom:10px; left:10px; border-bottom:2px solid; border-left:2px solid; border-radius:0 0 0 4px; }
+.corner.br { bottom:10px; right:10px; border-bottom:2px solid; border-right:2px solid; border-radius:0 0 4px 0; }
+
+/* Line decorations */
+.deco-line {
+  height:2px; background:linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+  opacity:0.4; margin:4px 0;
+}
+
+/* Question narrative */
+.narrative {
+  font-style:italic; color:var(--text-dim); font-size:0.92rem;
+  border-left:3px solid var(--gold-dim); padding-left:14px;
+  line-height:1.6; white-space:pre-wrap;
+}
+
+/* Main text */
+.main-text {
+  font-size:clamp(0.95rem, 1.6vw, 1.15rem);
+  line-height:1.65;
+  color:var(--text-main);
+  white-space:pre-wrap;
+  flex:1;
+}
+.main-text strong { color:var(--gold); }
+.main-text .colored { color:var(--red); }
+.main-text .align-left { text-align:left; }
+
+/* Answer picture / image area */
+.answer-picture-area {
+  display:flex; align-items:center; justify-content:center;
+  min-height:80px; border:1px dashed var(--panel-border); border-radius:8px;
+  color:var(--text-dim); font-size:0.85rem; margin:8px 0;
+}
+
+/* ===== FOOTER / BUTTONS ===== */
+#footer-panel {
+  grid-area:footer;
+  display:flex; flex-direction:column; align-items:center; gap:10px;
+}
+
+/* Carousel for Slide type */
+.carousel-wrap {
+  display:flex; align-items:center; justify-content:center; gap:12px;
+  width:100%; max-width:700px;
+}
+.carousel-btn {
+  width:44px; height:44px; border-radius:50%;
+  border:2px solid var(--gold-dim); background:rgba(0,0,0,0.5);
+  color:var(--gold); font-size:1.3rem; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:all 0.2s; flex-shrink:0;
+}
+.carousel-btn:hover { background:var(--gold); color:#000; }
+.carousel-btn:disabled { opacity:0.3; cursor:not-allowed; }
+
+.carousel-display {
+  flex:1; min-height:90px;
+  background:rgba(0,0,0,0.35);
+  border:1px solid var(--panel-border); border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  padding:16px; text-align:center; font-size:1.1rem;
+  color:var(--text-main); transition:all 0.3s;
+}
+.carousel-display.active-opt {
+  border-color:var(--gold); box-shadow:0 0 12px rgba(255,215,0,0.2);
+}
+
+/* Button grid for Button type */
+.btn-grid {
+  display:flex; flex-wrap:wrap; gap:10px; justify-content:center;
+  width:100%;
+}
+.q-btn {
+  background:linear-gradient(145deg, #141414, #0a0a0a);
+  border:2px solid var(--panel-border); color:var(--gold);
+  padding:12px 22px; border-radius:8px; cursor:pointer;
+  font-family:inherit; font-size:1rem; min-width:100px;
+  text-align:center; transition:all 0.2s;
+}
+.q-btn:hover { border-color:var(--gold); box-shadow:0 0 10px rgba(255,215,0,0.25); }
+.q-btn.selected {
+  background:var(--gold); color:#000; border-color:var(--gold);
+  box-shadow:0 0 18px rgba(255,215,0,0.45); font-weight:700;
+}
+.q-btn.correct { border-color:var(--green); box-shadow:0 0 14px rgba(0,200,81,0.35); }
+.q-btn.wrong { border-color:var(--red); box-shadow:0 0 14px rgba(233,14,27,0.35); }
+
+/* Input field */
+.input-wrap {
+  display:flex; gap:10px; align-items:center; justify-content:center;
+  flex-wrap:wrap;
+}
+.q-input {
+  background:#0a0a0a; border:2px solid var(--panel-border); color:var(--gold);
+  padding:12px 18px; border-radius:8px; font-size:1.15rem; text-align:center;
+  min-width:220px; outline:none; font-family:inherit;
+}
+.q-input:focus { border-color:var(--gold); box-shadow:0 0 10px rgba(255,215,0,0.25); }
+.q-input::placeholder { color:var(--text-dim); opacity:0.6; }
+
+/* OK / Next button */
+.action-btn {
+  background:var(--red); color:#fff; border:none;
+  padding:14px 48px; border-radius:8px; font-size:1.15rem;
+  font-weight:700; cursor:pointer; text-transform:uppercase;
+  letter-spacing:2px; transition:all 0.2s;
+}
+.action-btn:hover { background:#ff1a2e; box-shadow:0 0 20px rgba(233,14,27,0.45); }
+.action-btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+/* Art / AntiArt screen */
+.art-screen {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:20px; text-align:center; height:100%;
+}
+.art-screen h2 { color:var(--gold); font-size:2rem; text-shadow:0 0 16px rgba(255,215,0,0.3); }
+.art-screen p { font-size:1.1rem; color:var(--text-dim); max-width:500px; line-height:1.6; }
+
+/* ===== REACTION OVERLAY ===== */
+#reaction-overlay {
+  position:fixed; inset:0; z-index:500;
+  background:rgba(0,0,0,0.9);
+  display:none; align-items:center; justify-content:center; flex-direction:column;
+  padding:30px; text-align:center; backdrop-filter:blur(4px);
+}
+#reaction-overlay.active { display:flex; }
+#reaction-sign { font-size:4.5rem; margin-bottom:16px; }
+#reaction-text {
+  font-size:clamp(1rem, 2vw, 1.25rem); color:var(--text-main);
+  max-width:620px; line-height:1.7; white-space:pre-wrap;
+}
+#reaction-btn { margin-top:28px; }
+
+/* ===== AR HINT ===== */
+#ar-hint {
+  position:fixed; bottom:12px; left:50%; transform:translateX(-50%);
+  background:rgba(7,7,7,0.9); border:1px solid var(--panel-border);
+  color:var(--gold-dim); padding:6px 14px; border-radius:20px;
+  font-size:0.72rem; z-index:50; letter-spacing:0.5px;
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes fadeIn { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+.fade-in { animation:fadeIn 0.45s ease-out both; }
+
+@keyframes pulseGold {
+  0%,100%{box-shadow:0 0 5px rgba(255,215,0,0.15)}
+  50%{box-shadow:0 0 20px rgba(255,215,0,0.4)}
+}
+.pulse-gold { animation:pulseGold 2.5s infinite; }
+
+@keyframes shake {
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-6px)} 40%{transform:translateX(6px)}
+  60%{transform:translateX(-4px)} 80%{transform:translateX(4px)}
+}
+.shake { animation:shake 0.4s ease-in-out; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width:6px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--panel-border); border-radius:3px; }
+
+</style>
+</head>
+<body>
+
+<div id="bg-layer"></div>
+<div id="bg-pattern"></div>
+
+<div id="timer-wrap"><div id="timer-bar"></div></div>
+
+<div id="quest-root">
+  <header id="title-bar">
+    <div id="title-text"></div>
+    <div id="quest-id-badge"></div>
+  </header>
+
+  <aside class="side-panel" id="left-panel">
+    <div class="help-card" id="help-up"><h4>💡 Подсказка</h4><div></div></div>
+    <div class="panel-decor" id="left-decor">◈</div>
+    <div class="help-card" id="help-down"><h4>🔍 Совет</h4><div></div></div>
+  </aside>
+
+  <main id="main-panel">
+    <div class="corner tl"></div><div class="corner tr"></div>
+    <div class="corner bl"></div><div class="corner br"></div>
+    <div class="deco-line"></div>
+    <div id="narrative" class="narrative"></div>
+    <div class="deco-line"></div>
+    <div id="main-content"></div>
+    <div class="deco-line"></div>
+    <div id="answer-picture-area" class="answer-picture-area" style="display:none"></div>
+  </main>
+
+  <aside class="side-panel" id="right-panel">
+    <div class="panel-decor" id="right-decor">◈</div>
+    <div class="help-card" id="right-help"><h4>📜 Заметка</h4><div></div></div>
+  </aside>
+
+  <footer id="footer-panel">
+    <div id="buttons-area"></div>
+  </footer>
+</div>
+
+<div id="reaction-overlay">
+  <div id="reaction-sign"></div>
+  <div id="reaction-text"></div>
+  <button class="action-btn" id="reaction-btn">Дальше</button>
+</div>
+
+<div id="ar-hint"></div>
+
+<script>
+// ===== EMBEDDED DATA =====
+const QUEST_DATA = [
+  {
+    "id": "Start",
+    "basePrefab": "BasePrefabQuestions",
+    "question": "...Ваня, владелец кафешки, говорит, \nчто уже 2 дня Аленку не видел. \n\n- Однако ж, помочь могу. Помнишь, блюдечко с голубой каемочкой? \nВот тебе аналог с искусственным интеллектом, R4. Правда, вредный он, прямо не ведет, но подсказки дает. \nКак никак, помощь. \nУспей! Время помощи ограничено.\n\n\n<i><size=20>Закрывай окошко и наводи камеру на картинку.</size></i>",
+    "task": 1,
+    "answers": [
+      "A01",
+      "A02",
+      "A03",
+      "A04"
+    ],
+    "rightIndices": [
+      1,
+      2,
+      3
+    ],
+    "rightQuest": "Q03",
+    "rightReactionSign": "Back2",
+    "rightReaction": "Голова - всему начало!\n\nВерный ответ. Продолжай в том же духе. \n\nСкорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!",
+    "wrongQuest": "Q03",
+    "wrongReactionSign": "Back4",
+    "wrongReaction": "Эх, просто сказка сказывается, да непросто дело делается. \n\nВ другой раз пуcть будет правильный ответ!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!",
+    "timer": 5,
+    "artefact": "",
+    "nextQuest": "",
+    "recognitionImage": "T1",
+    "signImage": "T1",
+    "goalImage": "",
+    "goalIndex": 0
+  },
+  {
+    "id": "Q02",
+    "basePrefab": "BasePrefabQuestions",
+    "question": "- Привет! Да, это я, Надя.\n\n- Знаю я, где Аленка. Вовремя ты! Услуга за услугу. \n\n- Ты мне Ослепляющее кольцо раздобудь, а я тебе ее координаты сообщу. Срочно оно нужно, завтра смогу вернуть. \n\n- Кольцо у Василича. Ты его знаешь, придется тебе постараться его уговорить. Удачи!",
+    "task": 2,
+    "answers": [
+      "A43"
+    ],
+    "rightIndices": [],
+    "rightQuest": "Q05",
+    "rightReactionSign": "Back2",
+    "rightReaction": "Продолжайте прогулку. Ищите стенды с информацией для продолжения квеста. Телефон можно перевести в режим сна",
+    "wrongQuest": "Q05",
+    "wrongReactionSign": "Back4",
+    "wrongReaction": "Продолжайте прогулку. Ищите стенды с информацией для продолжения квеста. Телефон можно перевести в режим сна",
+    "timer": 5,
+    "artefact": "",
+    "nextQuest": "",
+    "recognitionImage": "T2",
+    "signImage": "T2",
+    "goalImage": "",
+    "goalIndex": 1
+  },
+  {
+    "id": "Q03",
+    "basePrefab": "BasePrefabQuestions",
+    "question": "Пришло письмо от клиента:\n\n\"Мы хотели отправить курьера, но не смогли связаться с Аленой. Уточните, пожалуйста, куда следует ему приехать, чтобы привезти реквизит для сегодняшней съемки. \n\nСообщаем также, что в задании на съемку планируем внести небольшое изменение, будьте внимательны!\"",
+    "task": 1,
+    "answers": [
+      "A05",
+      "A06",
+      "A07"
+    ],
+    "rightIndices": [
+      1
+    ],
+    "rightQuest": "Q04",
+    "rightReactionSign": "Back2",
+    "rightReaction": "Голова - всему начало!\n\nВерный ответ. Продолжай в том же духе. \n\nСкорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!",
+    "wrongQuest": "Q04",
+    "wrongReactionSign": "Back4",
+    "wrongReaction": "Эх, просто сказка сказывается, да непросто дело делается. \n\nВ другой раз пуcть будет правильный ответ!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!",
+    "timer": 5,
+    "artefact": "",
+    "nextQuest": "",
+    "recognitionImage": "T3",
+    "signImage": "T3",
+    "goalImage": "",
+    "goalIndex": 2
+  },
+  {
+    "id": "Q04",
+    "basePrefab": "BasePrefabQuestions",
+    "question": "- Спасибо тебе, дружище!, - сказал конь.\n\n- Знаю про твою беду. Слышал я от ветра, что встречал он девушку заколдованную, на мероприятии с нетворкингом. Волшебный коктейль она выпила, чувство времени потеряла. И телефон.\n\n- Надо, чтобы она последнее фото в нем увидела, тогда и расколдуется!",
+    "task": 1,
+    "answers": [
+      "A08",
+      "A09",
+      "A10",
+      "A11",
+      "A12"
+    ],
+    "rightIndices": [
+      2
+    ],
+    "rightQuest": "Q02",
+    "rightReactionSign": "Back2",
+    "rightReaction": "Голова - всему начало!\n\nВерный ответ. Продолжай в том же духе. \n\nСкорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!",
+    "wrongQuest": "Q02",
+    "wrongReactionSign": "Back4",
+    "wrongReaction": "Эх, просто сказка сказывается, да непросто дело делается. \n\nВ другой раз пуcть будет правильный ответ!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!",
+    "timer": 5,
+    "artefact": "",
+    "nextQuest": "",
+    "recognitionImage": "T4",
+    "signImage": "T4",
+    "goalImage": "",
+    "goalIndex": 3
+  },
+  {
+    "id": "Q05",
+    "basePrefab": "BasePrefabQuestions",
+    "question": "Сообщение от партнера:\n\n\"Долгожданное уточнение к заданию: \n\nТребуется крупный план с кольцом. \nЭто единственый экземпляр, оригинал баснословной цены, поэтому за кольцом мы Емелю отправили. Сейчас он направляется за ним. \n\nОчень ждем информацию, где и во сколько ему быть, чтобы передать реквизит.\n\nНапоминаем о Вашей ответственности за своевременное размещение публикации.\"",
+    "task": 1,
+    "answers": [
+      "A16",
+      "A17",
+      "A18",
+      "A19",
+      "A20"
+    ],
+    "rightIndices": [
+      4
+    ],
+    "rightQuest": "Q07",
+    "rightReactionSign": "Back2",
+    "rightReaction": "Голова - всему начало!\n\nВерный ответ. Продолжай в том же духе. \n\nСкорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!",
+    "wrongQuest": "Q07",
+    "wrongReactionSign": "Back4",
+    "wrongReaction": "Эх, просто сказка сказывается, да непросто дело делается. \n\nВ другой раз пуcть будет правильный ответ!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!",
+    "timer": 5,
+    "artefact": "",
+    "nextQuest": "",
+    "recognitionImage": "T5",
+    "signImage": "T5",
+    "goalImage": "",
+    "goalIndex": 4
+  },
+  {
+    "id": "Q06",
+    "basePrefab": "BasePrefabQuestions",
+    "question": "Дела налаживаются! Кольцо нашлось. Отдам его Наде, узнаю, где Аленка.\n\nВообще, странно, что Наде именно это кольцо понадобилось и именно сегодня. Уж не хочет ли она нашу сделку сорвать?\n\nЕще Аленкин телефон найти бы! Конь говорил, Аленка заколодована, и расколудет ее последнее селфи. Где же искать этот телефон?",
+    "task": 2,
+    "answers": [
+      "A44"
+    ],
+    "rightIndices": [],
+    "rightQuest": "Q14",
+    "rightReactionSign": "Back2",
+    "rightReaction": "Продолжайте прогулку. Ищите стенды с информацией для продолжения квеста. Телефон можно перевести в режим сна",
+    "wrongQuest": "Q14",
+    "wrongReactionSign": "Back4",
+    "wrongReaction": "Продолжайте прогулку. Ищите стенды с информацией для продолжения квеста. Телефон можно перевести в режим сна",
+    "timer": 5,
+    "artefact": "",
+    "nextQuest": "",
+    "recognitionImage": "T6",
+    "signImage": "T6",
+    "goalImage": "",
+    "goalIndex": 5
+  },
+  {
+    "id": "Q07",
+    "basePrefab": "BasePrefabQuestions",
+    "question": "- Спасибо тебе за добрый совет! \n\n- А ты знаешь, что Надя тоже хотела\nна твоего клиента работать, а Аленка ее обошла в конкурсе. Так что, если Аленка провалится, Наде проект достанется. Кстати, от них согласование и жду, \nдолжны прислать человека с залогом. \n\n... Вот так поворот!\nКак бы устроить так, чтобы все довольны остались?...",
+    "task": 1,
+    "answers": [
+      "A25",
+      "A26"
+    ],
+    "rightIndices": [],
+    "rightQuest": "Q06",
+    "rightReactionSign": "Back2",
+    "rightReaction": "Голова - всему начало!\n\nВерный ответ. Продолжай в том же духе. \n\nСкорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!",
+    "wrongQuest": "Q06",
+    "wrongReactionSign": "Back4",
+    "wrongReaction": "Эх, просто сказка сказывается, да непросто дело делается. \n\nВ другой раз пуcть будет правильный ответ!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!",
+    "timer": 5,
+    "artefact": "",
+    "nextQuest": "",
+    "recognitionImage": "T7",
+    "signImage": "T7",
+    "goalImage": "",
+    "goalIndex": 6
+  },
+  {
+    "id": "Q08",
+    "basePrefab": "BasePrefabQuestions",
+    "question": "Вот и ваш с Аленкой офис. У дверей Емеля грустный уже стоит, с реквизитом.\n\n- Привет, - говорит. \n\n- Был я у Василича, должен был кольцо забрать редкое, а не успел. Уволят меня теперь. Что делать, не знаю!",
+    "task": 1,
+    "answers": [
+      "A27",
+      "A28",
+      "A29"
+    ],
+    "rightIndices": [
+      1
+    ],
+    "rightQuest": "Q10",
+    "rightReactionSign": "Back2",
+    "rightReaction": "Голова - всему начало!\n\nВерный ответ. Продолжай в том же духе. \n\nСкорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!",
+    "wrongQuest": "Q10",
+    "wrongReactionSign": "Back4",
+    "wrongReaction": "Эх, просто сказка сказывается, да непросто дело делается. \n\nВ другой раз пуcть будет правильный ответ!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!",
+    "timer": 5,
+    "artefact": "",
+    "nextQuest": "",
+    "recognitionImage": "T8",
+    "signImage": "T8",
+    "goalImage": "",
+    "goalIndex": 7
+  },
+  {
+    "id": "Q09",
+    "basePrefab": "BasePrefabQuestions",
+    "question": "Теперь все у нас есть!\n\nОсталось выяснить у Нади, где Аленка.",
+    "task": 2,
+    "answers": [
+      "A45"
+    ],
+    "rightIndices": [],
+    "rightQuest": "Q11",
+    "rightReactionSign": "Back2",
+    "rightReaction": "Продолжайте прогулку. Ищите стенды с информацией для продолжения квеста. Телефон можно перевести в режим сна",
+    "wrongQuest": "Q11",
+    "wrongReactionSign": "Back4",
+    "wrongReaction": "Продолжайте прогулку. Ищите стенды с информацией для продолжения квеста. Телефон можно перевести в режим сна",
+    "timer": 5,
+    "artefact": "",
+    "nextQuest": "",
+    "recognitionImage": "T9",
+    "signImage": "T9",
+    "goalImage": "",
+    "goalIndex": 8
+  },
+  {
+    "id": "Q10",
+    "basePrefab": "BasePrefabQuestions",
+    "question": "Емеля - добрый человек, решил помочь тебе, вместе отправиться к Наде. Что она скажет, интересно, представителю клиента? \n\nА пока вы в офис зашли, сначала телефон найти же нужно. \n\nГлавное, с количеством попыток ввода пароля не переусердствовать!",
+    "task": 1,
+    "answers": [
+      "A30",
+      "A31",
+      "A32",
+      "A33"
+    ],
+    "rightIndices": [
+      1
+    ],
+    "rightQuest": "Q12",
+    "rightReactionSign": "Back2",
+    "rightReaction": "Голова - всему начало!\n\nВерный ответ. Продолжай в том же духе. \n\nСкорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!",
+    "wrongQuest": "Q12",
+    "wrongReactionSign": "Back4",
+    "wrongReaction": "Эх, просто сказка сказывается, да непросто дело делается. \n\nВ другой раз пуcть будет правильный ответ!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!",
+    "timer": 5,
+    "artefact": "",
+    "nextQuest": "",
+    "recognitionImage": "T10",
+    "signImage": "T10",
+    "goalImage": "",
+    "goalIndex": 9
+  },
+  {
+    "id": "Q11",
+    "basePrefab": "BasePrefabQuestions",
+    "question": "Принесли Наде кольцо желанное. \n\n- Условие твое выполнено. Но надо договориться.\n\n- Нужно нам сейчас и кольцо, и Аленку найти. Неужели встанешь у нас на пути?\n\nНа Емеле мерч фирменный, и лого бренда желанного на планшете так и светится. \n\n... Условие выполнено, но до конца ли? Можно ли кольцо до завтра оставить?",
+    "task": 1,
+    "answers": [
+      "A34",
+      "A35",
+      "A36",
+      "A37",
+      "A38",
+      "A39"
+    ],
+    "rightIndices": [
+      3
+    ],
+    "rightQuest": "Finish",
+    "rightReactionSign": "Back2",
+    "rightReaction": "Голова - всему начало!\n\nВерный ответ. Продолжай в том же духе. \n\nСкорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!",
+    "wrongQuest": "Finish",
+    "wrongReactionSign": "Back4",
+    "wrongReaction": "Эх, просто сказка сказывается, да непросто дело делается. \n\nВ другой раз пуcть будет правильный ответ!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!",
+    "timer": 5,
+    "artefact": "",
+    "nextQuest": "",
+    "recognitionImage": "T11",
+    "signImage": "T11",
+    "goalImage": "",
+    "goalIndex": 10
+  },
+  {
+    "id": "Q12",
+    "basePrefab": "BasePrefabQuestions",
+    "question": "Хороши технологии, вот и адрес, где телефон Алёнкин, дом красивый, яркий, окна резные, это ж её бабушки дом! \n\nДобрая она, Любовь Андреевна, всегда пирожком угостит. \n\nТолько калитка закрыта, а на ней записка...",
+    "task": 1,
+    "answers": [
+      "A40",
+      "A41",
+      "A42"
+    ],
+    "rightIndices": [],
+    "rightQuest": "Q09",
+    "rightReactionSign": "Back2",
+    "rightReaction": "Голова - всему начало!\n\nВерный ответ. Продолжай в том же духе. \n\nСкорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!",
+    "wrongQuest": "Q09",
+    "wrongReactionSign": "Back4",
+    "wrongReaction": "Эх, просто сказка сказывается, да непросто дело делается. \n\nВ другой раз пуcть будет правильный ответ!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!",
+    "timer": 5,
+    "artefact": "",
+    "nextQuest": "",
+    "recognitionImage": "T12",
+    "signImage": "T12",
+    "goalImage": "",
+    "goalIndex": 11
+  },
+  {
+    "id": "Q13",
+    "basePrefab": "BasePrefabQuestions",
+    "question": "Сказала Надя, где Аленку искать. \n\nВот это новость, это же офис нашего партнёра, студия звукозаписи, и Тик-Ток кабинки для трансляций здесь в разных дизайнах.\n\nЧего только нет в нашем славном месте!\n\nКаким волшебством мы обладаем, рядом и новое, и старое, и родное, и зарубежное в ладу живут.\n\nИ привратник - Кот",
+    "task": 1,
+    "answers": [
+      "A46",
+      "A47",
+      "A48",
+      "A49",
+      "A50"
+    ],
+    "rightIndices": [
+      3
+    ],
+    "rightQuest": "",
+    "rightReactionSign": "Back2",
+    "rightReaction": "Голова - всему начало!\n\nВерный ответ. Продолжай в том же духе. \n\nСкорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!",
+    "wrongQuest": "",
+    "wrongReactionSign": "Back4",
+    "wrongReaction": "Эх, просто сказка сказывается, да непросто дело делается. \n\nВ другой раз путь будет правильный ответ!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!",
+    "timer": 5,
+    "artefact": "",
+    "nextQuest": "",
+    "recognitionImage": "T13",
+    "signImage": "T13",
+    "goalImage": "",
+    "goalIndex": 12
+  },
+  {
+    "id": "Q14",
+    "basePrefab": "BasePrefabQuestions",
+    "question": "Ах, пусто",
+    "task": 3,
+    "answers": [
+      "A51"
+    ],
+    "rightIndices": [],
+    "rightQuest": "Q08",
+    "rightReactionSign": "Back2",
+    "rightReaction": "Продолжайте прогулку. Ищите стенды с информацией для продолжения квеста. Телефон можно перевести в режим сна",
+    "wrongQuest": "Q08",
+    "wrongReactionSign": "Back4",
+    "wrongReaction": "Продолжайте прогулку. Ищите стенды с информацией для продолжения квеста. Телефон можно перевести в режим сна",
+    "timer": 5,
+    "artefact": "",
+    "nextQuest": "",
+    "recognitionImage": "T14",
+    "signImage": "T14",
+    "goalImage": "",
+    "goalIndex": 13
+  },
+  {
+    "id": "Finish",
+    "basePrefab": "BasePrefabQuestions",
+    "question": "Сдержала Надя слово, \n\nтут же и Аленка нашлась, и все хорошо сложилось. \n\n\n<b><size=+15>УРА !!!</size></b>",
+    "task": 2,
+    "answers": [
+      "A52"
+    ],
+    "rightIndices": [],
+    "rightQuest": "",
+    "rightReactionSign": "Back2",
+    "rightReaction": "Ах, красота какая, квест завршен, цели достигнуты! Ура!",
+    "wrongQuest": "",
+    "wrongReactionSign": "",
+    "wrongReaction": "Эх, просто сказка сказывается, да непросто дело делается. \n\nВ другой раз пуcть будет правильный ответ!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!",
+    "timer": 5,
+    "artefact": "",
+    "nextQuest": "",
+    "recognitionImage": "T15",
+    "signImage": "T15",
+    "goalImage": "",
+    "goalIndex": 14
+  }
+];
+const ANSWER_DATA = {
+  "A01": {
+    "id": "A01",
+    "type": "Slide",
+    "question": "...Ваня, владелец кафешки, говорит, \nчто уже 2 дня Аленку не видел. \n\n- Однако ж, помочь могу. Помнишь, блюдечко с голубой каемочкой? \nВот тебе аналог с искусственным интеллектом, R4. Правда, вредный он, прямо не ведет, но подсказки дает. \nКак никак, помощь. \nУспей! Время помощи ограничено.\n\n\n<i><size=20>Закрывай окошко и наводи камеру на картинку.</size></i>",
+    "mainText": "<size=+5><b>Привет!</b></size>\n\nR4 начинает обучаться работе с тобой. \n\nЧтобы Аленку найти, надо куда-то пойти. \n\n<size=+5><b>Выбирай!</b></size>",
+    "title": "Первое задание - тренировочное",
+    "helpUp": "Когда найдено испытание, здесь отображается задание и все, что с ним связано. Ответы можно выбрать кнопкой OK, кнопкой с ответом или ввести в поле",
+    "helpDown": "Перед наведением на AR-цель осмотрись камерой вокруг, так дополненная реальность лучше размещается в пространстве",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "q1sound_oneshot",
+    "music": "Q1music_loop",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "1",
+    "decor4corner": "1",
+    "decorIfEmpty": "Back1",
+    "leftPanelImg": "1",
+    "rightPanelImg": "1",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A02": {
+    "id": "A02",
+    "type": "Option",
+    "question": "",
+    "mainText": "Прямо пойдешь - ничего не найдешь\n\n\n",
+    "title": "",
+    "helpUp": "Это вариант вашего решения задачи. Их несколько, минимум 2 варианта. Листай их стрелками, они идут друг за другом по кругу, пока не дойдут до условий задания",
+    "helpDown": "Определись с решением, \nподтверди выбор кнопкой ОК",
+    "answerPicture": "angle-double-up",
+    "additionalImg": "",
+    "sound": "",
+    "music": "Q2music_loop",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "1",
+    "decor4corner": "",
+    "decorIfEmpty": "Back2",
+    "leftPanelImg": "1",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A03": {
+    "id": "A03",
+    "type": "Option",
+    "question": "",
+    "mainText": "Направо пойдешь - время потеряешь\n\n\n",
+    "title": "",
+    "helpUp": "Это вариант вашего решения задачи. Их несколько, минимум 2 варианта. Листай их стрелками, они идут друг за другом по кругу, пока не дойдут до условий задания",
+    "helpDown": "Определись с решением, \nподтверди выбор кнопкой ОК",
+    "answerPicture": "angle-double-right",
+    "additionalImg": "",
+    "sound": "",
+    "music": "Q3music_loop",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "1",
+    "decorIfEmpty": "Back3",
+    "leftPanelImg": "",
+    "rightPanelImg": "1",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A04": {
+    "id": "A04",
+    "type": "Option",
+    "question": "",
+    "mainText": "Налево выберешь - деньги потратишь\n\n\n",
+    "title": "",
+    "helpUp": "Это вариант вашего решения задачи. Их несколько, минимум 2 варианта. Листай их стрелками, они идут друг за другом по кругу, пока не дойдут до условий задания",
+    "helpDown": "Определись с решением, \nподтверди выбор кнопкой ОК",
+    "answerPicture": "angle-double-left",
+    "additionalImg": "",
+    "sound": "",
+    "music": "Q4music_loop",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "Back2",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A05": {
+    "id": "A05",
+    "type": "Slide",
+    "question": "Пришло письмо от клиента:\n\n\"Мы хотели отправить курьера, но не смогли связаться с Аленой. Уточните, пожалуйста, куда следует ему приехать, чтобы привезти реквизит для сегодняшней съемки. \n\nСообщаем также, что в задании на съемку планируем внести небольшое изменение, будьте внимательны!\"",
+    "mainText": "На поляне ты встретил коня! \nКопытом бьет, красавец.\n<align=left>\n\t- Отпусти меня! К плохому хозяину я попал... \n\t- Слышал, мясокомбинат у него есть. \n\t- Страшно мне. \n\t- Помоги, а я тебе пригожусь!\n</align>\nКак ты поступишь?\n \n<size=+5><b>Выбирай!</b></size>",
+    "title": "Дорога привела тебя к сказочной красоты поляне",
+    "helpUp": "Оглянись вокруг! Вдруг, найдешь что-то, что может пригодиться",
+    "helpDown": "Ищи подсказки в дополненной реальности",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "Q3sound_oneshot",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A06": {
+    "id": "A06",
+    "type": "Option",
+    "question": "",
+    "mainText": "<size=+5>Отпущу коня, жаль его. \nГоворящий!</size>",
+    "title": "",
+    "helpUp": "Оглянись вокруг! Вдруг, найдешь что-то, что может пригодиться",
+    "helpDown": "Ищи подсказки в дополненной реальности",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A07": {
+    "id": "A07",
+    "type": "Option",
+    "question": "",
+    "mainText": "<size=+5>Мясокомбинат \nсерьезной структуре принадлежит. \n\nМожно без бизнеса остаться.</size>",
+    "title": "",
+    "helpUp": "Оглянись вокруг! Вдруг, найдешь что-то, что может пригодиться",
+    "helpDown": "Ищи подсказки в дополненной реальности",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A08": {
+    "id": "A08",
+    "type": "Button",
+    "question": "- Спасибо тебе, дружище!, - сказал конь.\n\n- Знаю про твою беду. Слышал я от ветра, что встречал он девушку заколдованную, на мероприятии с нетворкингом. Волшебный коктейль она выпила, чувство времени потеряла. И телефон.\n\n- Надо, чтобы она последнее фото в нем увидела, тогда и расколдуется!",
+    "mainText": "<size=-2>Надо Наде позвонить, подруге ее. Номер только бы вспомнить, последние 3 цифры.</size>\n\n<size=+3>+7 903 123 -4<color=red>Х-ХХ</color></size>\n<align=\"left\">\n        <color=red><size=+3>571</size></color><size=-2> – правильна одна цифра и находится \nв правильном месте</size>\n        <color=red><size=+3>503</size></color><size=-2> – правильна одна цифра, но находится в неправильном месте</size>\n        <color=red><size=+3>195</size></color><size=-2> – правильны две цифры, но обе расположены не на своем месте</size>\n        <color=red><size=+3>627</size></color><size=-2> – все цифры неправильные</size>\n        <size=-2><color=red>Число из подсказки в прошлом ходе</color> — правильна одна цифра, но находится в неправильном месте.</size>",
+    "title": "Мероприятие... куда Аленка могла собраться? \nИ с кем?",
+    "helpUp": "Нажми на кнопку с недостающими цифрами",
+    "helpDown": "Оглянись, может, где-то есть ценная информаци",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "Q4sound_oneshot",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A09": {
+    "id": "A09",
+    "type": "Option",
+    "question": "",
+    "mainText": "301",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A10": {
+    "id": "A10",
+    "type": "Option",
+    "question": "",
+    "mainText": "931",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A11": {
+    "id": "A11",
+    "type": "Option",
+    "question": "",
+    "mainText": "503",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A12": {
+    "id": "A12",
+    "type": "Option",
+    "question": "",
+    "mainText": "193",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A13": {
+    "id": "A13",
+    "type": "Option",
+    "question": "",
+    "mainText": "Надо Наде позвонить, подруге ее. \nКакая же у Нади фамилия? \n\n<size=+5>Круглой формы голова, \nТой же формы буква… </size>",
+    "title": "Мероприятие... куда Аленка могла собраться? \nИ с кем?",
+    "helpUp": "Кликай на поле, и вводи ответ",
+    "helpDown": "После ввода подтверди результат на клавиатуре",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A14": {
+    "id": "A14",
+    "type": "Option",
+    "question": "",
+    "mainText": "О",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A15": {
+    "id": "A15",
+    "type": "Option",
+    "question": "",
+    "mainText": "о",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A16": {
+    "id": "A16",
+    "type": "Slide",
+    "question": "Сообщение от партнера:\n\n\"Долгожданное уточнение к заданию: \n\nТребуется крупный план с кольцом. \nЭто единственый экземпляр, оригинал баснословной цены, поэтому за кольцом мы Емелю отправили. Сейчас он направляется за ним. \n\nОчень ждем информацию, где и во сколько ему быть, чтобы передать реквизит.\n\nНапоминаем о Вашей ответственности за своевременное размещение публикации.\"",
+    "mainText": "<align=left>\t- Кольцо, говоришь, нужно? Рисковано его сейчас отдавать. Есть у меня на него клиент, \nжду согласования. \n\t- Помочь могу, время потяну, но и ты выручи. \n\t- Есть у меня план в производство вложиться. Надо, чтобы экономика сошлась. \n\n\t- График производства есть у меня, никак не соображу, сколько стоит товар... Посчитаешь, пойдем в банк, в ячейке кольцо хранится.</align>",
+    "title": "Василич, известный в городе ювелир, \nничего не делает просто так",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "Numbertask",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A17": {
+    "id": "A17",
+    "type": "Option",
+    "question": "",
+    "mainText": "<size=+5>Цена за комплект \"Кoльцо, серьги и браслет\" - <color=red>$370</color>.\nСерьги стоят в 2 раза больше кольца, \nбраслет - на $50 дороже серег.</size>",
+    "title": "",
+    "helpUp": "Специальное упражнение для продвинутых - посчитать оборот по графику",
+    "helpDown": "",
+    "answerPicture": "Numbertask",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A18": {
+    "id": "A18",
+    "type": "Option",
+    "question": "",
+    "mainText": "<size=+15>Кольцо стоит $62</size>",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A19": {
+    "id": "A19",
+    "type": "Option",
+    "question": "",
+    "mainText": "<size=+15>Серьги стоят $133</size>",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A20": {
+    "id": "A20",
+    "type": "Option",
+    "question": "",
+    "mainText": "<size=+15>Браслет стоит $178</size>",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A22": {
+    "id": "A22",
+    "type": "Option",
+    "question": "",
+    "mainText": "<align=left> \n\t- Кольцо, говоришь, нужно? Рисковано его сейчас отдавать. Есть у меня на него клиент, жду согласования. \n\t- Помочь могу, время потяну, но и ты выручи, подскажи-ка, кто таков: </align>\n<size=+5>\nГость гостил,\nНа реке мост мостил.\nБез гвоздей и топора,\nБез молота и долота </size>",
+    "title": "Василич, известный в городе ювелир, \nничего не делает просто так",
+    "helpUp": "Под задачей поле для ввода ответа, коснись его, и  откроется клавиатура",
+    "helpDown": "Коснись прямоугольника ниже, напечатай, что думаешь, нажми ввод на клавиатуре",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A23": {
+    "id": "A23",
+    "type": "Option",
+    "question": "",
+    "mainText": "Мороз",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A24": {
+    "id": "A24",
+    "type": "Option",
+    "question": "",
+    "mainText": "мороз",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A25": {
+    "id": "A25",
+    "type": "InputField",
+    "question": "- Спасибо тебе за добрый совет! \n\n- А ты знаешь, что Надя тоже хотела\nна твоего клиента работать, а Аленка ее обошла в конкурсе. Так что, если Аленка провалится, Наде проект достанется. Кстати, от них согласование и жду, \nдолжны прислать человека с залогом. \n\n... Вот так поворот!\nКак бы устроить так, чтобы все довольны остались?...",
+    "mainText": "- Так уж и быть, кольцо можешь забрать, \n- сказал ювелир.\n- Надо только пароль ввести. Это количество квадратов на картинке.",
+    "title": "У Нади нет причин требовать кольцо \nименно сегодня",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "Squaretask",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A26": {
+    "id": "A26",
+    "type": "Option",
+    "question": "",
+    "mainText": "51",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A27": {
+    "id": "A27",
+    "type": "Slide",
+    "question": "Вот и ваш с Аленкой офис. У дверей Емеля грустный уже стоит, с реквизитом.\n\n- Привет, - говорит. \n\n- Был я у Василича, должен был кольцо забрать редкое, а не успел. Уволят меня теперь. Что делать, не знаю!",
+    "mainText": "Емеля не знает, что у тебя кольцо.\n\nЕсли кольцо Наде отдать, то Емелю уволят, но ты найдешь Аленку. Съемка будет не то, \nчто надо и важно клиенту. \nЖаль Емелю, семеро по лавкам у него детей.  \n\nА если кольцо Емеле отдать? Придется признаться, что Аленка потерялась, и ты не можешь сообщить время и место съемки, \nэто провал! ",
+    "title": "Надо выбрать, как поступить",
+    "helpUp": "Оглянись вокруг, найди, что запомнить",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A28": {
+    "id": "A28",
+    "type": "Option",
+    "question": "",
+    "mainText": "Отдать кольцо Емеле. \nБудущее проекта под вопросом.",
+    "title": "",
+    "helpUp": "Оглянись вокруг, найди, что запомнить",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A29": {
+    "id": "A29",
+    "type": "Option",
+    "question": "",
+    "mainText": "Лучше найти Аленку и сохранить лицо.\nНо клиент не получит желаемое, а Емелю уволят.",
+    "title": "",
+    "helpUp": "Оглянись вокруг, найди, что запомнить",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A30": {
+    "id": "A30",
+    "type": "Slide",
+    "question": "Емеля - добрый человек, решил помочь тебе, вместе отправиться к Наде. Что она скажет, интересно, представителю клиента? \n\nА пока вы в офис зашли, сначала телефон найти же нужно. \n\nГлавное, с количеством попыток ввода пароля не переусердствовать!",
+    "mainText": "<size=+15>Что было, вспоминай, \nлистай вперед, \nфигуры выбирай!</size>",
+    "title": "Пароль, пароль) ",
+    "helpUp": "Помни, что подсказки можно найти, осмотревшись)",
+    "helpDown": "Оглянись, может, где-то есть ценная информаци",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A31": {
+    "id": "A31",
+    "type": "Option",
+    "question": "",
+    "mainText": "Визуальный код доступа\nВыбери, чтобы пройти!",
+    "title": "",
+    "helpUp": "Помни, что подсказки можно найти, осмотревшись)",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A32": {
+    "id": "A32",
+    "type": "Option",
+    "question": "",
+    "mainText": "Визуальный код доступа\nВыбери, чтобы пройти!",
+    "title": "",
+    "helpUp": "Помни, что подсказки можно найти, осмотревшись)",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A33": {
+    "id": "A33",
+    "type": "Option",
+    "question": "",
+    "mainText": "Визуальный код доступа\nВыбери, чтобы пройти!",
+    "title": "",
+    "helpUp": "Помни, что подсказки можно найти, осмотревшись)",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A34": {
+    "id": "A34",
+    "type": "Button",
+    "question": "Принесли Наде кольцо желанное. \n\n- Условие твое выполнено. Но надо договориться.\n\n- Нужно нам сейчас и кольцо, и Аленку найти. Неужели встанешь у нас на пути?\n\nНа Емеле мерч фирменный, и лого бренда желанного на планшете так и светится. \n\n... Условие выполнено, но до конца ли? Можно ли кольцо до завтра оставить?",
+    "mainText": "<align=left>        - Уговор дороже денег. Раз кольцо здесь, пусть здесь с Емелей и будет. Емелю я не приглашала, значит, и тебе неожиданный поворот.\n\n        - Есть у меня 12 подарков и 13 гостей. Хочу, чтобы никто не обиделся, но есть среди них один не очень приятный человек. Гости встанут в круг, и надо будет им раздать подарки, каждому девятому. \n\n        - Подойдет твой совет, значит договоримся! \nБудет у тебя все вовремя, и кольцо, и Аленка.</align>\n\n<size=40>На каком месте поставить того человека?</size>",
+    "title": "Улыбнулась Надя хитро и говорит:",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A35": {
+    "id": "A35",
+    "type": "Option",
+    "question": "",
+    "mainText": "<size=+75>3</size>",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A36": {
+    "id": "A36",
+    "type": "Option",
+    "question": "",
+    "mainText": "<size=+75>11</size>",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A37": {
+    "id": "A37",
+    "type": "Option",
+    "question": "",
+    "mainText": "<size=+75>2</size>",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A38": {
+    "id": "A38",
+    "type": "Option",
+    "question": "",
+    "mainText": "<size=+75>5</size>",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A39": {
+    "id": "A39",
+    "type": "Option",
+    "question": "",
+    "mainText": "<size=+75>7</size>",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A40": {
+    "id": "A40",
+    "type": "InputField",
+    "question": "Хороши технологии, вот и адрес, где телефон Алёнкин, дом красивый, яркий, окна резные, это ж её бабушки дом! \n\nДобрая она, Любовь Андреевна, всегда пирожком угостит. \n\nТолько калитка закрыта, а на ней записка...",
+    "mainText": "Кто свой, проходи, а не свой, уходи! \nКалитка откроется, \nесли ответ дашь верный: \n\n<size=+5>Что за чудо:\nчетыре ноги, два уха, \nодин нос да брюхо?</size>",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A41": {
+    "id": "A41",
+    "type": "Option",
+    "question": "",
+    "mainText": "самовар",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A42": {
+    "id": "A42",
+    "type": "Option",
+    "question": "",
+    "mainText": "Самовар",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A43": {
+    "id": "A43",
+    "type": "Art",
+    "question": "- Привет! Да, это я, Надя.\n\n- Знаю я, где Аленка. Вовремя ты! Услуга за услугу. \n\n- Ты мне Ослепляющее кольцо раздобудь, а я тебе ее координаты сообщу. Срочно оно нужно, завтра смогу вернуть. \n\n- Кольцо у Василича. Ты его знаешь, придется тебе постараться его уговорить. Удачи!",
+    "mainText": "<size=+5>Отлично, звоним! \n\nНадя, скорее ответь, \nна тебя надежда великая!</size>",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "Q2sound_oneshot",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A44": {
+    "id": "A44",
+    "type": "Art",
+    "question": "Дела налаживаются! Кольцо нашлось. Отдам его Наде, узнаю, где Аленка.\n\nВообще, странно, что Наде именно это кольцо понадобилось и именно сегодня. Уж не хочет ли она нашу сделку сорвать?\n\nЕще Аленкин телефон найти бы! Конь говорил, Аленка заколодована, и расколудет ее последнее селфи. Где же искать этот телефон?",
+    "mainText": "",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "ArtFound_oneshot",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A45": {
+    "id": "A45",
+    "type": "Art",
+    "question": "Теперь все у нас есть!\n\nОсталось выяснить у Нади, где Аленка.",
+    "mainText": "",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "ArtFound_oneshot",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A46": {
+    "id": "A46",
+    "type": "Button",
+    "question": "Сказала Надя, где Аленку искать. \n\nВот это новость, это же офис нашего партнёра, студия звукозаписи, и Тик-Ток кабинки для трансляций здесь в разных дизайнах.\n\nЧего только нет в нашем славном месте!\n\nКаким волшебством мы обладаем, рядом и новое, и старое, и родное, и зарубежное в ладу живут.\n\nИ привратник - Кот",
+    "mainText": "<align=left>\t- Мяу, господа, добро пожаловать! Видел я вашу Алёнку, ну и хитрая у неё схема все Тик-Ток кабинки красивые попробовать. Выбирала на каждый час разные.\n\n\t- На 9 часов выбрала 6 кабинку, на 12 часов выбрала 10 кабинку. Схема у неё какая-то была.\nСейчас 14 часов. </align>\n\n<size=+5>Поди, угадай, в какой она сейчас?</size>",
+    "title": "Кот чёрный у дверей прохаживается, гостей встречает. ",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A47": {
+    "id": "A47",
+    "type": "Option",
+    "question": "",
+    "mainText": "<size=+15>18</size>",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A48": {
+    "id": "A48",
+    "type": "Option",
+    "question": "",
+    "mainText": "<size=+15>7</size>",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A49": {
+    "id": "A49",
+    "type": "Option",
+    "question": "",
+    "mainText": "<size=+15>12</size>",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A50": {
+    "id": "A50",
+    "type": "Option",
+    "question": "",
+    "mainText": "<size=+15>5</size>",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A51": {
+    "id": "A51",
+    "type": "AntiArt",
+    "question": "",
+    "mainText": "<size=+3>Ты на середине пути, \nеще столько же пройти.\n\nЧто же ответить на вопрос:\n\"Где Аленка, и когда будет съемка?\"\n\nЧто сказать?</size>\n\n...Что же, пусть Емеля в офис едет, \nпока обернется, \nАленка, авось, и найдется!...",
+    "title": "",
+    "helpUp": "На авось надейся, а сам не плошай!",
+    "helpDown": "Оглянись, может, где-то есть подсказка",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "NoArtFound_oneshot",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  },
+  "A52": {
+    "id": "A52",
+    "type": "Art",
+    "question": "Сдержала Надя слово, \n\nтут же и Аленка нашлась, и все хорошо сложилось. \n\n\n<b><size=+15>УРА !!!</size></b>",
+    "mainText": "Победа",
+    "title": "",
+    "helpUp": "",
+    "helpDown": "",
+    "answerPicture": "",
+    "additionalImg": "",
+    "sound": "ArtFound_oneshot",
+    "music": "",
+    "videoLink": "",
+    "videoType": "",
+    "decor2lines": "",
+    "decor4corner": "",
+    "decorIfEmpty": "",
+    "leftPanelImg": "",
+    "rightPanelImg": "",
+    "additionalPrefab": "",
+    "startAnim": "",
+    "idleAnim": "",
+    "deleteAnim": ""
+  }
+};
+const DESIGN_DATA = {
+  "BasePrefabQuestions": {
+    "id": "BasePrefabQuestionsBase",
+    "name": "BasePrefabQuestions",
+    "BackGradient_Image": "Back3",
+    "TitleText_bg_Color": "#070707EE",
+    "TitleText_bg_Image": "ButtonPanelBG",
+    "TitleText_Font": "nk_vitez SDF",
+    "TitleText_Color": "#FFD700",
+    "MainText_Decor_2lines_line1_Image": "Line2S",
+    "MainText_Decor_2lines_line2_Image": "Line2S",
+    "MainText_4corner_decor_Corner_Image": "RusStyleElement",
+    "MainText_bg_Color": "#070707EE",
+    "MainText_bg_Image": "MainTextPanelDark",
+    "MainText_MainTxt_Font": "RobotoSlab-Regular SDF",
+    "MainText_MainTxt_Color": "#FFFFFF",
+    "additionalCanvas_Prefab": "BigSparks",
+    "RightPanel_4corner_decor_Corner_Image": "RusStyleElement",
+    "RightPanel_bgRight_Panel_Color": "#070707EE",
+    "RightPanel_bgRight_Panel_Image": "MainTextPanelDark",
+    "LeftPanel_4corner_decor_Corner_Image": "RusStyleElement",
+    "LeftPanel_bgLeftPanel_Color": "#070707EE",
+    "LeftPanel_bgLeftPanel_Image": "MainTextPanelDark",
+    "LeftPanel_HelpUp_Font": "RobotoSlab-Regular SDF",
+    "LeftPanel_HelpUp_Color": "#FF69B4",
+    "LeftPanel_HelpDown_Font": "RobotoSlab-Regular SDF",
+    "LeftPanel_HelpDown_Color": "#FF69B4",
+    "Buttons_bgButtonsPanel_Color": "#070707EE",
+    "Buttons_bgButtonsPanel_Image": "ButtonPanelBG",
+    "Buttons_Button_OK_Image_Color": "#E90E1B",
+    "Buttons_Button_OK_Image_Image": "Emerald",
+    "Buttons_Button_OK_Label_Shadow_Color": "#070707EE",
+    "Buttons_Button_OK_Label_Shadow_Image": "Emerald",
+    "Buttons_Button_OK_RIM_Color": "#F5004E",
+    "Buttons_Button_OK_RIM_Image": "Emerald",
+    "Buttons_Button_OK_Text_Font": "nk_vitez SDF",
+    "Buttons_Button_Left_Color": "#DAA520",
+    "Buttons_Button_Left_Image": "angle-left",
+    "Buttons_Button_Right_Color": "#DAA520",
+    "Buttons_Button_Right_Image": "angle-right",
+    "Buttons_Button_Right_Label_Color": "#D6A617",
+    "Buttons_Button_NEXT_Image_Color": "#FA0617",
+    "Buttons_Button_NEXT_Image_Image": "RoundedSquareFull512px",
+    "Buttons_Button_NEXT_Label Shadow_Color": "#0E0E0E72",
+    "Buttons_Button_NEXT_Label Shadow_Image": "sq-shadow128",
+    "Buttons_Button_NEXT_RIM_Color": "#5B1919",
+    "Buttons_Button_NEXT_RIM_Image": "RoundedSquareStroke128px",
+    "Buttons_Button_NEXT_Text_Font": "nk_vitez SDF",
+    "Buttons_Button_NEXT_Text_Color": "#E9BF15",
+    "Buttons_Button_NEXT_Text_Text": "Дальше",
+    "Buttons_4Buttons_Image_Color": "#2F32FF",
+    "Buttons_4Buttons_Image_Image": "Circle64px1Shadow",
+    "Buttons_4Buttons_LabelShadow_Color": "#0F0C4B72",
+    "Buttons_4Buttons_LabelShadow_Image": "sq-shadow128",
+    "Buttons_4Buttons_RIM_Color": "#330E0E33",
+    "Buttons_4Buttons_RIM_Image": "Decor1",
+    "Buttons_4Buttons_Text_Font": "nk_vitez SDF",
+    "Buttons_4Buttons_Text_Color": "#E9BF15",
+    "Buttons_InputField_Shadow_Color": "#41331672",
+    "Buttons_InputField_Shadow_Image": "sq-shadow128",
+    "Buttons_InputField_Color": "#6A550E",
+    "Buttons_InputField_Image": "InputOutline",
+    "Buttons_InputField_Placeholder_Font": "nk_vitez SDF",
+    "Buttons_InputField_Placeholder_Color": "#D19C27",
+    "Buttons_InputField_Placeholder_Text": "ВВЕДИТЕ ОТВЕТ",
+    "Buttons_InputField_Text_Font": "nk_vitez SDF",
+    "Buttons_InputField_Text_Color": "#FFFFFF"
+  }
+};
+
+// ===== STATE =====
+let currentQuest = null;
+let selectedOptionIdx = -1;
+let carouselIdx = 0;
+let timerId = null;
+let timeLeft = 0;
+let inputValue = '';
+
+// ===== UTILS =====
+function $(id){ return document.getElementById(id); }
+function stripTags(t){
+  if(!t) return '';
+  return t
+    .replace(/<size=[^>]+>/gi,'')
+    .replace(/<\/size>/gi,'')
+    .replace(/<color=["']?#?[^"'>]+["']?>/gi,'<span class="colored">')
+    .replace(/<\/color>/gi,'</span>')
+    .replace(/<b>/gi,'<strong>').replace(/<\/b>/gi,'</strong>')
+    .replace(/<i>/gi,'<em>').replace(/<\/i>/gi,'</em>')
+    .replace(/<align=["']?left["']?>/gi,'<div class="align-left">')
+    .replace(/<\/align>/gi,'</div>')
+    .replace(/\t/g,'  ');
+}
+
+// ===== TIMER =====
+function startTimer(seconds){
+  clearInterval(timerId);
+  if(!seconds || seconds<=0){ $('timer-bar').style.width='100%'; return; }
+  timeLeft = seconds;
+  const total = seconds;
+  $('timer-bar').style.width = '100%';
+  timerId = setInterval(()=>{
+    timeLeft--;
+    $('timer-bar').style.width = (timeLeft/total*100)+'%';
+    if(timeLeft<=0){ clearInterval(timerId); handleTimeout(); }
+  },1000);
+}
+function stopTimer(){ clearInterval(timerId); }
+function handleTimeout(){
+  showReaction('⏳','Время вышки! Придется попробовать снова.','',()=>location.reload());
+}
+
+// ===== REACTION OVERLAY =====
+function showReaction(sign, text, btnText, callback){
+  $('reaction-sign').textContent = sign || '✦';
+  $('reaction-text').innerHTML = stripTags(text);
+  $('reaction-btn').textContent = btnText || 'Дальше';
+  $('reaction-overlay').classList.add('active');
+  $('reaction-btn').onclick = ()=>{
+    $('reaction-overlay').classList.remove('active');
+    if(callback) callback();
+  };
+}
+
+// ===== QUEST LOADING =====
+function loadQuest(qid){
+  const quest = QUEST_DATA.find(q=>q.id===qid);
+  if(!quest){ console.error('Quest not found:',qid); return; }
+  currentQuest = quest;
+  selectedOptionIdx = -1;
+  carouselIdx = 0;
+  inputValue = '';
+
+  const masterAns = quest.answers[0] ? ANSWER_DATA[quest.answers[0]] : null;
+
+  // Title
+  $('title-text').innerHTML = stripTags(masterAns?.title || quest.question.substring(0,70)+'...');
+  $('quest-id-badge').textContent = quest.id;
+
+  // Help panels
+  $('help-up').querySelector('div').innerHTML = stripTags(masterAns?.helpUp || 'Когда найдено испытание, здесь отображается задание и всё, что с ним связано.');
+  $('help-down').querySelector('div').innerHTML = stripTags(masterAns?.helpDown || 'Перед наведением на AR-цель осмотрись камерой вокруг, так дополненная реальность лучше размещается в пространстве.');
+  $('right-help').querySelector('div').innerHTML = stripTags(masterAns?.question || '');
+
+  // Narrative
+  $('narrative').innerHTML = stripTags(quest.question);
+
+  // AR hint
+  $('ar-hint').textContent = 'Наведи камеру на AR-метку • Испытание ' + (quest.goalIndex+1) + ' из ' + QUEST_DATA.length;
+
+  // Content
+  renderTask();
+
+  // Timer
+  startTimer(quest.timer);
+
+  // Animation
+  const mp = $('main-panel');
+  mp.classList.remove('fade-in');
+  void mp.offsetWidth;
+  mp.classList.add('fade-in');
+}
+
+function renderTask(){
+  const task = currentQuest.task;
+  const ansIds = currentQuest.answers;
+  const master = ansIds[0] ? ANSWER_DATA[ansIds[0]] : null;
+  const mainContent = $('main-content');
+  const btnArea = $('buttons-area');
+  const picArea = $('answer-picture-area');
+
+  mainContent.innerHTML = '';
+  btnArea.innerHTML = '';
+  picArea.style.display = 'none';
+
+  // Master main text
+  if(master?.mainText){
+    const div = document.createElement('div');
+    div.className = 'main-text';
+    div.innerHTML = stripTags(master.mainText);
+    mainContent.appendChild(div);
+  }
+
+  // Answer picture placeholder
+  if(master?.answerPicture){
+    picArea.style.display = 'flex';
+    picArea.innerHTML = '<span>🖼️ Задание: <strong>' + master.answerPicture + '</strong></span>';
+  }
+
+  if(task===1){
+    const options = ansIds.slice(1);
+    const masterType = master?.type || 'Slide';
+
+    if(masterType==='Slide' && options.length>0){
+      // Carousel
+      const wrap = document.createElement('div');
+      wrap.className = 'carousel-wrap';
+      const leftBtn = document.createElement('button');
+      leftBtn.className = 'carousel-btn'; leftBtn.innerHTML = '◀';
+      const display = document.createElement('div');
+      display.className = 'carousel-display';
+      const rightBtn = document.createElement('button');
+      rightBtn.className = 'carousel-btn'; rightBtn.innerHTML = '▶';
+
+      function updateCarousel(){
+        const opt = ANSWER_DATA[options[carouselIdx]];
+        display.innerHTML = stripTags(opt?.mainText || '...');
+        display.classList.toggle('active-opt', carouselIdx===selectedOptionIdx);
+        leftBtn.disabled = carouselIdx===0;
+        rightBtn.disabled = carouselIdx>=options.length-1;
+      }
+      leftBtn.onclick = ()=>{ if(carouselIdx>0){carouselIdx--; updateCarousel();} };
+      rightBtn.onclick = ()=>{ if(carouselIdx<options.length-1){carouselIdx++; updateCarousel();} };
+      display.onclick = ()=>{ selectedOptionIdx = carouselIdx; updateCarousel(); };
+      updateCarousel();
+
+      wrap.appendChild(leftBtn); wrap.appendChild(display); wrap.appendChild(rightBtn);
+      btnArea.appendChild(wrap);
+
+      const ok = document.createElement('button');
+      ok.className = 'action-btn'; ok.textContent = 'ОК';
+      ok.onclick = ()=> checkAnswer(options[selectedOptionIdx], selectedOptionIdx+1);
+      btnArea.appendChild(ok);
+    }
+    else if(masterType==='Button' && options.length>0){
+      const grid = document.createElement('div');
+      grid.className = 'btn-grid';
+      options.forEach((oid, idx)=>{
+        const opt = ANSWER_DATA[oid];
+        const btn = document.createElement('button');
+        btn.className = 'q-btn';
+        btn.innerHTML = stripTags(opt?.mainText || oid);
+        btn.onclick = ()=> checkAnswer(oid, idx+1);
+        grid.appendChild(btn);
+      });
+      btnArea.appendChild(grid);
+    }
+    else if(masterType==='InputField' && options.length>0){
+      const wrap = document.createElement('div');
+      wrap.className = 'input-wrap';
+      const inp = document.createElement('input');
+      inp.className = 'q-input';
+      inp.placeholder = 'ВВЕДИТЕ ОТВЕТ';
+      inp.type = 'text';
+      inp.oninput = (e)=>{ inputValue = e.target.value; };
+      inp.onkeydown = (e)=>{ if(e.key==='Enter') checkInput(); };
+      const ok = document.createElement('button');
+      ok.className = 'action-btn'; ok.textContent = 'ОК';
+      ok.onclick = checkInput;
+      wrap.appendChild(inp); wrap.appendChild(ok);
+      btnArea.appendChild(wrap);
+    }
+    else {
+      const grid = document.createElement('div');
+      grid.className = 'btn-grid';
+      options.forEach((oid, idx)=>{
+        const opt = ANSWER_DATA[oid];
+        const btn = document.createElement('button');
+        btn.className = 'q-btn';
+        btn.innerHTML = stripTags(opt?.mainText || oid);
+        btn.onclick = ()=> checkAnswer(oid, idx+1);
+        grid.appendChild(btn);
+      });
+      btnArea.appendChild(grid);
+    }
+  }
+  else if(task===2){
+    const art = document.createElement('div');
+    art.className = 'art-screen';
+    art.innerHTML = '<h2>✦ Артефакт</h2><p>' + stripTags(master?.mainText || 'Продолжай путь...') + '</p>';
+    mainContent.appendChild(art);
+    const next = document.createElement('button');
+    next.className = 'action-btn pulse-gold';
+    next.textContent = 'Продолжить';
+    next.onclick = ()=> goTo(currentQuest.rightQuest || currentQuest.nextQuest);
+    btnArea.appendChild(next);
+  }
+  else if(task===3){
+    const art = document.createElement('div');
+    art.className = 'art-screen';
+    art.innerHTML = '<h2>⚠️ Тупик</h2><p>' + stripTags(master?.mainText || 'Ах, пусто... Нужно вернуться.') + '</p>';
+    mainContent.appendChild(art);
+    const next = document.createElement('button');
+    next.className = 'action-btn';
+    next.textContent = 'Вернуться';
+    next.onclick = ()=> goTo(currentQuest.wrongQuest || currentQuest.nextQuest);
+    btnArea.appendChild(next);
+  }
+}
+
+function checkAnswer(answerId, optionIndex){
+  if(optionIndex<1) return;
+  const rightIndices = currentQuest.rightIndices;
+  const isCorrect = rightIndices.length===0 || rightIndices.includes(optionIndex);
+
+  if(isCorrect){
+    showReaction(
+      currentQuest.rightReactionSign || '✦',
+      currentQuest.rightReaction || 'Верно! Продолжай в том же духе.',
+      'Дальше',
+      ()=> goTo(currentQuest.rightQuest)
+    );
+  } else {
+    showReaction(
+      currentQuest.wrongReactionSign || '✖',
+      currentQuest.wrongReaction || 'Эх, неправильно. Попробуй ещё раз!',
+      'Повторить',
+      ()=>{}
+    );
+  }
+}
+
+function checkInput(){
+  const ansIds = currentQuest.answers;
+  const options = ansIds.slice(1);
+  const val = inputValue.trim().toLowerCase();
+  let isCorrect = false;
+
+  options.forEach(oid=>{
+    const opt = ANSWER_DATA[oid];
+    const optText = (opt?.mainText || '').trim().toLowerCase();
+    if(optText && optText===val){ isCorrect = true; }
+  });
+
+  if(currentQuest.rightIndices.length===0 && options.length>0 && !isCorrect){
+    options.forEach(oid=>{
+      const opt = ANSWER_DATA[oid];
+      const optText = (opt?.mainText || '').trim().toLowerCase();
+      if(optText && (val.includes(optText) || optText.includes(val))){ isCorrect = true; }
+    });
+  }
+
+  if(isCorrect){
+    showReaction(
+      currentQuest.rightReactionSign || '✦',
+      currentQuest.rightReaction || 'Верно! Продолжай в том же духе.',
+      'Дальше',
+      ()=> goTo(currentQuest.rightQuest)
+    );
+  } else {
+    showReaction(
+      currentQuest.wrongReactionSign || '✖',
+      currentQuest.wrongReaction || 'Эх, неправильно. Подумай ещё!',
+      'Повторить',
+      ()=>{}
+    );
+  }
+}
+
+function goTo(qid){
+  if(!qid){ console.warn('No next quest'); return; }
+  stopTimer();
+  loadQuest(qid);
+}
+
+// ===== INIT =====
+window.addEventListener('DOMContentLoaded', ()=>{
+  loadQuest('Start');
+});
+</script>
+</body>
+</html>
