@@ -1,11 +1,13 @@
-/** Утилиты: пути, экранирование, base64, dataset, transform */
+/**
+ * js/utils.js
+ * Утилиты: пути, экранирование, base64, dataset, transform
+ */
 (function () {
     'use strict';
 
     function normalizePath(path) {
         if (!path) return '';
         let p = path.trim();
-        // Поддержка абсолютных URL (http/https/blob/data)
         if (/^(https?:|blob:|data:|\/\/)/i.test(p)) return p;
         if (p.startsWith('./')) return p;
         if (p.startsWith('/')) return '.' + p;
@@ -40,7 +42,7 @@
             if (name.startsWith('data-')) {
                 name = name.slice(5);
             }
-            const camelCaseKey = name.replace(/-([a-z])/g, g => g[1].toUpperCase());
+            const camelCaseKey = name.replace/-([a-z])/g, function (g) { return g[1].toUpperCase(); });
             data[camelCaseKey] = attr.value;
         }
         return data;
@@ -50,7 +52,7 @@
         if (!mesh || !data) return;
         
         const MathUtils = (typeof THREE !== 'undefined' && THREE.MathUtils) ? THREE.MathUtils : {
-            degToRad: (deg) => deg * (Math.PI / 180)
+            degToRad: function (deg) { return deg * (Math.PI / 180); }
         };
 
         if (data.position) {
@@ -58,7 +60,7 @@
             if (pos.length === 3 && !pos.some(isNaN)) mesh.position.set(pos[0], pos[1], pos[2]);
         }
         if (data.rotation) {
-            const rot = data.rotation.split(',').map(v => MathUtils.degToRad(parseFloat(v) || 0));
+            const rot = data.rotation.split(',').map(function (v) { return MathUtils.degToRad(parseFloat(v) || 0); });
             if (rot.length === 3) mesh.rotation.set(rot[0], rot[1], rot[2]);
         }
         if (data.scale) {
@@ -68,11 +70,11 @@
     }
 
     window.UtilsModule = {
-        normalizePath,
-        escapeAttr,
-        encodeHtmlB64,
-        decodeHtmlB64,
-        getDataset,
-        applyTransformData
+        normalizePath: normalizePath,
+        escapeAttr: escapeAttr,
+        encodeHtmlB64: encodeHtmlB64,
+        decodeHtmlB64: decodeHtmlB64,
+        getDataset: getDataset,
+        applyTransformData: applyTransformData
     };
 })();

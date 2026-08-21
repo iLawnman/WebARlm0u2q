@@ -310,11 +310,11 @@
       font-size: clamp(1rem, 2vw, 1.25rem); color: #f0e6d2;
       max-width: 620px; line-height: 1.7; white-space: pre-wrap;
     }
-    #sim-ar-hint {
-      position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
-      background: rgba(7,7,7,0.9); border: 1px solid #6A550E; color: #B8860B;
-      padding: 6px 14px; border-radius: 20px; font-size: 0.72rem; z-index: 5;
-    }
+    /*#sim-ar-hint {*/
+    /*  position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);*/
+    /*  background: rgba(7,7,7,0.9); border: 1px solid #6A550E; color: #B8860B;*/
+    /*  padding: 6px 14px; border-radius: 20px; font-size: 0.72rem; z-index: 5;*/
+    /*}*/
   </style>
 </head>
 <body>
@@ -439,7 +439,7 @@
       <div id="sim-reaction-text"></div>
       <button class="action-btn" id="sim-reaction-btn" style="margin-top:28px;">Дальше</button>
     </div>
-    <div id="sim-ar-hint"></div>
+    // <div id="sim-ar-hint"></div>
   </div>
 </div>
 
@@ -1071,8 +1071,8 @@
       }
       applyAnswerToPanels(master, true);
 
-      $("sim-ar-hint").textContent = "Наведи камеру на AR-метку • " + quest.id +
-              (quest.goalIndex != null ? " • " + (quest.goalIndex + 1) + " / " + QUEST_DATA.length : "");
+      // $("sim-ar-hint").textContent = "Наведи камеру на AR-метку • " + quest.id +
+      //         (quest.goalIndex != null ? " • " + (quest.goalIndex + 1) + " / " + QUEST_DATA.length : "");
 
       renderTask();
       startTimer(quest.timer || 0);

@@ -170,7 +170,6 @@
         sceneObjects = [];
     }
 
-    // Алиасы для inspector.js
     function addEditableObject(mesh) { addSceneObject(mesh); }
     function removeEditableObject(mesh) { removeSceneObject(mesh); }
 

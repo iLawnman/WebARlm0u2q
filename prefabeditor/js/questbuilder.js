@@ -1,6 +1,6 @@
-/** Генератор дизайн-превью из arprefabsdesign.json → разметка в стиле ardesign.html
- *  Парсинг колонок "Группа_Свойство" использует тот же приём, что и json-design.js в редакторе:
- *  заголовок режется по последнему "_", всё до него — имя группы, после — свойство.
+/**
+ * js/questbuilder.js
+ * Генератор дизайн-превью из arprefabsdesign.json → разметка в стиле ardesign.html
  */
 
 export const PROP_KEYS = ['font', 'color', 'image', 'fx', 'sound', 'text', 'prefab'];
@@ -180,7 +180,7 @@ export function buildLegendHTML(assetNames) {
     </div>`).join('');
 }
 
-/** Полная таблица всех групп/свойств по всем строкам — не захардкожена, строится из данных */
+/** Полная таблица всех групп/свойств по всем строкам */
 export function buildPropsTableHTML(rows) {
     const groupNames = new Set();
     rows.forEach(r => Object.keys(r.groups).forEach(gn => groupNames.add(gn)));
@@ -216,16 +216,17 @@ export function generateDesignPreview(jsonData, options = {}) {
     return { rows, tabsHTML, screensHTML, legendHTML, propsTableHTML };
 }
 
-/** Навешивает обработчики переключения вкладок на уже отрисованный DOM */
+/** Навешивает обработчики переключения вкладок на DOM */
 export function wireTabs(root = document) {
     root.querySelectorAll('.tab').forEach(tab => {
         tab.addEventListener('click', () => {
             root.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             root.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             tab.classList.add('active');
-            root.getElementById ?
-                root.getElementById('screen-' + tab.dataset.tab).classList.add('active') :
-                root.querySelector('#screen-' + tab.dataset.tab).classList.add('active');
+            const target = root.getElementById ?
+                root.getElementById('screen-' + tab.dataset.tab) :
+                root.querySelector('#screen-' + tab.dataset.tab);
+            if (target) target.classList.add('active');
         });
     });
 }

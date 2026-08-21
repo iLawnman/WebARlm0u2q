@@ -107,9 +107,7 @@
             try {
                 var jsonData = JSON.parse(e.target.result);
 
-                // Если есть DesignBuilder (inline) — можно использовать его parse
                 if (global.DesignBuilder && typeof global.DesignBuilder.loadJSON === 'function' && Array.isArray(jsonData)) {
-                    // Для 3D-сцены используем простой parse
                     parseAndBuildPrefab(jsonData);
                 } else {
                     parseAndBuildPrefab(jsonData);
