@@ -22,154 +22,81 @@
 
   <style>
     :root {
-      --bg: #0f0f12;
-      --panel: #1a1a20;
-      --border: #2a2a35;
-      --text: #e8e8ef;
-      --muted: #888;
-      --accent: #c9a227;
-      --success: #2d8a4e;
+      --bg: #0f0f12; --panel: #1a1a20; --border: #2a2a35;
+      --text: #e8e8ef; --muted: #888; --accent: #c9a227; --success: #2d8a4e;
     }
     * { box-sizing: border-box; }
     body {
-      margin: 0;
-      display: flex;
-      height: 100vh;
-      background: var(--bg);
-      color: var(--text);
-      font-family: system-ui, -apple-system, sans-serif;
-      overflow: hidden;
+      margin: 0; display: flex; height: 100vh;
+      background: var(--bg); color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif; overflow: hidden;
     }
     #sidebar {
-      width: 280px;
-      background: var(--panel);
-      border-right: 1px solid var(--border);
-      padding: 12px;
-      overflow-y: auto;
-      flex-shrink: 0;
+      width: 280px; background: var(--panel); border-right: 1px solid var(--border);
+      padding: 12px; overflow-y: auto; flex-shrink: 0;
     }
     #sidebar .section { margin-bottom: 18px; }
     #sidebar h3 {
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--muted);
-      margin: 0 0 8px;
+      font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--muted); margin: 0 0 8px;
     }
     #sidebar button {
-      display: block;
-      width: 100%;
-      margin: 4px 0;
-      padding: 8px 12px;
-      background: #252530;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      color: var(--text);
-      cursor: pointer;
-      font-size: 13px;
-      text-align: left;
+      display: block; width: 100%; margin: 4px 0; padding: 8px 12px;
+      background: #252530; border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); cursor: pointer; font-size: 13px; text-align: left;
     }
     #sidebar button:hover { background: #2e2e3a; border-color: #444; }
     #sidebar button.btn-success {
-      background: rgba(45, 138, 78, 0.25);
-      border-color: var(--success);
-      color: #7dcea0;
+      background: rgba(45, 138, 78, 0.25); border-color: var(--success); color: #7dcea0;
     }
     #sidebar button.btn-success:hover { background: rgba(45, 138, 78, 0.4); }
     #sidebar select {
-      width: 100%;
-      padding: 6px 8px;
-      background: #252530;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      color: var(--text);
-      font-size: 13px;
+      width: 100%; padding: 6px 8px; background: #252530;
+      border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px;
     }
-    #viewport {
-      flex: 1;
-      position: relative;
-      background: #0a0a0e;
-    }
+    #viewport { flex: 1; position: relative; background: #0a0a0e; }
     #canvas3d { width: 100%; height: 100%; display: block; }
     #inspector {
-      width: 300px;
-      background: var(--panel);
-      border-left: 1px solid var(--border);
-      padding: 12px;
-      overflow-y: auto;
-      flex-shrink: 0;
+      width: 300px; background: var(--panel); border-left: 1px solid var(--border);
+      padding: 12px; overflow-y: auto; flex-shrink: 0;
     }
     #inspector h3 {
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--muted);
-      margin: 0 0 8px;
+      font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--muted); margin: 0 0 8px;
     }
     #design-preview-overlay {
-      display: none;
-      position: absolute;
-      inset: 0;
-      z-index: 50;
-      background: #111;
-      overflow: auto;
+      display: none; position: absolute; inset: 0; z-index: 50; background: #111; overflow: auto;
     }
     #design-preview-overlay.active { display: block; }
     #design-preview-overlay .preview-toolbar {
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 16px;
-      background: #1a1a20;
-      border-bottom: 1px solid #2a2a35;
+      position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 10px;
+      padding: 10px 16px; background: #1a1a20; border-bottom: 1px solid #2a2a35;
     }
     #design-preview-overlay .preview-toolbar button {
-      padding: 6px 14px;
-      background: #252530;
-      border: 1px solid #2a2a35;
-      border-radius: 6px;
-      color: #e8e8ef;
-      cursor: pointer;
-      font-size: 13px;
+      padding: 6px 14px; background: #252530; border: 1px solid #2a2a35;
+      border-radius: 6px; color: #e8e8ef; cursor: pointer; font-size: 13px;
     }
     #design-preview-overlay .preview-toolbar button:hover { background: #2e2e3a; }
-    #design-preview-frame {
-      width: 100%;
-      height: calc(100% - 48px);
-      border: none;
-      background: #111;
-    }
-    #json-status {
-      font-size: 11px;
-      color: var(--muted);
-      margin-top: 6px;
-      line-height: 1.4;
-    }
+    #design-preview-frame { width: 100%; height: calc(100% - 48px); border: none; background: #111; }
+    #json-status { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
     #json-status.ok { color: #7dcea0; }
     #json-status.err { color: #e07070; }
-
     #sidebar button.btn-run {
-      background: rgba(233, 14, 27, 0.25);
-      border-color: #E90E1B;
-      color: #ff8a8a;
-      font-weight: 600;
+      background: rgba(233, 14, 27, 0.25); border-color: #E90E1B; color: #ff8a8a; font-weight: 600;
     }
     #sidebar button.btn-run:hover { background: rgba(233, 14, 27, 0.4); }
     #sim-status { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
     #sim-status.ok { color: #7dcea0; }
     #sim-status.err { color: #e07070; }
 
-    /* ===== SIMULATION ===== */
+    /* ===== SIM ===== */
     #sim-overlay {
       display: none; position: absolute; inset: 0; z-index: 60;
       background: #050505; flex-direction: column;
     }
     #sim-overlay.active { display: flex; }
     #sim-overlay .sim-toolbar {
-      position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 10px;
+      position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 10px;
       padding: 10px 16px; background: #1a1a20; border-bottom: 1px solid #2a2a35; flex-shrink: 0;
     }
     #sim-overlay .sim-toolbar button {
@@ -179,8 +106,7 @@
     #sim-overlay .sim-toolbar button:hover { background: #2e2e3a; }
     #sim-body { flex: 1; position: relative; overflow: hidden; }
     .sim-bg-img {
-      position: absolute; inset: 0;
-      background-size: cover; background-position: center;
+      position: absolute; inset: 0; background-size: cover; background-position: center;
       opacity: 0.3; pointer-events: none; z-index: 0;
     }
     #sim-timer-wrap {
@@ -193,194 +119,168 @@
       transition: width 1s linear;
     }
 
-    #sim-root {
-      position: absolute; inset: 0; display: grid;
-      grid-template-areas:
-        "header header header"
-        "left   main   right"
-        "footer footer footer";
-      grid-template-columns: minmax(140px, 16%) 1fr minmax(140px, 16%);
-      grid-template-rows: auto 1fr auto;
-      gap: 12px;
-      padding: 14px 16px 12px;
+    /* Плавно выезжающая панель с Question из questtable */
+    #sim-quest-banner {
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 10%;
+      right: 10%;
+      width: 80%;
+      max-width: 900px;
+      margin: 0 auto;
+      z-index: 25;
+      background: rgba(7,7,7,0.97);
+      border: 2px solid #6A550E;
+      border-top: none;
+      border-radius: 0 0 16px 16px;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.8);
+      padding: 20px 48px 20px 24px;
       color: #f0e6d2;
-      font-family: 'Segoe UI', Georgia, serif;
-      z-index: 1;
+      font-size: 1rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      max-height: 80vh;
+      overflow-y: auto;
+      cursor: pointer;
+      transform: translateY(-105%);
+      opacity: 0;
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
+      pointer-events: none;
     }
-    @media (max-width: 900px) {
-      #sim-root {
-        grid-template-columns: 1fr;
-        grid-template-areas: "header" "main" "footer";
-      }
-      #sim-root .side-panel { display: none !important; }
+    #sim-quest-banner.active {
+      transform: translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+    #sim-quest-banner-close {
+      position: absolute; top: 12px; right: 14px;
+      background: rgba(0,0,0,0.4); border: 1px solid #6A550E; color: #FFD700;
+      width: 32px; height: 32px; border-radius: 6px; cursor: pointer; font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #sim-quest-banner-close:hover { border-color: #FFD700; background: rgba(106,85,14,0.3); }
+
+    /* Оформление изображений в ресурсах */
+    .resource-image-wrap {
+      text-align: center;
+      margin: 8px 0;
+    }
+    .resource-image-wrap img {
+      max-width: 100%;
+      max-height: 320px;
+      object-fit: contain;
+      border-radius: 8px;
+      border: 1px solid #6A550E;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
 
+    #sim-root {
+      position: absolute; inset: 0; display: grid;
+      grid-template-areas: "header header header" "left main right" "footer footer footer";
+      grid-template-columns: minmax(140px, 16%) 1fr minmax(140px, 16%);
+      grid-template-rows: auto 1fr auto; gap: 12px; padding: 14px 16px 12px;
+      color: #f0e6d2; font-family: 'Segoe UI', Georgia, serif; z-index: 1;
+    }
+    @media (max-width: 900px) {
+      #sim-root { grid-template-columns: 1fr; grid-template-areas: "header" "main" "footer"; }
+      #sim-root .side-panel { display: none !important; }
+      #sim-quest-banner { left: 4%; right: 4%; width: 92%; }
+    }
     .sim-panel {
-      position: relative;
-      background: rgba(7,7,7,0.93);
-      border: 2px solid #6A550E;
-      border-radius: 12px;
-      box-shadow: 0 0 14px rgba(255,215,0,0.18), inset 0 0 30px rgba(0,0,0,0.45);
+      position: relative; background: rgba(7,7,7,0.93); border: 2px solid #6A550E;
+      border-radius: 12px; box-shadow: 0 0 14px rgba(255,215,0,0.18), inset 0 0 30px rgba(0,0,0,0.45);
       overflow: hidden;
     }
     .sim-panel-corner {
-      position: absolute;
-      width: 32px; height: 32px;
-      background-size: contain;
-      background-repeat: no-repeat;
-      opacity: 0.85;
-      pointer-events: none;
-      z-index: 2;
+      position: absolute; width: 32px; height: 32px; background-size: contain;
+      background-repeat: no-repeat; opacity: 0.85; pointer-events: none; z-index: 2;
     }
     .sim-panel-corner.tl { top: 4px; left: 4px; }
     .sim-panel-corner.tr { top: 4px; right: 4px; transform: scaleX(-1); }
     .sim-panel-corner.bl { bottom: 4px; left: 4px; transform: scaleY(-1); }
     .sim-panel-corner.br { bottom: 4px; right: 4px; transform: scale(-1); }
-
     #sim-title-bar {
-      grid-area: header;
-      padding: 12px 20px;
-      display: flex; align-items: center; justify-content: center;
-      position: relative;
+      grid-area: header; padding: 12px 20px;
+      display: flex; align-items: center; justify-content: center; position: relative;
     }
     #sim-title-text {
-      font-size: clamp(1rem, 2vw, 1.35rem);
-      color: #FFD700;
-      text-align: center;
-      font-weight: 600;
+      font-size: clamp(1rem, 2vw, 1.35rem); color: #FFD700; text-align: center; font-weight: 600;
     }
     #sim-quest-badge {
       position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
       font-size: 0.65rem; color: #a09070; opacity: 0.7;
       border: 1px solid #6A550E; padding: 2px 8px; border-radius: 4px;
     }
-
     .side-panel { display: flex; flex-direction: column; gap: 10px; }
     #sim-left { grid-area: left; }
     #sim-right { grid-area: right; }
-
     .help-card {
-      flex: 1;
-      padding: 14px 12px;
-      font-size: 0.82rem;
-      line-height: 1.5;
-      color: #FF69B4;
-      position: relative;
+      flex: 1; padding: 14px 12px; font-size: 0.82rem; line-height: 1.5;
+      color: #FF69B4; position: relative;
     }
     .help-card h4 {
-      color: #FFD700;
-      font-size: 0.78rem;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      border-bottom: 1px solid #6A550E;
-      padding-bottom: 4px;
-      margin: 0 0 8px;
+      color: #FFD700; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1px;
+      border-bottom: 1px solid #6A550E; padding-bottom: 4px; margin: 0 0 8px;
     }
     .side-mandala {
-      height: 56px;
-      background-size: contain;
-      background-repeat: no-repeat;
-      background-position: center;
-      opacity: 0.45;
-      margin-bottom: 6px;
+      height: 56px; background-size: contain; background-repeat: no-repeat;
+      background-position: center; opacity: 0.45; margin-bottom: 6px;
     }
-
     #sim-main {
-      grid-area: main;
-      padding: 20px 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      position: relative;
-      overflow-y: auto;
+      grid-area: main; padding: 20px 24px; display: flex; flex-direction: column;
+      gap: 12px; position: relative; overflow-y: auto;
     }
     .deco-line {
-      height: 10px;
-      background-size: contain;
-      background-repeat: repeat-x;
-      background-position: center;
-      opacity: 0.45;
-      flex-shrink: 0;
+      height: 10px; background-size: contain; background-repeat: repeat-x;
+      background-position: center; opacity: 0.45; flex-shrink: 0;
     }
     .narrative {
-      font-style: italic;
-      color: #a09070;
-      font-size: 0.92rem;
-      border-left: 3px solid #B8860B;
-      padding-left: 14px;
-      line-height: 1.6;
-      white-space: pre-wrap;
+      font-style: italic; color: #a09070; font-size: 0.92rem;
+      border-left: 3px solid #B8860B; padding-left: 14px; line-height: 1.6; white-space: pre-wrap;
     }
     .main-text {
-      font-size: clamp(0.95rem, 1.6vw, 1.15rem);
-      line-height: 1.65;
-      color: #f0e6d2;
-      white-space: pre-wrap;
-      flex: 1;
+      font-size: clamp(0.95rem, 1.6vw, 1.15rem); line-height: 1.65;
+      color: #f0e6d2; white-space: pre-wrap; flex: 1;
     }
     .main-text strong { color: #FFD700; }
-
     #sim-footer {
-      grid-area: footer;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 10px;
+      grid-area: footer; display: flex; flex-direction: column; align-items: center; gap: 10px;
     }
     #sim-buttons-area {
-      width: 100%;
-      max-width: 820px;
-      padding: 14px 16px;
-      border-radius: 12px;
-      border: 2px solid #6A550E;
-      background: rgba(7,7,7,0.93);
+      width: 100%; max-width: 820px; padding: 14px 16px; border-radius: 12px;
+      border: 2px solid #6A550E; background: rgba(7,7,7,0.93);
       box-shadow: 0 0 12px rgba(255,215,0,0.15);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 12px;
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
     }
-
     .carousel-wrap {
       display: flex; align-items: center; justify-content: center;
       gap: 12px; width: 100%; max-width: 700px;
     }
     .carousel-btn {
-      width: 44px; height: 44px; border-radius: 50%;
-      border: 2px solid #B8860B; background: rgba(0,0,0,0.5);
-      color: #FFD700; font-size: 1.3rem; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
+      width: 44px; height: 44px; border-radius: 50%; border: 2px solid #B8860B;
+      background: rgba(0,0,0,0.5); color: #FFD700; font-size: 1.3rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     }
     .carousel-btn:disabled { opacity: 0.3; cursor: not-allowed; }
     .carousel-display {
-      flex: 1; min-height: 90px;
-      background: rgba(0,0,0,0.35);
+      flex: 1; min-height: 60px; background: rgba(0,0,0,0.35);
       border: 1px solid #6A550E; border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      padding: 16px; text-align: center; font-size: 1.1rem; color: #f0e6d2;
-      cursor: pointer;
-      white-space: pre-wrap;
+      display: flex; align-items: center; justify-content: center; flex-direction: column;
+      padding: 12px 16px; text-align: center; font-size: 1.1rem; color: #f0e6d2;
+      cursor: pointer; white-space: pre-wrap;
     }
     .carousel-display.active-opt {
-      border-color: #FFD700;
-      box-shadow: 0 0 12px rgba(255,215,0,0.2);
+      border-color: #FFD700; box-shadow: 0 0 12px rgba(255,215,0,0.2);
     }
-    .btn-grid {
-      display: flex; flex-wrap: wrap; gap: 10px;
-      justify-content: center; width: 100%;
-    }
+    .btn-grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; width: 100%; }
     .q-btn {
-      background: linear-gradient(145deg, #141414, #0a0a0a);
-      border: 2px solid #6A550E; color: #FFD700;
-      padding: 12px 22px; border-radius: 8px; cursor: pointer;
+      background: linear-gradient(145deg, #141414, #0a0a0a); border: 2px solid #6A550E;
+      color: #FFD700; padding: 12px 22px; border-radius: 8px; cursor: pointer;
       font-family: inherit; font-size: 1rem; min-width: 100px; text-align: center;
     }
     .q-btn:hover { border-color: #FFD700; }
-    .input-wrap {
-      display: flex; gap: 10px; align-items: center;
-      justify-content: center; flex-wrap: wrap;
-    }
+    .input-wrap { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; }
     .q-input {
       background: #0a0a0a; border: 2px solid #6A550E; color: #FFD700;
       padding: 12px 18px; border-radius: 8px; font-size: 1.15rem;
@@ -389,33 +289,26 @@
     .q-input:focus { border-color: #FFD700; }
     .q-input::placeholder { color: #a09070; opacity: 0.6; }
     .action-btn {
-      background: #E90E1B; color: #fff; border: none;
-      padding: 14px 48px; border-radius: 8px;
-      font-size: 1.15rem; font-weight: 700; cursor: pointer;
-      text-transform: uppercase; letter-spacing: 2px;
+      background: #E90E1B; color: #fff; border: none; padding: 14px 48px; border-radius: 8px;
+      font-size: 1.15rem; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 2px;
     }
     .action-btn:hover { background: #ff1a2e; }
     .art-screen {
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
       gap: 20px; text-align: center;
     }
     .art-screen h2 { color: #FFD700; font-size: 2rem; margin: 0; }
-    .art-screen p {
-      font-size: 1.1rem; color: #a09070;
-      max-width: 500px; line-height: 1.6; margin: 0;
-    }
+    .art-screen p { font-size: 1.1rem; color: #a09070; max-width: 500px; line-height: 1.6; margin: 0; }
     #sim-reaction {
-      position: absolute; inset: 0; z-index: 20;
-      background: rgba(0,0,0,0.9);
+      position: absolute; inset: 0; z-index: 40; background: rgba(0,0,0,0.9);
       display: none; align-items: center; justify-content: center;
       flex-direction: column; padding: 30px; text-align: center;
     }
     #sim-reaction.active { display: flex; }
     #sim-reaction-sign { font-size: 4.5rem; margin-bottom: 16px; }
     #sim-reaction-text {
-      font-size: clamp(1rem, 2vw, 1.25rem);
-      color: #f0e6d2; max-width: 620px; line-height: 1.7; white-space: pre-wrap;
+      font-size: clamp(1rem, 2vw, 1.25rem); color: #f0e6d2;
+      max-width: 620px; line-height: 1.7; white-space: pre-wrap;
     }
     #sim-ar-hint {
       position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
@@ -433,7 +326,6 @@
     <button onclick="document.getElementById('file-input').click()">Открыть HTML...</button>
     <button class="btn-success" onclick="document.getElementById('json-input').click()">Загрузить JSON дизайн</button>
     <button onclick="window.__editor && window.__editor.exportHTML && window.__editor.exportHTML()">Сохранить HTML</button>
-
     <input type="file" id="file-input" style="display:none" accept=".html,.template" onchange="window.__editor && window.__editor.handleFileSelect && window.__editor.handleFileSelect(event)">
     <input type="file" id="json-input" style="display:none" accept=".json" onchange="DesignBuilder.handleJsonFile(event)">
     <select id="json-row-selector" style="display:none; margin-top:6px;" onchange="DesignBuilder.handleRowChange(event)"></select>
@@ -441,14 +333,12 @@
     <button class="btn-success" id="btn-show-design" style="display:none; margin-top:8px;" onclick="DesignBuilder.showPreview()">Показать дизайн-превью</button>
     <button id="btn-hide-design" style="display:none; margin-top:4px;" onclick="DesignBuilder.hidePreview()">Скрыть превью</button>
   </div>
-
   <div class="section">
     <h3>Симуляция квеста</h3>
     <button class="btn-run" onclick="document.getElementById('bundle-json-input').click()">▶ Загрузить JSON(ы)</button>
     <input type="file" id="bundle-json-input" style="display:none" accept=".json" multiple onchange="QuestSim.handleBundleFiles(event)">
     <div id="sim-status"></div>
   </div>
-
   <div class="section">
     <h3>Добавить 3D Элемент</h3>
     <button onclick="window.__editor && window.__editor.addObject3D && window.__editor.addObject3D()">+ 3D Объект (OBJ)</button>
@@ -456,7 +346,6 @@
     <button onclick="window.__editor && window.__editor.addVideoObject3D && window.__editor.addVideoObject3D()">+ Video</button>
     <button onclick="window.__editor && window.__editor.addHtmlObject3D && window.__editor.addHtmlObject3D()">+ Other HTML</button>
   </div>
-
   <div class="section hierarchy">
     <h3>Иерархия сцены</h3>
     <div id="tree"></div>
@@ -484,6 +373,13 @@
   <div id="sim-body">
     <div class="sim-bg-img" id="sim-bg"></div>
     <div id="sim-timer-wrap"><div id="sim-timer-bar"></div></div>
+
+    <!-- Question из questtable — выезжает сверху плавно в центр, клик закрывает -->
+    <div id="sim-quest-banner">
+      <button type="button" id="sim-quest-banner-close" title="Закрыть">✕</button>
+      <div id="sim-quest-banner-text"></div>
+    </div>
+
     <div id="sim-root">
       <header id="sim-title-bar" class="sim-panel">
         <div class="sim-panel-corner tl" id="sim-title-c-tl"></div>
@@ -493,7 +389,6 @@
         <div id="sim-title-text"></div>
         <div id="sim-quest-badge"></div>
       </header>
-
       <aside class="side-panel" id="sim-left">
         <div class="help-card sim-panel" id="sim-help-up">
           <div class="sim-panel-corner tl" data-corner="left"></div>
@@ -513,19 +408,17 @@
           <div class="help-body"></div>
         </div>
       </aside>
-
       <main id="sim-main" class="sim-panel">
         <div class="sim-panel-corner tl" id="sim-main-c-tl"></div>
         <div class="sim-panel-corner tr" id="sim-main-c-tr"></div>
         <div class="sim-panel-corner bl" id="sim-main-c-bl"></div>
         <div class="sim-panel-corner br" id="sim-main-c-br"></div>
         <div class="deco-line" id="sim-decor-1"></div>
-        <div id="sim-narrative" class="narrative"></div>
+        <div id="sim-narrative" class="narrative" style="display:none;"></div>
         <div class="deco-line" id="sim-decor-2"></div>
         <div id="sim-main-content"></div>
         <div class="deco-line" id="sim-decor-3"></div>
       </main>
-
       <aside class="side-panel" id="sim-right">
         <div class="help-card sim-panel" id="sim-right-help">
           <div class="sim-panel-corner tl" data-corner="right"></div>
@@ -537,7 +430,6 @@
           <div class="help-body"></div>
         </div>
       </aside>
-
       <footer id="sim-footer">
         <div id="sim-buttons-area"></div>
       </footer>
@@ -561,10 +453,7 @@
 <script>
   /* ========== DesignBuilder ========== */
   const DesignBuilder = (() => {
-    let headers = [];
-    let rows = [];
-    let currentRowIndex = 0;
-    let lastHTML = "";
+    let headers = [], rows = [], currentRowIndex = 0, lastHTML = "";
 
     function getVal(row, key, fallback) {
       if (fallback === undefined) fallback = "";
@@ -575,17 +464,14 @@
 
     function parsePrefab(row) {
       return {
-        id: getVal(row, "id"),
-        name: getVal(row, "name"),
+        id: getVal(row, "id"), name: getVal(row, "name"),
         back_image: getVal(row, "BackGradient_Image") || getVal(row, "BackImage_Image") || "Back3",
-        title_font: getVal(row, "TitleText_Font") || "nk_vitez SDF",
         title_color: getVal(row, "TitleText_Color") || "#FFD700",
         title_bg_color: getVal(row, "TitleText_bg_Color") || "#070707EE",
         title_bg_image: getVal(row, "TitleText_bg_Image") || "ButtonPanelBG",
         title_corner_image: getVal(row, "TitleText_If_Title_Empty_Corner_Image") || "mandala",
         main_bg_color: getVal(row, "MainText_bg_Color") || "#070707EE",
         main_bg_image: getVal(row, "MainText_bg_Image") || "MainTextPanelDark",
-        main_font: getVal(row, "MainText_MainTxt_Font") || getVal(row, "MainTxt_Font") || "RobotoSlab-Regular SDF",
         main_color: getVal(row, "MainText_MainTxt_Color") || getVal(row, "MainTxt_Color") || "#FFFFFF",
         main_decor1: getVal(row, "MainText_Decor_2lines_line1_Image") || "Line2S",
         main_decor2: getVal(row, "MainText_Decor_2lines_line2_Image") || "Line2S",
@@ -603,7 +489,6 @@
         btn_next_text: getVal(row, "Buttons_Button_NEXT_Text_Text") || "Дальше",
         btn_next_color: getVal(row, "Buttons_Button_NEXT_Text_Color") || "#E9BF15",
         input_ph_text: getVal(row, "Buttons_InputField_Placeholder_Text") || "ВВЕДИТЕ ОТВЕТ",
-        input_ph_color: getVal(row, "Buttons_InputField_Placeholder_Color") || "#D19C27",
         input_border: getVal(row, "Buttons_InputField_Color") || "#6A550E",
         input_text_color: getVal(row, "Buttons_InputField_Text_Color") || "#FFFFFF",
         left_angle: getVal(row, "Buttons_Button_Left_Image_Image") || getVal(row, "Buttons_Button_Left_Image") || "angle-left",
@@ -616,7 +501,7 @@
       if (!name) return "";
       const n = String(name).trim();
       if (!n) return "";
-      if (n.startsWith("http://") || n.startsWith("https://") || n.startsWith("./") || n.startsWith("/")) return n;
+      if (/^(https?:|\/\/|\.\/|\/)/i.test(n)) return n;
       return "./assets/resources/" + n + ".png";
     }
 
@@ -629,8 +514,7 @@
     function buildScreenHTML(prefab, options) {
       options = options || {};
       const titleText = options.title || (prefab.id && String(prefab.id).toLowerCase().indexOf("base") !== -1 ? "Базовый вопрос" : "Вопрос");
-      const mainPlaceholder = options.mainText || "Текст основного вопроса отображается здесь. Можно использовать несколько строк.";
-
+      const mainPlaceholder = options.mainText || "Текст основного вопроса отображается здесь.";
       const bgImg = normalizeAsset(prefab.back_image);
       const titleBgImg = normalizeAsset(prefab.title_bg_image);
       const mainBgImg = normalizeAsset(prefab.main_bg_image);
@@ -645,14 +529,12 @@
       const mainCorner = normalizeAsset(prefab.main_corner);
       const leftAngle = normalizeAsset(prefab.left_angle);
       const rightAngle = normalizeAsset(prefab.right_angle);
-
       const corners = function(img) {
         return '<div class="panel-corner tl" style="background-image:url(\'' + img + '\');"></div>' +
                 '<div class="panel-corner tr" style="background-image:url(\'' + img + '\');"></div>' +
                 '<div class="panel-corner bl" style="background-image:url(\'' + img + '\');"></div>' +
                 '<div class="panel-corner br" style="background-image:url(\'' + img + '\');"></div>';
       };
-
       return '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>' +
               'body{margin:0;background:#111;color:#f0e6d2;font-family:system-ui,sans-serif;}' +
               '.screen{position:relative;min-height:100vh;display:flex;flex-direction:column;}' +
@@ -678,45 +560,33 @@
               '.four-btns{display:flex;gap:10px;justify-content:center;margin-top:12px;}' +
               '.four-btn{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;}' +
               '@media(max-width:800px){.panels{grid-template-columns:1fr;}.side-panel{display:none;}}' +
-              '</style></head><body>' +
-              '<div class="screen">' +
+              '</style></head><body><div class="screen">' +
               (bgImg ? '<div class="bg-img" style="background-image:url(\'' + bgImg + '\');"></div>' : '') +
-              '<div class="content">' +
-              '<div class="title-area" style="' + bgStyle(prefab.title_bg_color, titleBgImg, "rgba(7,7,7,0.93)") + '">' +
+              '<div class="content"><div class="title-area" style="' + bgStyle(prefab.title_bg_color, titleBgImg, "rgba(7,7,7,0.93)") + '">' +
               '<div class="title-text" style="color:' + (prefab.title_color || "#FFD700") + ';">' + titleText + '</div></div>' +
-              '<div class="panels">' +
-              '<div class="panel side-panel" style="' + bgStyle(prefab.left_bg_color, leftBgImg, "rgba(7,7,7,0.93)") + '">' +
-              corners(leftCorner) +
-              '<div class="side-empty" style="background-image:url(\'' + mandalaImg + '\');"></div>' +
-              '<div class="help" style="color:' + (prefab.left_help_color || "#FF69B4") + ';">' + (prefab.left_help_text || "Подсказка") + '</div>' +
-              '<div class="help" style="color:' + (prefab.left_help_color || "#FF69B4") + ';">↓</div></div>' +
+              '<div class="panels"><div class="panel side-panel" style="' + bgStyle(prefab.left_bg_color, leftBgImg, "rgba(7,7,7,0.93)") + '">' +
+              corners(leftCorner) + '<div class="side-empty" style="background-image:url(\'' + mandalaImg + '\');"></div>' +
+              '<div class="help" style="color:' + (prefab.left_help_color || "#FF69B4") + ';">' + (prefab.left_help_text || "Подсказка") + '</div></div>' +
               '<div class="panel main-panel" style="' + bgStyle(prefab.main_bg_color, mainBgImg, "rgba(7,7,7,0.93)") + '">' +
-              corners(mainCorner) +
-              '<div class="decor-line" style="background-image:url(\'' + decorLine1 + '\');"></div>' +
+              corners(mainCorner) + '<div class="decor-line" style="background-image:url(\'' + decorLine1 + '\');"></div>' +
               '<div class="main-text" style="color:' + (prefab.main_color || "#FFFFFF") + ';">' + mainPlaceholder + '</div>' +
               '<div class="decor-line" style="background-image:url(\'' + decorLine2 + '\');"></div></div>' +
               '<div class="panel side-panel" style="' + bgStyle(prefab.right_bg_color, rightBgImg, "rgba(7,7,7,0.93)") + '">' +
-              corners(rightCorner) +
-              '<div class="side-empty" style="background-image:url(\'' + mandalaImg + '\');opacity:0.4;"></div>' +
-              '<div style="color:#888;font-size:0.75rem;">Правая панель</div></div></div>' +
+              corners(rightCorner) + '<div class="side-empty" style="background-image:url(\'' + mandalaImg + '\');opacity:0.4;"></div></div></div>' +
               '<div class="buttons-area" style="' + bgStyle(prefab.buttons_bg_color, buttonsBgImg, "rgba(7,7,7,0.93)") + '">' +
-              '<div class="buttons-row">' +
-              '<div class="nav-btn"><div class="icon" style="background:url(\'' + leftAngle + '\') center/contain no-repeat;"></div></div>' +
-              '<input class="input-field" type="text" placeholder="' + (prefab.input_ph_text || "ВВЕДИТЕ ОТВЕТ") + '" style="border-color:' + (prefab.input_border || "#6A550E") + ';color:' + (prefab.input_text_color || "#FFFFFF") + ';">' +
+              '<div class="buttons-row"><div class="nav-btn"><div class="icon" style="background:url(\'' + leftAngle + '\') center/contain no-repeat;"></div></div>' +
+              '<input class="input-field" type="text" placeholder="' + (prefab.input_ph_text || "ВВЕДИТЕ ОТВЕТ") + '">' +
               '<button class="next-btn" style="color:' + (prefab.btn_next_color || "#E9BF15") + ';">' + (prefab.btn_next_text || "Дальше") + '</button>' +
               '<div class="nav-btn"><div class="icon" style="background:url(\'' + rightAngle + '\') center/contain no-repeat;"></div></div></div>' +
-              '<div class="four-btns">' +
-              [1,2,3,4].map(function(n) {
+              '<div class="four-btns">' + [1,2,3,4].map(function(n) {
                 return '<div class="four-btn" style="background:radial-gradient(circle at 30% 30%,' + (prefab.four_btn_color || "#2F32FF") + ',#1a1a80);"><span>' + n + '</span></div>';
-              }).join("") +
-              '</div></div></div></div></body></html>';
+              }).join("") + '</div></div></div></div></body></html>';
     }
 
     function setStatus(msg, type) {
       const el = document.getElementById("json-status");
       if (!el) return;
-      el.textContent = msg;
-      el.className = type || "";
+      el.textContent = msg; el.className = type || "";
     }
 
     function rebuild() {
@@ -731,26 +601,19 @@
 
     function loadJSON(data) {
       if (!Array.isArray(data) || data.length < 2) {
-        setStatus("Неверный формат JSON (ожидается [headers, ...rows])", "err");
-        return;
+        setStatus("Неверный формат JSON", "err"); return;
       }
-      headers = data[0];
-      rows = data.slice(1);
-      currentRowIndex = 0;
-
+      headers = data[0]; rows = data.slice(1); currentRowIndex = 0;
       const sel = document.getElementById("json-row-selector");
       if (sel) {
         sel.innerHTML = "";
         rows.forEach(function(r, i) {
           const opt = document.createElement("option");
-          opt.value = i;
-          opt.textContent = (r[0] || r[1] || ("Строка " + (i + 1)));
+          opt.value = i; opt.textContent = r[0] || r[1] || ("Строка " + (i + 1));
           sel.appendChild(opt);
         });
-        sel.style.display = rows.length > 1 ? "block" : "none";
-        sel.value = "0";
+        sel.style.display = rows.length > 1 ? "block" : "none"; sel.value = "0";
       }
-
       rebuild();
       setStatus("Загружено строк: " + rows.length, "ok");
     }
@@ -761,97 +624,58 @@
         if (!file) return;
         const reader = new FileReader();
         reader.onload = function() {
-          try {
-            loadJSON(JSON.parse(reader.result));
-          } catch (e) {
-            setStatus("Ошибка JSON: " + e.message, "err");
-            console.error(e);
-          }
+          try { loadJSON(JSON.parse(reader.result)); }
+          catch (e) { setStatus("Ошибка JSON: " + e.message, "err"); }
         };
         reader.onerror = function() { setStatus("Не удалось прочитать файл", "err"); };
         reader.readAsText(file);
         event.target.value = "";
       },
-
       handleRowChange: function(event) {
         currentRowIndex = parseInt(event.target.value, 10) || 0;
         rebuild();
-        setStatus("Выбран: " + (rows[currentRowIndex] && rows[currentRowIndex][0]), "ok");
         const overlay = document.getElementById("design-preview-overlay");
         if (overlay && overlay.classList.contains("active")) this.showPreview();
       },
-
       showPreview: function() {
-        if (!lastHTML) {
-          setStatus("Сначала загрузите JSON дизайн", "err");
-          return;
-        }
+        if (!lastHTML) { setStatus("Сначала загрузите JSON дизайн", "err"); return; }
         const overlay = document.getElementById("design-preview-overlay");
         const frame = document.getElementById("design-preview-frame");
         if (!overlay || !frame) return;
-
-        try {
-          frame.removeAttribute("src");
-          frame.srcdoc = "";
-        } catch (e) {}
-
-        frame.onload = null;
-        frame.src = "about:blank";
+        try { frame.removeAttribute("src"); frame.srcdoc = ""; } catch (e) {}
+        frame.onload = null; frame.src = "about:blank";
         frame.onload = function() {
           frame.onload = null;
           try {
             const doc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
-            if (doc) {
-              doc.open();
-              doc.write(lastHTML);
-              doc.close();
-            } else {
-              frame.srcdoc = lastHTML;
-            }
-          } catch (err) {
-            console.warn("[DesignBuilder] fallback srcdoc", err);
-            frame.srcdoc = lastHTML;
-          }
+            if (doc) { doc.open(); doc.write(lastHTML); doc.close(); }
+            else frame.srcdoc = lastHTML;
+          } catch (err) { frame.srcdoc = lastHTML; }
         };
         frame.src = "about:blank";
         overlay.classList.add("active");
         const btnHide = document.getElementById("btn-hide-design");
         if (btnHide) btnHide.style.display = "block";
       },
-
       hidePreview: function() {
         const overlay = document.getElementById("design-preview-overlay");
         const frame = document.getElementById("design-preview-frame");
         if (overlay) overlay.classList.remove("active");
         if (frame) {
-          try {
-            frame.onload = null;
-            frame.removeAttribute("src");
-            frame.srcdoc = "";
-            frame.src = "about:blank";
-          } catch (e) {}
+          try { frame.onload = null; frame.removeAttribute("src"); frame.srcdoc = ""; frame.src = "about:blank"; } catch (e) {}
         }
         const btnHide = document.getElementById("btn-hide-design");
         if (btnHide) btnHide.style.display = "none";
       },
-
       exportDesignHTML: function() {
         if (!lastHTML) return;
         const blob = new Blob([lastHTML], { type: "text/html;charset=utf-8" });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
         a.download = ((rows[currentRowIndex] && rows[currentRowIndex][0]) || "design") + ".html";
-        a.click();
-        URL.revokeObjectURL(a.href);
+        a.click(); URL.revokeObjectURL(a.href);
       },
-
-      getLastHTML: function() { return lastHTML; },
-      getCurrentPrefab: function() {
-        if (!rows.length) return null;
-        return parsePrefab(rows[currentRowIndex]);
-      },
-      getHeaders: function() { return headers.slice(); },
-      getRows: function() { return rows; },
+      getCurrentPrefab: function() { return rows.length ? parsePrefab(rows[currentRowIndex]) : null; },
       loadJSON: loadJSON
     };
   })();
@@ -860,34 +684,26 @@
   /* ========== QuestSim ========== */
   const QuestSim = (() => {
     const RES = "./assets/resources";
-
-    let QUEST_DATA = [];
-    let ANSWER_DATA = {};
-    let currentQuest = null;
-    let selectedOptionIdx = -1;
-    let carouselIdx = 0;
-    let timerId = null;
-    let timeLeft = 0;
-    let inputValue = "";
+    let QUEST_DATA = [], ANSWER_DATA = {}, currentQuest = null;
+    let selectedOptionIdx = -1, carouselIdx = 0, timerId = null, timeLeft = 0, inputValue = "";
+    let currentOptions = [];
 
     function $(id) { return document.getElementById(id); }
 
     function setStatus(msg, type) {
       const el = $("sim-status");
       if (!el) return;
-      el.textContent = msg;
-      el.className = type || "";
+      el.textContent = msg; el.className = type || "";
     }
 
     function stripTags(t) {
       if (!t) return "";
       return String(t)
-              .replace(/<size=[^>]+>/gi, "")
-              .replace(/<\/size>/gi, "")
+              .replace(/<size=[^>]+>/gi, "").replace(/<\/size>/gi, "")
               .replace(/<color=["']?#?[^"'>]+["']?>/gi, '<span style="color:#E90E1B">')
               .replace(/<\/color>/gi, "</span>")
               .replace(/<b>/gi, "<strong>").replace(/<\/b>/gi, "</strong>")
-              .replace(/<i>/gi, "<em>").replace(/<\/i>/gi, "</em>")
+              .replace(/<i>/gi, "em").replace(/<\/i>/gi, "</em>")
               .replace(/<align=["']?left["']?>/gi, '<div style="text-align:left">')
               .replace(/<\/align>/gi, "</div>")
               .replace(/\t/g, "  ");
@@ -897,8 +713,23 @@
       if (!name) return "";
       const n = String(name).trim();
       if (!n) return "";
-      if (n.startsWith("http://") || n.startsWith("https://") || n.startsWith("./") || n.startsWith("/")) return n;
-      return RES + "/" + n + ".png";
+      if (/^(https?:|\/\/|\.\/|\/)/i.test(n)) return n;
+      return RES + "/" + n + (/\.[a-z0-9]+$/i.test(n) ? "" : ".png");
+    }
+
+    /** Генерация HTML для картинок и доп. ресурсов из полей таблицы */
+    function renderMediaMarkup(pictureName, textContent) {
+      var html = "";
+      if (pictureName && String(pictureName).trim() !== "") {
+        var imgUrl = normalizeAsset(pictureName);
+        if (imgUrl) {
+          html += '<div class="resource-image-wrap"><img src="' + imgUrl + '" alt="Ресурс" onerror="this.style.display=\'none\'" /></div>';
+        }
+      }
+      if (textContent) {
+        html += stripTags(textContent);
+      }
+      return html;
     }
 
     function setCornerBg(el, imgName) {
@@ -910,10 +741,8 @@
     function applyDesign() {
       const p = DesignBuilder.getCurrentPrefab && DesignBuilder.getCurrentPrefab();
       if (!p) return;
-
       const bg = $("sim-bg");
       if (bg && p.back_image) bg.style.backgroundImage = "url('" + normalizeAsset(p.back_image) + "')";
-
       const titleBar = $("sim-title-bar");
       if (titleBar) {
         if (p.title_bg_color) titleBar.style.backgroundColor = p.title_bg_color;
@@ -923,12 +752,10 @@
         }
       }
       if (p.title_color) $("sim-title-text").style.color = p.title_color;
-
       const titleCorner = p.title_corner_image || p.main_corner || "RusStyleElement";
       ["sim-title-c-tl","sim-title-c-tr","sim-title-c-bl","sim-title-c-br"].forEach(function(id) {
         setCornerBg($(id), titleCorner);
       });
-
       const main = $("sim-main");
       if (main) {
         if (p.main_bg_color) main.style.backgroundColor = p.main_bg_color;
@@ -940,12 +767,10 @@
       ["sim-main-c-tl","sim-main-c-tr","sim-main-c-bl","sim-main-c-br"].forEach(function(id) {
         setCornerBg($(id), p.main_corner || "RusStyleElement");
       });
-
       const d1 = $("sim-decor-1"), d2 = $("sim-decor-2"), d3 = $("sim-decor-3");
       if (d1) d1.style.backgroundImage = "url('" + normalizeAsset(p.main_decor1 || "Line2S") + "')";
       if (d2) d2.style.backgroundImage = "url('" + normalizeAsset(p.main_decor2 || "Line2S") + "')";
       if (d3) d3.style.backgroundImage = "url('" + normalizeAsset(p.main_decor1 || "Line2S") + "')";
-
       [$("sim-help-up"), $("sim-help-down")].forEach(function(card) {
         if (!card) return;
         if (p.left_bg_color) card.style.backgroundColor = p.left_bg_color;
@@ -960,7 +785,6 @@
       });
       const leftMandala = $("sim-left-mandala");
       if (leftMandala) leftMandala.style.backgroundImage = "url('" + normalizeAsset("mandala") + "')";
-
       const rightCard = $("sim-right-help");
       if (rightCard) {
         if (p.right_bg_color) rightCard.style.backgroundColor = p.right_bg_color;
@@ -977,7 +801,6 @@
         rightMandala.style.backgroundImage = "url('" + normalizeAsset("mandala") + "')";
         rightMandala.style.opacity = "0.4";
       }
-
       const btnArea = $("sim-buttons-area");
       if (btnArea) {
         if (p.buttons_bg_color) btnArea.style.backgroundColor = p.buttons_bg_color;
@@ -989,69 +812,109 @@
     }
 
     function normalizeQuests(quests) {
-      if (Array.isArray(quests)) {
-        if (quests.length > 0 && Array.isArray(quests[0]) && typeof quests[0][0] === "string") {
-          const headers = quests[0];
-          return quests.slice(1).map(function(row) {
-            const o = {};
-            headers.forEach(function(h, i) { o[h] = row[i]; });
-            return {
-              id: o.id || o.QuestID,
-              question: o.Question,
-              task: parseInt(o.Task, 10) || 1,
-              answers: (o.AnswerList || "").split(",").map(function(s) { return s.trim(); }).filter(Boolean),
-              timer: parseFloat(o.Timer) || 0,
-              rightIndices: (o.RightWayIndx || "").split(",").map(function(s) { return parseInt(s.trim(), 10); }).filter(function(n) { return !isNaN(n); }),
-              rightQuest: o.RightWayQuest,
-              rightReactionSign: o.RightReactionSign,
-              rightReaction: o.RightReaction,
-              wrongQuest: o.WrongWayQuest,
-              wrongReactionSign: o.WrongReactionSign,
-              wrongReaction: o.WrongReaction,
-              nextQuest: o.NextWayQuest,
-              goalIndex: parseInt(o.GoalIndex, 10)
-            };
-          });
-        }
-        return quests;
+      if (Array.isArray(quests) && quests.length > 0 && Array.isArray(quests[0]) && typeof quests[0][0] === "string") {
+        const headers = quests[0];
+        return quests.slice(1).map(function(row) {
+          const o = {};
+          headers.forEach(function(h, i) { o[h] = row[i]; });
+          return {
+            id: o.id || o.QuestID,
+            question: o.Question || "",
+            picture: o.QuestPicture_Image || o.Picture || o.picture || "",
+            task: parseInt(o.Task, 10) || 1,
+            answers: String(o.AnswerList || "").split(",").map(function(s) { return s.trim(); }).filter(Boolean),
+            timer: parseFloat(o.Timer) || 0,
+            rightIndices: String(o.RightWayIndx || "").split(",").map(function(s) { return parseInt(s.trim(), 10); }).filter(function(n) { return !isNaN(n); }),
+            rightQuest: o.RightWayQuest || "",
+            rightReactionSign: o.RightReactionSign || "",
+            rightReaction: o.RightReaction || "",
+            wrongQuest: o.WrongWayQuest || "",
+            wrongReactionSign: o.WrongReactionSign || "",
+            wrongReaction: o.WrongReaction || "",
+            nextQuest: o.NextWayQuest || "",
+            goalIndex: parseInt(o.GoalIndex, 10)
+          };
+        });
       }
-      if (quests && Array.isArray(quests.quests)) return quests.quests;
-      if (quests && Array.isArray(quests.list)) return quests.list;
-      if (quests && typeof quests === "object") {
-        return Object.values(quests).filter(function(v) { return v && typeof v === "object" && v.id; });
-      }
+      if (Array.isArray(quests)) return quests;
       return [];
     }
 
+    /** Разбор answers: берем MainTxt_Text + ресурсы и картинки */
     function normalizeAnswers(answers) {
-      if (answers && typeof answers === "object" && !Array.isArray(answers)) return answers;
-      if (Array.isArray(answers)) {
-        if (answers.length > 0 && Array.isArray(answers[0]) && typeof answers[0][0] === "string") {
-          const headers = answers[0];
-          const map = {};
-          answers.slice(1).forEach(function(row) {
-            const o = {};
-            headers.forEach(function(h, i) { o[h] = row[i]; });
-            const id = o.id || o.AnswerID;
-            if (id) {
-              map[id] = {
-                id: id,
-                type: o.AnswerType || "",
-                title: o.TitleText_Text || "",
-                mainText: o.MainTxt_Text || "",
-                helpUp: o.HelpUpText_Text || "",
-                helpDown: o.HelpDownText_Text || "",
-                question: o.Question || ""
-              };
-            }
-          });
-          return map;
+      var map = {};
+
+      function put(id, raw) {
+        if (!id) return;
+        id = String(id).trim();
+        var mainText = "";
+        var candidates = [
+          raw.MainTxt_Text, raw.MainText_Text, raw.MainTxt, raw.MainText,
+          raw.mainText, raw.Text, raw.text, raw.AnswerText
+        ];
+        for (var i = 0; i < candidates.length; i++) {
+          if (candidates[i] != null && String(candidates[i]).trim() !== "") {
+            mainText = String(candidates[i]);
+            break;
+          }
         }
-        const map = {};
-        answers.forEach(function(a) { if (a && a.id) map[a.id] = a; });
+        map[id] = {
+          id: id,
+          type: raw.AnswerType || raw.type || "",
+          title: raw.TitleText_Text || raw.title || "",
+          mainText: mainText,
+          helpUp: raw.HelpUpText_Text || raw.helpUp || "",
+          helpDown: raw.HelpDownText_Text || raw.helpDown || "",
+          question: raw.Question || raw.question || "",
+          picture: raw.AnswerPicture_Image || raw.Picture || raw.picture || ""
+        };
+      }
+
+      if (Array.isArray(answers) && answers.length > 0 && Array.isArray(answers[0])) {
+        var headers = answers[0].map(function(h) { return String(h == null ? "" : h).trim(); });
+        var idxMain = -1;
+        for (var hi = 0; hi < headers.length; hi++) {
+          var hl = headers[hi].toLowerCase();
+          if (hl === "maintxt_text" || hl === "maintext_text" || hl === "maintxt" || hl === "maintext") {
+            idxMain = hi; break;
+          }
+        }
+        answers.slice(1).forEach(function(row) {
+          if (!row || !row.length) return;
+          var o = {};
+          headers.forEach(function(h, i) { if (h) o[h] = row[i] != null ? row[i] : ""; });
+          if (idxMain >= 0 && (o.MainTxt_Text == null || o.MainTxt_Text === "") && row[idxMain] != null) {
+            o.MainTxt_Text = row[idxMain];
+          }
+          var id = o.id || o.AnswerID || o.AnswerId || row[0];
+          put(id, o);
+        });
         return map;
       }
-      return {};
+
+      if (answers && typeof answers === "object" && !Array.isArray(answers)) {
+        Object.keys(answers).forEach(function(k) { put(k, answers[k] || {}); });
+        return map;
+      }
+
+      if (Array.isArray(answers)) {
+        answers.forEach(function(a) { if (a && a.id) put(a.id, a); });
+      }
+      return map;
+    }
+
+    function detectKind(data, fileName) {
+      var name = (fileName || "").toLowerCase();
+      if (name.indexOf("quest") !== -1) return "quest";
+      if (name.indexOf("answer") !== -1) return "answer";
+      if (name.indexOf("arprefab") !== -1 || name.indexOf("design") !== -1) return "design";
+      if (Array.isArray(data) && data[0] && Array.isArray(data[0])) {
+        var h = data[0].map(function(x) { return String(x || "").toLowerCase(); });
+        if (h.indexOf("answerlist") !== -1 || h.indexOf("questid") !== -1) return "quest";
+        if (h.indexOf("answertype") !== -1 || h.indexOf("maintxt_text") !== -1 || h.indexOf("answerid") !== -1) return "answer";
+        if (h.indexOf("backgradient_image") !== -1) return "design";
+      }
+      return "unknown";
     }
 
     function readFileAsJson(file) {
@@ -1078,33 +941,25 @@
     async function handleBundleFiles(event) {
       const files = Array.from(event.target.files || []);
       if (!files.length) return;
-
       try {
         let qData = null, aData = null, designData = null;
-
         for (const file of files) {
-          const name = file.name.toLowerCase();
-          if (name.indexOf("quest") !== -1) qData = await readFileAsJson(file);
-          else if (name.indexOf("answer") !== -1) aData = await readFileAsJson(file);
-          else if (name.indexOf("arprefab") !== -1 || name.indexOf("design") !== -1) designData = await readFileAsJson(file);
+          const data = await readFileAsJson(file);
+          const kind = detectKind(data, file.name);
+          if (kind === "quest") qData = data;
+          else if (kind === "answer") aData = data;
+          else if (kind === "design") designData = data;
+          else if (!qData) qData = data;
         }
-
-        if (!qData && files.length === 1) qData = await readFileAsJson(files[0]);
-
         if (qData) QUEST_DATA = normalizeQuests(qData);
-
         if (!aData) aData = await tryFetchJson("./answers.json") || await tryFetchJson("./assets/answers.json");
         if (aData) ANSWER_DATA = normalizeAnswers(aData);
-
         if (!designData) designData = await tryFetchJson("./arprefabsdesign.json") || await tryFetchJson("./assets/arprefabsdesign.json");
         if (designData) DesignBuilder.loadJSON(designData);
-
-        if (!QUEST_DATA.length) throw new Error("Не удалось загрузить квесты. Выберите questtable.json!");
-
-        if (!Object.keys(ANSWER_DATA).length) {
-          setStatus("Внимание: answers.json не загружен — варианты будут пустыми. Выберите оба файла.", "err");
-        }
-
+        if (!QUEST_DATA.length) throw new Error("Нет квестов (questtable.json)");
+        var ansCount = Object.keys(ANSWER_DATA).length;
+        setStatus("Квестов: " + QUEST_DATA.length + ", ответов: " + ansCount +
+                (ansCount ? "" : " — загрузите answers.json!"), ansCount ? "ok" : "err");
         start();
       } catch (e) {
         setStatus("Ошибка: " + e.message, "err");
@@ -1113,15 +968,11 @@
       event.target.value = "";
     }
 
-    /* Timer — значение из JSON = МИНУТЫ */
     function startTimer(minutes) {
       clearInterval(timerId);
       var bar = $("sim-timer-bar");
       var totalSeconds = Math.max(0, Math.round((parseFloat(minutes) || 0) * 60));
-      if (!totalSeconds) {
-        if (bar) bar.style.width = "100%";
-        return;
-      }
+      if (!totalSeconds) { if (bar) bar.style.width = "100%"; return; }
       timeLeft = totalSeconds;
       var total = totalSeconds;
       if (bar) bar.style.width = "100%";
@@ -1130,7 +981,7 @@
         if (bar) bar.style.width = (timeLeft / total * 100) + "%";
         if (timeLeft <= 0) {
           clearInterval(timerId);
-          showReaction("⏳", "Время вышло! Попробуйте снова.", "Закрыть", function() { stop(); });
+          showReaction("⏳", "Время вышло!", "Закрыть", function() { stop(); });
         }
       }, 1000);
     }
@@ -1147,6 +998,56 @@
       };
     }
 
+    function getAnswer(id) {
+      if (!id) return null;
+      return ANSWER_DATA[id] || ANSWER_DATA[String(id).trim()] || null;
+    }
+
+    /** Заполнить панели из одного answer-объекта (с учетом ресурсов и картинок) */
+    function applyAnswerToPanels(ans, isMaster) {
+      if (!ans) ans = {};
+      // title
+      if (ans.title) $("sim-title-text").innerHTML = stripTags(ans.title);
+      // helps
+      var up = $("sim-help-up") && $("sim-help-up").querySelector(".help-body");
+      var down = $("sim-help-down") && $("sim-help-down").querySelector(".help-body");
+      var right = $("sim-right-help") && $("sim-right-help").querySelector(".help-body");
+
+      if (up) up.innerHTML = renderMediaMarkup("", ans.helpUp || (isMaster ? "Когда найдено испытание, здесь отображается задание." : ""));
+      if (down) down.innerHTML = renderMediaMarkup("", ans.helpDown || (isMaster ? "Перед наведением на AR-цель осмотрись камерой вокруг." : ""));
+      // правая панель: Question ответа
+      if (right) right.innerHTML = renderMediaMarkup("", ans.question || "");
+
+      // основной блок с поддержкой картинок
+      var mainContent = $("sim-main-content");
+      if (mainContent) {
+        var htmlContent = renderMediaMarkup(ans.picture, ans.mainText);
+        if (htmlContent) {
+          mainContent.innerHTML = '<div class="main-text">' + htmlContent + "</div>";
+        } else if (isMaster) {
+          mainContent.innerHTML = "";
+        }
+      }
+    }
+
+    function showQuestBanner(text, picture) {
+      var banner = $("sim-quest-banner");
+      var body = $("sim-quest-banner-text");
+      if (!banner || !body) return;
+      var content = renderMediaMarkup(picture, text);
+      if (!content || !String(content).trim()) {
+        hideQuestBanner();
+        return;
+      }
+      body.innerHTML = content;
+      banner.classList.add("active");
+    }
+
+    function hideQuestBanner() {
+      var banner = $("sim-quest-banner");
+      if (banner) banner.classList.remove("active");
+    }
+
     function loadQuest(qid) {
       var quest = QUEST_DATA.find(function(q) { return q.id === qid; });
       if (!quest) { setStatus("Квест не найден: " + qid, "err"); return; }
@@ -1154,22 +1055,22 @@
       selectedOptionIdx = -1;
       carouselIdx = 0;
       inputValue = "";
-      var masterAns = quest.answers && quest.answers[0] ? ANSWER_DATA[quest.answers[0]] : null;
+      currentOptions = (quest.answers || []).slice(1);
 
-      $("sim-title-text").innerHTML = stripTags(
-              (masterAns && masterAns.title) || ((quest.question || "").substring(0, 70) + "...")
-      );
+      var master = quest.answers && quest.answers[0] ? getAnswer(quest.answers[0]) : null;
+
+      // 1) Question & Picture из questtable → выезжающая сверху панель
+      showQuestBanner(quest.question || "", quest.picture || "");
+
+      // 2) Панели из master answer
       $("sim-quest-badge").textContent = quest.id;
+      if (master && master.title) {
+        $("sim-title-text").innerHTML = stripTags(master.title);
+      } else {
+        $("sim-title-text").innerHTML = stripTags((quest.question || "").substring(0, 60) + (quest.question && quest.question.length > 60 ? "…" : ""));
+      }
+      applyAnswerToPanels(master, true);
 
-      var helpUpBody = $("sim-help-up") && $("sim-help-up").querySelector(".help-body");
-      var helpDownBody = $("sim-help-down") && $("sim-help-down").querySelector(".help-body");
-      var rightBody = $("sim-right-help") && $("sim-right-help").querySelector(".help-body");
-
-      if (helpUpBody) helpUpBody.innerHTML = stripTags((masterAns && masterAns.helpUp) || "Когда найдено испытание, здесь отображается задание.");
-      if (helpDownBody) helpDownBody.innerHTML = stripTags((masterAns && masterAns.helpDown) || "Перед наведением на AR-цель осмотрись камерой вокруг.");
-      if (rightBody) rightBody.innerHTML = stripTags((masterAns && masterAns.question) || "");
-
-      $("sim-narrative").innerHTML = stripTags(quest.question || "");
       $("sim-ar-hint").textContent = "Наведи камеру на AR-метку • " + quest.id +
               (quest.goalIndex != null ? " • " + (quest.goalIndex + 1) + " / " + QUEST_DATA.length : "");
 
@@ -1181,25 +1082,16 @@
     function renderTask() {
       var task = currentQuest.task;
       var ansIds = currentQuest.answers || [];
-      var master = ansIds[0] ? ANSWER_DATA[ansIds[0]] : null;
-      var mainContent = $("sim-main-content");
+      var master = ansIds[0] ? getAnswer(ansIds[0]) : null;
       var btnArea = $("sim-buttons-area");
-      mainContent.innerHTML = "";
       btnArea.innerHTML = "";
-
-      if (master && master.mainText) {
-        var div = document.createElement("div");
-        div.className = "main-text";
-        div.innerHTML = stripTags(master.mainText);
-        mainContent.appendChild(div);
-      }
 
       var p = DesignBuilder.getCurrentPrefab && DesignBuilder.getCurrentPrefab();
       var nextLabel = (p && p.btn_next_text) || "Дальше";
       var ph = (p && p.input_ph_text) || "ВВЕДИТЕ ОТВЕТ";
 
       if (task === 1) {
-        var options = ansIds.slice(1);
+        var options = currentOptions;
         var masterType = (master && master.type) || "Slide";
 
         if (masterType === "Slide" && options.length > 0) {
@@ -1217,19 +1109,34 @@
 
           function updateCarousel() {
             var oid = options[carouselIdx];
-            var opt = oid ? ANSWER_DATA[oid] : null;
-            var text = (opt && opt.mainText) ? opt.mainText : (oid ? ("[" + oid + "]") : "…");
-            display.innerHTML = stripTags(text);
+            var opt = getAnswer(oid);
+            var optText = opt ? ((opt.mainText && String(opt.mainText).trim()) ? opt.mainText : opt.question) : "";
+            
+            // Рендерим ТОЛЬКО ТЕКСТ в самом карусельном блоке (без картинок)
+            display.innerHTML = stripTags(optText) || ("Нет текста для " + oid);
             display.classList.toggle("active-opt", carouselIdx === selectedOptionIdx);
             leftBtn.disabled = carouselIdx === 0;
             rightBtn.disabled = carouselIdx >= options.length - 1;
+
+            // Отображаем изображение и полные данные текущего выбранного слайда в ГЛАВНОМ центральном окне
+            if (opt) {
+              applyAnswerToPanels(opt, false);
+            }
           }
 
           leftBtn.onclick = function() {
-            if (carouselIdx > 0) { carouselIdx--; updateCarousel(); }
+            if (carouselIdx > 0) {
+              carouselIdx--;
+              selectedOptionIdx = carouselIdx;
+              updateCarousel();
+            }
           };
           rightBtn.onclick = function() {
-            if (carouselIdx < options.length - 1) { carouselIdx++; updateCarousel(); }
+            if (carouselIdx < options.length - 1) {
+              carouselIdx++;
+              selectedOptionIdx = carouselIdx;
+              updateCarousel();
+            }
           };
           display.onclick = function() {
             selectedOptionIdx = carouselIdx;
@@ -1248,17 +1155,10 @@
           ok.onclick = function() {
             var idx = selectedOptionIdx >= 0 ? selectedOptionIdx : carouselIdx;
             var oid = options[idx];
-            if (!oid) {
-              setStatus("Нет варианта ответа (проверьте answers.json)", "err");
-              return;
-            }
+            if (!oid) { setStatus("Нет варианта", "err"); return; }
             checkAnswer(oid, idx + 1);
           };
           btnArea.appendChild(ok);
-
-          if (!ANSWER_DATA[options[0]]) {
-            setStatus("Варианты пустые: загрузите answers.json вместе с questtable.json", "err");
-          }
         } else if (masterType === "InputField" && options.length > 0) {
           var iwrap = document.createElement("div");
           iwrap.className = "input-wrap";
@@ -1270,33 +1170,31 @@
           ok2.className = "action-btn"; ok2.textContent = "ОК"; ok2.onclick = checkInput;
           iwrap.appendChild(inp); iwrap.appendChild(ok2);
           btnArea.appendChild(iwrap);
-        } else {
+        } else if (options.length > 0) {
           var grid = document.createElement("div");
           grid.className = "btn-grid";
           options.forEach(function(oid, idx) {
-            var opt = ANSWER_DATA[oid];
+            var opt = getAnswer(oid);
             var btn = document.createElement("button");
             btn.className = "q-btn";
-            btn.innerHTML = stripTags((opt && opt.mainText) || oid);
-            btn.onclick = function() { checkAnswer(oid, idx + 1); };
+            var optText = (opt && (opt.mainText || opt.question)) || oid;
+            
+            // В кнопках выводим только очищенный текст
+            btn.innerHTML = stripTags(optText);
+            btn.onclick = function() {
+              applyAnswerToPanels(opt, false);
+              checkAnswer(oid, idx + 1);
+            };
             grid.appendChild(btn);
           });
           btnArea.appendChild(grid);
         }
       } else if (task === 2) {
-        var art = document.createElement("div");
-        art.className = "art-screen";
-        art.innerHTML = "<h2>✦ Артефакт</h2><p>" + stripTags((master && master.mainText) || "Продолжай путь...") + "</p>";
-        mainContent.appendChild(art);
         var next = document.createElement("button");
         next.className = "action-btn"; next.textContent = nextLabel;
         next.onclick = function() { goTo(currentQuest.rightQuest || currentQuest.nextQuest); };
         btnArea.appendChild(next);
       } else if (task === 3) {
-        var art3 = document.createElement("div");
-        art3.className = "art-screen";
-        art3.innerHTML = "<h2>⚠️ Тупик</h2><p>" + stripTags((master && master.mainText) || "Ах, пусто...") + "</p>";
-        mainContent.appendChild(art3);
         var next3 = document.createElement("button");
         next3.className = "action-btn"; next3.textContent = "Вернуться";
         next3.onclick = function() { goTo(currentQuest.wrongQuest || currentQuest.nextQuest); };
@@ -1329,28 +1227,19 @@
     }
 
     function checkInput() {
-      var options = (currentQuest.answers || []).slice(1);
+      var options = currentOptions;
       var val = inputValue.trim().toLowerCase();
       var isCorrect = false;
       options.forEach(function(oid) {
-        var opt = ANSWER_DATA[oid];
-        var optText = ((opt && opt.mainText) || "").trim().toLowerCase();
+        var opt = getAnswer(oid);
+        var optText = ((opt && (opt.mainText || opt.question)) || "").trim().toLowerCase();
         if (optText && (optText === val || val.indexOf(optText) !== -1 || optText.indexOf(val) !== -1)) isCorrect = true;
       });
       if (isCorrect) {
-        showReaction(
-                currentQuest.rightReactionSign || "✦",
-                currentQuest.rightReaction || "Верно!",
-                "Дальше",
-                function() { goTo(currentQuest.rightQuest); }
-        );
+        showReaction(currentQuest.rightReactionSign || "✦", currentQuest.rightReaction || "Верно!", "Дальше",
+                function() { goTo(currentQuest.rightQuest); });
       } else {
-        showReaction(
-                currentQuest.wrongReactionSign || "✖",
-                currentQuest.wrongReaction || "Неправильно.",
-                "Повторить",
-                function() {}
-        );
+        showReaction(currentQuest.wrongReactionSign || "✖", currentQuest.wrongReaction || "Неправильно.", "Повторить", function() {});
       }
     }
 
@@ -1365,13 +1254,12 @@
       $("sim-overlay").classList.add("active");
       var startId = (QUEST_DATA[0] && QUEST_DATA[0].id) || "Start";
       loadQuest(startId);
-      setStatus("Симуляция: " + QUEST_DATA.length + " квестов" +
-              (Object.keys(ANSWER_DATA).length ? "" : " (без answers.json)"), "ok");
       $("sim-toolbar-title").textContent = "Симуляция • " + QUEST_DATA.length + " квестов";
     }
 
     function stop() {
       stopTimer();
+      hideQuestBanner();
       $("sim-overlay").classList.remove("active");
       $("sim-reaction").classList.remove("active");
       setStatus("", "");
@@ -1382,6 +1270,20 @@
       $("sim-reaction").classList.remove("active");
       if (QUEST_DATA.length) loadQuest((QUEST_DATA[0] && QUEST_DATA[0].id) || "Start");
     }
+
+    // banner close listener
+    document.addEventListener("DOMContentLoaded", function() {
+      var banner = $("sim-quest-banner");
+      var closeBtn = $("sim-quest-banner-close");
+      if (banner) banner.addEventListener("click", function(e) {
+        if (e.target === closeBtn) return;
+        hideQuestBanner();
+      });
+      if (closeBtn) closeBtn.addEventListener("click", function(e) {
+        e.stopPropagation();
+        hideQuestBanner();
+      });
+    });
 
     return {
       start: start,
@@ -1397,6 +1299,5 @@
     window.__editor.handleJsonRowChange = function(e) { DesignBuilder.handleRowChange(e); };
   });
 </script>
-
 </body>
 </html>
