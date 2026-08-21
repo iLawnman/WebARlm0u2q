@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>prefab in progress Редактор — Квест Платформа</title>
-  <link rel="stylesheet" href="./prefabeditor/css/styles.css">
+  <title>Редактор — Квест Платформа</title>
+  <link rel="stylesheet" href="./css/styles.css">
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -145,6 +145,125 @@
     }
     #json-status.ok { color: #7dcea0; }
     #json-status.err { color: #e07070; }
+  
+    #sidebar button.btn-run {
+      background: rgba(233, 14, 27, 0.25);
+      border-color: #E90E1B;
+      color: #ff8a8a;
+      font-weight: 600;
+    }
+    #sidebar button.btn-run:hover { background: rgba(233, 14, 27, 0.4); }
+    #sim-status { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+    #sim-status.ok { color: #7dcea0; }
+    #sim-status.err { color: #e07070; }
+    #sim-overlay {
+      display: none; position: absolute; inset: 0; z-index: 60;
+      background: #050505; flex-direction: column;
+    }
+    #sim-overlay.active { display: flex; }
+    #sim-overlay .sim-toolbar {
+      position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 10px;
+      padding: 10px 16px; background: #1a1a20; border-bottom: 1px solid #2a2a35; flex-shrink: 0;
+    }
+    #sim-overlay .sim-toolbar button {
+      padding: 6px 14px; background: #252530; border: 1px solid #2a2a35;
+      border-radius: 6px; color: #e8e8ef; cursor: pointer; font-size: 13px;
+    }
+    #sim-overlay .sim-toolbar button:hover { background: #2e2e3a; }
+    #sim-body { flex: 1; position: relative; overflow: hidden; }
+    #sim-root {
+      position: absolute; inset: 0; display: grid;
+      grid-template-areas: "header header header" "left main right" "footer footer footer";
+      grid-template-columns: minmax(140px, 14%) 1fr minmax(140px, 14%);
+      grid-template-rows: auto 1fr auto; gap: 10px; padding: 12px 14px 10px;
+      color: #f0e6d2; font-family: 'Segoe UI', Georgia, serif; z-index: 1;
+    }
+    @media (max-width: 900px) {
+      #sim-root { grid-template-columns: 1fr; grid-template-areas: "header" "main" "footer"; }
+      #sim-root .side-panel { display: none !important; }
+    }
+    #sim-timer-wrap { position: absolute; top: 0; left: 0; width: 100%; height: 4px; z-index: 5; background: rgba(255,255,255,0.05); }
+    #sim-timer-bar { height: 100%; width: 100%; background: linear-gradient(90deg, #FFD700, #E90E1B); transition: width 1s linear; }
+    #sim-title-bar {
+      grid-area: header; background: rgba(7,7,7,0.93); border: 1px solid #6A550E; border-radius: 10px;
+      padding: 10px 18px; display: flex; align-items: center; justify-content: center; position: relative;
+      box-shadow: 0 0 12px rgba(255,215,0,0.25);
+    }
+    #sim-title-text { font-size: clamp(1rem, 2vw, 1.35rem); color: #FFD700; text-align: center; font-weight: 600; }
+    #sim-quest-badge {
+      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+      font-size: 0.65rem; color: #a09070; opacity: 0.6; border: 1px solid #6A550E; padding: 2px 6px; border-radius: 4px;
+    }
+    .side-panel { display: flex; flex-direction: column; gap: 10px; }
+    #sim-left { grid-area: left; }
+    #sim-right { grid-area: right; }
+    .help-card {
+      background: rgba(7,7,7,0.93); border: 1px solid #6A550E; border-radius: 8px;
+      padding: 12px; font-size: 0.82rem; line-height: 1.5; color: #FF69B4; flex: 1;
+    }
+    .help-card h4 {
+      color: #FFD700; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1px;
+      border-bottom: 1px solid #6A550E; padding-bottom: 4px; margin: 0 0 6px;
+    }
+    #sim-main {
+      grid-area: main; background: rgba(7,7,7,0.93); border: 2px solid #6A550E; border-radius: 14px;
+      padding: 22px 26px; display: flex; flex-direction: column; gap: 14px; position: relative;
+      overflow-y: auto; box-shadow: inset 0 0 40px rgba(0,0,0,0.5), 0 0 12px rgba(255,215,0,0.25);
+    }
+    .deco-line { height: 2px; background: linear-gradient(90deg, transparent, #B8860B, transparent); opacity: 0.4; }
+    .narrative {
+      font-style: italic; color: #a09070; font-size: 0.92rem; border-left: 3px solid #B8860B;
+      padding-left: 14px; line-height: 1.6; white-space: pre-wrap;
+    }
+    .main-text { font-size: clamp(0.95rem, 1.6vw, 1.15rem); line-height: 1.65; color: #f0e6d2; white-space: pre-wrap; flex: 1; }
+    .main-text strong { color: #FFD700; }
+    #sim-footer { grid-area: footer; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    .carousel-wrap { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; max-width: 700px; }
+    .carousel-btn {
+      width: 44px; height: 44px; border-radius: 50%; border: 2px solid #B8860B; background: rgba(0,0,0,0.5);
+      color: #FFD700; font-size: 1.3rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    .carousel-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .carousel-display {
+      flex: 1; min-height: 90px; background: rgba(0,0,0,0.35); border: 1px solid #6A550E; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center; padding: 16px; text-align: center; font-size: 1.1rem; color: #f0e6d2;
+    }
+    .carousel-display.active-opt { border-color: #FFD700; box-shadow: 0 0 12px rgba(255,215,0,0.2); }
+    .btn-grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; width: 100%; }
+    .q-btn {
+      background: linear-gradient(145deg, #141414, #0a0a0a); border: 2px solid #6A550E; color: #FFD700;
+      padding: 12px 22px; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 1rem; min-width: 100px; text-align: center;
+    }
+    .q-btn:hover { border-color: #FFD700; }
+    .input-wrap { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; }
+    .q-input {
+      background: #0a0a0a; border: 2px solid #6A550E; color: #FFD700; padding: 12px 18px; border-radius: 8px;
+      font-size: 1.15rem; text-align: center; min-width: 220px; outline: none; font-family: inherit;
+    }
+    .q-input:focus { border-color: #FFD700; }
+    .q-input::placeholder { color: #a09070; opacity: 0.6; }
+    .action-btn {
+      background: #E90E1B; color: #fff; border: none; padding: 14px 48px; border-radius: 8px;
+      font-size: 1.15rem; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 2px;
+    }
+    .action-btn:hover { background: #ff1a2e; }
+    .art-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; text-align: center; }
+    .art-screen h2 { color: #FFD700; font-size: 2rem; margin: 0; }
+    .art-screen p { font-size: 1.1rem; color: #a09070; max-width: 500px; line-height: 1.6; margin: 0; }
+    #sim-reaction {
+      position: absolute; inset: 0; z-index: 20; background: rgba(0,0,0,0.9);
+      display: none; align-items: center; justify-content: center; flex-direction: column; padding: 30px; text-align: center;
+    }
+    #sim-reaction.active { display: flex; }
+    #sim-reaction-sign { font-size: 4.5rem; margin-bottom: 16px; }
+    #sim-reaction-text { font-size: clamp(1rem, 2vw, 1.25rem); color: #f0e6d2; max-width: 620px; line-height: 1.7; white-space: pre-wrap; }
+    #sim-ar-hint {
+      position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+      background: rgba(7,7,7,0.9); border: 1px solid #6A550E; color: #B8860B;
+      padding: 6px 14px; border-radius: 20px; font-size: 0.72rem; z-index: 5;
+    }
+    .sim-bg-img { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0.25; pointer-events: none; z-index: 0; }
+
   </style>
 </head>
 <body>
@@ -163,6 +282,17 @@
     <div id="json-status"></div>
     <button class="btn-success" id="btn-show-design" style="display:none; margin-top:8px;" onclick="DesignBuilder.showPreview()">Показать дизайн-превью</button>
     <button id="btn-hide-design" style="display:none; margin-top:4px;" onclick="DesignBuilder.hidePreview()">Скрыть превью</button>
+  </div>
+
+  
+  <div class="section">
+    <h3>Симуляция квеста</h3>
+    <button class="btn-run" onclick="QuestSim.start()">▶ Запустить</button>
+    <button onclick="document.getElementById('quest-json-input').click()" style="margin-top:4px;">Загрузить questtable.json</button>
+    <button onclick="document.getElementById('answers-json-input').click()">Загрузить answers.json</button>
+    <input type="file" id="quest-json-input" style="display:none" accept=".json" onchange="QuestSim.handleQuestFile(event)">
+    <input type="file" id="answers-json-input" style="display:none" accept=".json" onchange="QuestSim.handleAnswersFile(event)">
+    <div id="sim-status"></div>
   </div>
 
   <div class="section">
@@ -191,6 +321,48 @@
   </div>
 </div>
 
+  <div id="sim-overlay">
+    <div class="sim-toolbar">
+      <button onclick="QuestSim.stop()">✕ Закрыть</button>
+      <button onclick="QuestSim.restart()">↺ Сначала</button>
+      <span id="sim-toolbar-title" style="margin-left:auto; font-size:13px; color:#aaa;">Симуляция квеста</span>
+    </div>
+    <div id="sim-body">
+      <div class="sim-bg-img" id="sim-bg"></div>
+      <div id="sim-timer-wrap"><div id="sim-timer-bar"></div></div>
+      <div id="sim-root">
+        <header id="sim-title-bar">
+          <div id="sim-title-text"></div>
+          <div id="sim-quest-badge"></div>
+        </header>
+        <aside class="side-panel" id="sim-left">
+          <div class="help-card" id="sim-help-up"><h4>💡 Подсказка</h4><div></div></div>
+          <div class="help-card" id="sim-help-down"><h4>🔍 Совет</h4><div></div></div>
+        </aside>
+        <main id="sim-main">
+          <div class="deco-line"></div>
+          <div id="sim-narrative" class="narrative"></div>
+          <div class="deco-line"></div>
+          <div id="sim-main-content"></div>
+          <div class="deco-line"></div>
+        </main>
+        <aside class="side-panel" id="sim-right">
+          <div class="help-card" id="sim-right-help"><h4>📜 Заметка</h4><div></div></div>
+        </aside>
+        <footer id="sim-footer">
+          <div id="sim-buttons-area"></div>
+        </footer>
+      </div>
+      <div id="sim-reaction">
+        <div id="sim-reaction-sign"></div>
+        <div id="sim-reaction-text"></div>
+        <button class="action-btn" id="sim-reaction-btn" style="margin-top:28px;">Дальше</button>
+      </div>
+      <div id="sim-ar-hint"></div>
+    </div>
+  </div>
+
+
 <div id="inspector">
   <h3>Свойства объекта</h3>
   <div id="inspector-content">
@@ -199,77 +371,75 @@
 </div>
 
 <script>
-  /**
-   * DesignBuilder — получение и построение design из JSON
-   * Ресурсы: ../assets/resources/ (редактор в подпапке)
-   */
-  const DesignBuilder = (() => {
-    let headers = [];
-    let rows = [];
-    let currentRowIndex = 0;
-    let lastHTML = "";
+/**
+ * DesignBuilder — получение и построение design из JSON
+ * (логика из makedesign.js, встроена в редактор)
+ */
+const DesignBuilder = (() => {
+  let headers = [];
+  let rows = [];
+  let currentRowIndex = 0;
+  let lastHTML = "";
 
-    const RES = "./assets/resources";
+  function getVal(row, key, fallback = "") {
+    const idx = headers.indexOf(key);
+    if (idx === -1) return fallback;
+    return (row[idx] || fallback);
+  }
 
-    function getVal(row, key, fallback = "") {
-      const idx = headers.indexOf(key);
-      if (idx === -1) return fallback;
-      return (row[idx] || fallback);
-    }
+  function parsePrefab(row) {
+    return {
+      id: getVal(row, "id"),
+      name: getVal(row, "name"),
+      back_image: getVal(row, "BackGradient_Image") || getVal(row, "BackImage_Image") || "Back3",
+      title_font: getVal(row, "TitleText_Font") || "nk_vitez SDF",
+      title_color: getVal(row, "TitleText_Color") || "#FFD700",
+      title_bg_color: getVal(row, "TitleText_bg_Color") || "#070707EE",
+      title_bg_image: getVal(row, "TitleText_bg_Image") || "ButtonPanelBG",
+      title_corner_image: getVal(row, "TitleText_If_Title_Empty_Corner_Image") || "mandala",
+      title_corner_color: getVal(row, "TitleText_If_Title_Empty_Corner_Color") || "#FF000033",
+      main_bg_color: getVal(row, "MainText_bg_Color") || "#070707EE",
+      main_bg_image: getVal(row, "MainText_bg_Image") || "MainTextPanelDark",
+      main_font: getVal(row, "MainText_MainTxt_Font") || getVal(row, "MainTxt_Font") || "RobotoSlab-Regular SDF",
+      main_color: getVal(row, "MainText_MainTxt_Color") || "#FFFFFF",
+      main_decor_line: getVal(row, "MainText_Decor_2lines_line1_Image") || "Line2S",
+      main_corner: getVal(row, "MainText_4corner_decor_Corner_Image") || "RusStyleElement",
+      main_empty_decor: getVal(row, "MainText_Decor_IfEmpty_Image") || "mandala",
+      main_empty_color: getVal(row, "MainText_Decor_IfEmpty_Color") || "#FF000033",
+      left_bg_color: getVal(row, "LeftPanel_bgLeftPanel_Color") || "#070707EE",
+      left_bg_image: getVal(row, "LeftPanel_bgLeftPanel_Image") || "MainTextPanelDark",
+      left_corner: getVal(row, "LeftPanel_4corner_decor_Corner_Image") || "RusStyleElement",
+      left_empty_image: getVal(row, "LeftPanel_If_Title_Empty_Image") || "mandala",
+      left_help_font: getVal(row, "LeftPanel_HelpUp_Font") || "RobotoSlab-Regular SDF",
+      left_help_color: getVal(row, "LeftPanel_HelpUp_Color") || "#FF69B4",
+      right_bg_color: getVal(row, "RightPanel_bgRight_Panel_Color") || "#070707EE",
+      right_bg_image: getVal(row, "RightPanel_bgRight_Panel_Image") || "MainTextPanelDark",
+      right_corner: getVal(row, "RightPanel_4corner_decor_Corner_Image") || "RusStyleElement",
+      buttons_bg_color: getVal(row, "Buttons_bgButtonsPanel_Color") || "#070707EE",
+      buttons_bg_image: getVal(row, "Buttons_bgButtonsPanel_Image") || "ButtonPanelBG",
+      btn_left_color: getVal(row, "Buttons_Button_Left_Image_Color") || "#DAA520",
+      btn_left_img: getVal(row, "Buttons_Button_Left_Image_Image") || "angle-left",
+      btn_right_color: getVal(row, "Buttons_Button_Right_Image_Color") || "#DAA520",
+      btn_right_img: getVal(row, "Buttons_Button_Right_Image_Image") || "angle-right",
+      btn_next_text: getVal(row, "Buttons_Button_NEXT_Text_Text") || "Дальше",
+      btn_next_font: getVal(row, "Buttons_Button_NEXT_Text_Font") || "nk_vitez SDF",
+      btn_next_color: getVal(row, "Buttons_Button_NEXT_Text_Color") || "#E9BF15",
+      btn_next_bg_color: getVal(row, "Buttons_Button_NEXT_Color") || "#FA0617",
+      input_color: getVal(row, "Buttons_InputField_Color") || "#6A550E",
+      input_img: getVal(row, "Buttons_InputField_Image") || "InputOutline",
+      input_ph_font: getVal(row, "Buttons_InputField_Placeholder_Font") || "nk_vitez SDF",
+      input_ph_color: getVal(row, "Buttons_InputField_Placeholder_Color") || "#D19C27",
+      input_ph_text: getVal(row, "Buttons_InputField_Placeholder_Text") || "ВВЕДИТЕ ОТВЕТ",
+      input_text_color: getVal(row, "Buttons_InputField_Text_Color") || "#FFFFFF",
+      four_btn_color: getVal(row, "Buttons_4Buttons_Color") || "#2F32FF",
+      four_btn_img: getVal(row, "Buttons_4Buttons_Image") || "Circle64px1Shadow",
+      four_btn_rim_img: getVal(row, "Buttons_4Buttons_RIM_Image") || "Decor1",
+      four_btn_label_color: getVal(row, "Buttons_4Buttons_Label_Color") || "#E9BF15",
+      additional_prefab: getVal(row, "additionalCanvas_Prefab") || "BigSparks",
+    };
+  }
 
-    function parsePrefab(row) {
-      return {
-        id: getVal(row, "id"),
-        name: getVal(row, "name"),
-        back_image: getVal(row, "BackGradient_Image") || getVal(row, "BackImage_Image") || "Back3",
-        title_font: getVal(row, "TitleText_Font") || "nk_vitez SDF",
-        title_color: getVal(row, "TitleText_Color") || "#FFD700",
-        title_bg_color: getVal(row, "TitleText_bg_Color") || "#070707EE",
-        title_bg_image: getVal(row, "TitleText_bg_Image") || "ButtonPanelBG",
-        title_corner_image: getVal(row, "TitleText_If_Title_Empty_Corner_Image") || "mandala",
-        title_corner_color: getVal(row, "TitleText_If_Title_Empty_Corner_Color") || "#FF000033",
-        main_bg_color: getVal(row, "MainText_bg_Color") || "#070707EE",
-        main_bg_image: getVal(row, "MainText_bg_Image") || "MainTextPanelDark",
-        main_font: getVal(row, "MainText_MainTxt_Font") || getVal(row, "MainTxt_Font") || "RobotoSlab-Regular SDF",
-        main_color: getVal(row, "MainText_MainTxt_Color") || "#FFFFFF",
-        main_decor_line: getVal(row, "MainText_Decor_2lines_line1_Image") || "Line2S",
-        main_corner: getVal(row, "MainText_4corner_decor_Corner_Image") || "RusStyleElement",
-        main_empty_decor: getVal(row, "MainText_Decor_IfEmpty_Image") || "mandala",
-        main_empty_color: getVal(row, "MainText_Decor_IfEmpty_Color") || "#FF000033",
-        left_bg_color: getVal(row, "LeftPanel_bgLeftPanel_Color") || "#070707EE",
-        left_bg_image: getVal(row, "LeftPanel_bgLeftPanel_Image") || "MainTextPanelDark",
-        left_corner: getVal(row, "LeftPanel_4corner_decor_Corner_Image") || "RusStyleElement",
-        left_empty_image: getVal(row, "LeftPanel_If_Title_Empty_Image") || "mandala",
-        left_help_font: getVal(row, "LeftPanel_HelpUp_Font") || "RobotoSlab-Regular SDF",
-        left_help_color: getVal(row, "LeftPanel_HelpUp_Color") || "#FF69B4",
-        right_bg_color: getVal(row, "RightPanel_bgRight_Panel_Color") || "#070707EE",
-        right_bg_image: getVal(row, "RightPanel_bgRight_Panel_Image") || "MainTextPanelDark",
-        right_corner: getVal(row, "RightPanel_4corner_decor_Corner_Image") || "RusStyleElement",
-        buttons_bg_color: getVal(row, "Buttons_bgButtonsPanel_Color") || "#070707EE",
-        buttons_bg_image: getVal(row, "Buttons_bgButtonsPanel_Image") || "ButtonPanelBG",
-        btn_left_color: getVal(row, "Buttons_Button_Left_Image_Color") || "#DAA520",
-        btn_left_img: getVal(row, "Buttons_Button_Left_Image_Image") || "angle-left",
-        btn_right_color: getVal(row, "Buttons_Button_Right_Image_Color") || "#DAA520",
-        btn_right_img: getVal(row, "Buttons_Button_Right_Image_Image") || "angle-right",
-        btn_next_text: getVal(row, "Buttons_Button_NEXT_Text_Text") || "Дальше",
-        btn_next_font: getVal(row, "Buttons_Button_NEXT_Text_Font") || "nk_vitez SDF",
-        btn_next_color: getVal(row, "Buttons_Button_NEXT_Text_Color") || "#E9BF15",
-        btn_next_bg_color: getVal(row, "Buttons_Button_NEXT_Color") || "#FA0617",
-        input_color: getVal(row, "Buttons_InputField_Color") || "#6A550E",
-        input_img: getVal(row, "Buttons_InputField_Image") || "InputOutline",
-        input_ph_font: getVal(row, "Buttons_InputField_Placeholder_Font") || "nk_vitez SDF",
-        input_ph_color: getVal(row, "Buttons_InputField_Placeholder_Color") || "#D19C27",
-        input_ph_text: getVal(row, "Buttons_InputField_Placeholder_Text") || "ВВЕДИТЕ ОТВЕТ",
-        input_text_color: getVal(row, "Buttons_InputField_Text_Color") || "#FFFFFF",
-        four_btn_color: getVal(row, "Buttons_4Buttons_Color") || "#2F32FF",
-        four_btn_img: getVal(row, "Buttons_4Buttons_Image") || "Circle64px1Shadow",
-        four_btn_rim_img: getVal(row, "Buttons_4Buttons_RIM_Image") || "Decor1",
-        four_btn_label_color: getVal(row, "Buttons_4Buttons_Label_Color") || "#E9BF15",
-        additional_prefab: getVal(row, "additionalCanvas_Prefab") || "BigSparks",
-      };
-    }
-
-    const CSS = `
+  const CSS = `
     @import url('https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@400;700&family=Cinzel:wght@600;700&display=swap');
     :root {
       --gold: #FFD700; --gold2: #E9BF15; --gold3: #D19C27; --gold4: #DAA520;
@@ -404,15 +574,15 @@
     }
   `;
 
-    function buildHTML(p, idx) {
-      const titleSample = idx === 0 ? "Вопрос" : "Базовый вопрос";
-      const mainSample =
-              idx === 0
-                      ? "Текст основного вопроса отображается здесь. Можно использовать несколько строк."
-                      : "Основной текст с белым цветом (Base вариант).";
-      const mainColor = p.main_color || "#FFFFFF";
+  function buildHTML(p, idx) {
+    const titleSample = idx === 0 ? "Вопрос" : "Базовый вопрос";
+    const mainSample =
+      idx === 0
+        ? "Текст основного вопроса отображается здесь. Можно использовать несколько строк."
+        : "Основной текст с белым цветом (Base вариант).";
+    const mainColor = p.main_color || "#FFFFFF";
 
-      return `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
@@ -422,50 +592,50 @@
 </head>
 <body>
   <h1>${escapeHtml(p.id || "Prefab")}</h1>
-  <p class="subtitle">ресурсы из <code>${RES}/</code></p>
+  <p class="subtitle">ресурсы из <code>./assets/resources/</code></p>
 
   <div class="screen">
     <div class="bg"></div>
-    <div class="bg-img" style="background-image: url('${RES}/${p.back_image}.png');"></div>
+    <div class="bg-img" style="background-image: url('./assets/resources/${p.back_image}.png');"></div>
     <div class="content">
-      <div class="title-area" style="background-color: ${p.title_bg_color}; background-image: url('${RES}/${p.title_bg_image}.png'); background-size: cover;">
+      <div class="title-area" style="background-color: ${p.title_bg_color}; background-image: url('./assets/resources/${p.title_bg_image}.png'); background-size: cover;">
         <div class="title-text" style="color: ${p.title_color};">${escapeHtml(titleSample)}</div>
       </div>
 
       <div class="panels">
-        <div class="panel side-panel" style="background-color: ${p.left_bg_color}; background-image: url('${RES}/${p.left_bg_image}.png'); background-size: cover;">
-          <div class="panel-corner tl" style="background-image: url('${RES}/${p.left_corner}.png');"></div>
-          <div class="panel-corner tr" style="background-image: url('${RES}/${p.left_corner}.png');"></div>
-          <div class="panel-corner bl" style="background-image: url('${RES}/${p.left_corner}.png');"></div>
-          <div class="panel-corner br" style="background-image: url('${RES}/${p.left_corner}.png');"></div>
-          <div class="side-empty" style="background-image: url('${RES}/${p.left_empty_image}.png');"></div>
+        <div class="panel side-panel" style="background-color: ${p.left_bg_color}; background-image: url('./assets/resources/${p.left_bg_image}.png'); background-size: cover;">
+          <div class="panel-corner tl" style="background-image: url('./assets/resources/${p.left_corner}.png');"></div>
+          <div class="panel-corner tr" style="background-image: url('./assets/resources/${p.left_corner}.png');"></div>
+          <div class="panel-corner bl" style="background-image: url('./assets/resources/${p.left_corner}.png');"></div>
+          <div class="panel-corner br" style="background-image: url('./assets/resources/${p.left_corner}.png');"></div>
+          <div class="side-empty" style="background-image: url('./assets/resources/${p.left_empty_image}.png');"></div>
           <div style="color: ${p.left_help_color};">Подсказка</div>
         </div>
 
-        <div class="panel main-panel" style="background-color: ${p.main_bg_color}; background-image: url('${RES}/${p.main_bg_image}.png'); background-size: cover;">
-          <div class="panel-corner tl" style="background-image: url('${RES}/${p.main_corner}.png');"></div>
-          <div class="panel-corner tr" style="background-image: url('${RES}/${p.main_corner}.png');"></div>
-          <div class="panel-corner bl" style="background-image: url('${RES}/${p.main_corner}.png');"></div>
-          <div class="panel-corner br" style="background-image: url('${RES}/${p.main_corner}.png');"></div>
-          <div class="decor-line" style="background-image: url('${RES}/${p.main_decor_line}.png');"></div>
+        <div class="panel main-panel" style="background-color: ${p.main_bg_color}; background-image: url('./assets/resources/${p.main_bg_image}.png'); background-size: cover;">
+          <div class="panel-corner tl" style="background-image: url('./assets/resources/${p.main_corner}.png');"></div>
+          <div class="panel-corner tr" style="background-image: url('./assets/resources/${p.main_corner}.png');"></div>
+          <div class="panel-corner bl" style="background-image: url('./assets/resources/${p.main_corner}.png');"></div>
+          <div class="panel-corner br" style="background-image: url('./assets/resources/${p.main_corner}.png');"></div>
+          <div class="decor-line" style="background-image: url('./assets/resources/${p.main_decor_line}.png');"></div>
           <div class="main-text" style="color: ${mainColor};">${escapeHtml(mainSample)}</div>
-          <div class="decor-line" style="background-image: url('${RES}/${p.main_decor_line}.png');"></div>
+          <div class="decor-line" style="background-image: url('./assets/resources/${p.main_decor_line}.png');"></div>
         </div>
 
-        <div class="panel side-panel" style="background-color: ${p.right_bg_color}; background-image: url('${RES}/${p.right_bg_image}.png'); background-size: cover;">
-          <div class="panel-corner tl" style="background-image: url('${RES}/${p.right_corner}.png');"></div>
-          <div class="panel-corner tr" style="background-image: url('${RES}/${p.right_corner}.png');"></div>
-          <div class="panel-corner bl" style="background-image: url('${RES}/${p.right_corner}.png');"></div>
-          <div class="panel-corner br" style="background-image: url('${RES}/${p.right_corner}.png');"></div>
-          <div class="side-empty" style="background-image: url('${RES}/mandala.png'); opacity:0.4;"></div>
+        <div class="panel side-panel" style="background-color: ${p.right_bg_color}; background-image: url('./assets/resources/${p.right_bg_image}.png'); background-size: cover;">
+          <div class="panel-corner tl" style="background-image: url('./assets/resources/${p.right_corner}.png');"></div>
+          <div class="panel-corner tr" style="background-image: url('./assets/resources/${p.right_corner}.png');"></div>
+          <div class="panel-corner bl" style="background-image: url('./assets/resources/${p.right_corner}.png');"></div>
+          <div class="panel-corner br" style="background-image: url('./assets/resources/${p.right_corner}.png');"></div>
+          <div class="side-empty" style="background-image: url('./assets/resources/mandala.png'); opacity:0.4;"></div>
           <div style="color:#888; font-size:0.75rem;">Правая панель</div>
         </div>
       </div>
 
-      <div class="buttons-area" style="background-color: ${p.buttons_bg_color}; background-image: url('${RES}/${p.buttons_bg_image}.png'); background-size: cover;">
+      <div class="buttons-area" style="background-color: ${p.buttons_bg_color}; background-image: url('./assets/resources/${p.buttons_bg_image}.png'); background-size: cover;">
         <div class="buttons-row">
           <div class="nav-btn" title="Left">
-            <div style="width:22px;height:22px;background:url('${RES}/${p.btn_left_img}.png') center/contain no-repeat; filter: drop-shadow(0 0 4px ${p.btn_left_color});"></div>
+            <div style="width:22px;height:22px;background:url('./assets/resources/${p.btn_left_img}.png') center/contain no-repeat; filter: drop-shadow(0 0 4px ${p.btn_left_color});"></div>
           </div>
           <div class="input-wrap">
             <input class="input-field" type="text" placeholder="${escapeHtml(p.input_ph_text)}"
@@ -473,7 +643,7 @@
           </div>
           <button class="next-btn">${escapeHtml(p.btn_next_text)}</button>
           <div class="nav-btn" title="Right">
-            <div style="width:22px;height:22px;background:url('${RES}/${p.btn_right_img}.png') center/contain no-repeat; filter: drop-shadow(0 0 4px ${p.btn_right_color});"></div>
+            <div style="width:22px;height:22px;background:url('./assets/resources/${p.btn_right_img}.png') center/contain no-repeat; filter: drop-shadow(0 0 4px ${p.btn_right_color});"></div>
           </div>
         </div>
         <div class="four-btns">
@@ -504,146 +674,562 @@
   </div>
 </body>
 </html>`;
-    }
+  }
 
-    function escapeHtml(s) {
-      return String(s)
-              .replace(/&/g, "&amp;")
-              .replace(/</g, "&lt;")
-              .replace(/>/g, "&gt;")
-              .replace(/"/g, "&quot;");
-    }
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
 
-    function setStatus(msg, type) {
-      const el = document.getElementById("json-status");
-      if (!el) return;
-      el.textContent = msg;
-      el.className = type || "";
-    }
+  function setStatus(msg, type) {
+    const el = document.getElementById("json-status");
+    if (!el) return;
+    el.textContent = msg;
+    el.className = type || "";
+  }
 
-    function rebuild() {
-      if (!rows.length) return;
-      const row = rows[currentRowIndex];
-      const prefab = parsePrefab(row);
-      lastHTML = buildHTML(prefab, currentRowIndex);
+  function rebuild() {
+    if (!rows.length) return;
+    const row = rows[currentRowIndex];
+    const prefab = parsePrefab(row);
+    lastHTML = buildHTML(prefab, currentRowIndex);
 
-      const title = document.getElementById("preview-title");
-      if (title) title.textContent = prefab.id || `Row ${currentRowIndex + 1}`;
+    const title = document.getElementById("preview-title");
+    if (title) title.textContent = prefab.id || `Row ${currentRowIndex + 1}`;
 
-      if (window.__editor && typeof window.__editor.onDesignBuilt === "function") {
-        window.__editor.onDesignBuilt({
-          html: lastHTML,
-          prefab,
-          rowIndex: currentRowIndex,
-          headers,
-          row,
-        });
-      }
-    }
-
-    function loadJSON(data) {
-      if (!Array.isArray(data) || data.length < 2) {
-        throw new Error("JSON должен быть массивом: [headers, row1, row2, ...]");
-      }
-      headers = data[0];
-      rows = data.slice(1);
-      currentRowIndex = 0;
-
-      const sel = document.getElementById("json-row-selector");
-      sel.innerHTML = "";
-      rows.forEach((r, i) => {
-        const id = (r[0] || `Row ${i + 1}`);
-        const opt = document.createElement("option");
-        opt.value = i;
-        opt.textContent = id;
-        sel.appendChild(opt);
+    // Notify editor if available
+    if (window.__editor && typeof window.__editor.onDesignBuilt === "function") {
+      window.__editor.onDesignBuilt({
+        html: lastHTML,
+        prefab,
+        rowIndex: currentRowIndex,
+        headers,
+        row,
       });
-      sel.style.display = rows.length > 1 ? "block" : "none";
-      sel.value = "0";
+    }
+  }
 
-      document.getElementById("btn-show-design").style.display = "block";
-      document.getElementById("btn-hide-design").style.display = "none";
+  function loadJSON(data) {
+    if (!Array.isArray(data) || data.length < 2) {
+      throw new Error("JSON должен быть массивом: [headers, row1, row2, ...]");
+    }
+    headers = data[0];
+    rows = data.slice(1);
+    currentRowIndex = 0;
 
+    const sel = document.getElementById("json-row-selector");
+    sel.innerHTML = "";
+    rows.forEach((r, i) => {
+      const id = (r[0] || `Row ${i + 1}`);
+      const opt = document.createElement("option");
+      opt.value = i;
+      opt.textContent = id;
+      sel.appendChild(opt);
+    });
+    sel.style.display = rows.length > 1 ? "block" : "none";
+    sel.value = "0";
+
+    document.getElementById("btn-show-design").style.display = "block";
+    document.getElementById("btn-hide-design").style.display = "none";
+
+    rebuild();
+    setStatus(`Загружено: ${rows.length} префаб(ов)`, "ok");
+  }
+
+  return {
+    handleJsonFile(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(reader.result);
+          loadJSON(data);
+        } catch (e) {
+          setStatus("Ошибка JSON: " + e.message, "err");
+          console.error(e);
+        }
+      };
+      reader.onerror = () => setStatus("Не удалось прочитать файл", "err");
+      reader.readAsText(file);
+      event.target.value = "";
+    },
+
+    handleRowChange(event) {
+      currentRowIndex = parseInt(event.target.value, 10) || 0;
       rebuild();
-      setStatus(`Загружено: ${rows.length} префаб(ов)`, "ok");
+      setStatus(`Выбран: ${rows[currentRowIndex] && rows[currentRowIndex][0]}`, "ok");
+      // refresh preview if open
+      const overlay = document.getElementById("design-preview-overlay");
+      if (overlay && overlay.classList.contains("active")) {
+        this.showPreview();
+      }
+    },
+
+    showPreview() {
+      if (!lastHTML) {
+        setStatus("Сначала загрузите JSON дизайн", "err");
+        return;
+      }
+      const overlay = document.getElementById("design-preview-overlay");
+      const frame = document.getElementById("design-preview-frame");
+      frame.srcdoc = lastHTML;
+      overlay.classList.add("active");
+      document.getElementById("btn-hide-design").style.display = "block";
+    },
+
+    hidePreview() {
+      const overlay = document.getElementById("design-preview-overlay");
+      overlay.classList.remove("active");
+      document.getElementById("design-preview-frame").srcdoc = "";
+      document.getElementById("btn-hide-design").style.display = "none";
+    },
+
+    exportDesignHTML() {
+      if (!lastHTML) return;
+      const blob = new Blob([lastHTML], { type: "text/html;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      const name = (rows[currentRowIndex] && rows[currentRowIndex][0]) || "design";
+      a.download = name + ".html";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    },
+
+    /** API for __editor / external use */
+    getLastHTML() { return lastHTML; },
+    getCurrentPrefab() {
+      if (!rows.length) return null;
+      return parsePrefab(rows[currentRowIndex]);
+    },
+    getHeaders() { return headers.slice(); },
+    getRows() { return rows; },
+    loadJSON,
+  };
+})();
+
+
+/**
+ * QuestSim — интерактивная симуляция (логика questsequence.html)
+ * Данные: ./assets/questtable.json, ./assets/answers.json
+ * Дизайн: DesignBuilder.getCurrentPrefab() + ./assets/resources/
+ */
+const QuestSim = (() => {
+  // Пути относительно prefabeditor.html в корне проекта
+  const ASSETS = "./assets";
+  const RES = "./assets/resources";
+
+  let QUEST_DATA = [];
+  let ANSWER_DATA = {};
+  let currentQuest = null;
+  let selectedOptionIdx = -1;
+  let carouselIdx = 0;
+  let timerId = null;
+  let timeLeft = 0;
+  let inputValue = "";
+  let questFileLoaded = false;
+  let answersFileLoaded = false;
+
+  function $(id) { return document.getElementById(id); }
+
+  function setStatus(msg, type) {
+    const el = $("sim-status");
+    if (!el) return;
+    el.textContent = msg;
+    el.className = type || "";
+  }
+
+  function isFileProtocol() {
+    return location.protocol === "file:";
+  }
+
+  function stripTags(t) {
+    if (!t) return "";
+    return String(t)
+      .replace(/<size=[^>]+>/gi, "")
+      .replace(/<\/size>/gi, "")
+      .replace(/<color=["']?#?[^"'>]+["']?>/gi, '<span style="color:#E90E1B">')
+      .replace(/<\/color>/gi, "</span>")
+      .replace(/<b>/gi, "<strong>").replace(/<\/b>/gi, "</strong>")
+      .replace(/<i>/gi, "<em>").replace(/<\/i>/gi, "</em>")
+      .replace(/<align=["']?left["']?>/gi, '<div style="text-align:left">')
+      .replace(/<\/align>/gi, "</div>")
+      .replace(/\t/g, "  ");
+  }
+
+  function normalizeQuests(quests) {
+    if (Array.isArray(quests)) return quests;
+    if (quests && Array.isArray(quests.quests)) return quests.quests;
+    if (quests && Array.isArray(quests.list)) return quests.list;
+    if (quests && typeof quests === "object") {
+      return Object.values(quests).filter(function(v){ return v && typeof v === "object" && v.id; });
+    }
+    return [];
+  }
+
+  function normalizeAnswers(answers) {
+    if (answers && typeof answers === "object" && !Array.isArray(answers)) return answers;
+    if (Array.isArray(answers)) {
+      var map = {};
+      answers.forEach(function(a){ if (a && a.id) map[a.id] = a; });
+      return map;
+    }
+    return {};
+  }
+
+  function applyDesign() {
+    const p = DesignBuilder.getCurrentPrefab && DesignBuilder.getCurrentPrefab();
+    if (!p) return;
+    const bg = $("sim-bg");
+    if (bg && p.back_image) bg.style.backgroundImage = "url('" + RES + "/" + p.back_image + ".png')";
+    const titleBar = $("sim-title-bar");
+    if (titleBar) {
+      if (p.title_bg_color) titleBar.style.backgroundColor = p.title_bg_color;
+      if (p.title_bg_image) {
+        titleBar.style.backgroundImage = "url('" + RES + "/" + p.title_bg_image + ".png')";
+        titleBar.style.backgroundSize = "cover";
+      }
+      if (p.title_color) $("sim-title-text").style.color = p.title_color;
+    }
+    const main = $("sim-main");
+    if (main) {
+      if (p.main_bg_color) main.style.backgroundColor = p.main_bg_color;
+      if (p.main_bg_image) {
+        main.style.backgroundImage = "url('" + RES + "/" + p.main_bg_image + ".png')";
+        main.style.backgroundSize = "cover";
+      }
+    }
+  }
+
+  function readFileAsJson(file) {
+    return new Promise(function(resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function() {
+        try { resolve(JSON.parse(reader.result)); }
+        catch (e) { reject(e); }
+      };
+      reader.onerror = function() { reject(new Error("Не удалось прочитать файл")); };
+      reader.readAsText(file);
+    });
+  }
+
+  async function tryFetchJson(paths) {
+    for (var i = 0; i < paths.length; i++) {
+      try {
+        var r = await fetch(paths[i]);
+        if (r.ok) return await r.json();
+      } catch (e) {}
+    }
+    return null;
+  }
+
+  async function loadData() {
+    // При file:// fetch блокируется CORS — используем уже загруженные через input файлы
+    if (isFileProtocol()) {
+      if (!QUEST_DATA.length || !Object.keys(ANSWER_DATA).length) {
+        throw new Error(
+          "Открыто как file:// — fetch запрещён браузером. " +
+          "Загрузите questtable.json и answers.json кнопками выше, затем снова «Запустить». " +
+          "Либо откройте через локальный сервер (npx serve)."
+        );
+      }
+      return;
     }
 
-    return {
-      handleJsonFile(event) {
-        const file = event.target.files && event.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = () => {
-          try {
-            const data = JSON.parse(reader.result);
-            loadJSON(data);
-          } catch (e) {
-            setStatus("Ошибка JSON: " + e.message, "err");
-            console.error(e);
-          }
-        };
-        reader.onerror = () => setStatus("Не удалось прочитать файл", "err");
-        reader.readAsText(file);
-        event.target.value = "";
-      },
+    var quests = await tryFetchJson([
+      ASSETS + "/questtable.json",
+      ASSETS + "/quests.json",
+      ASSETS + "/quest.json",
+      "./questtable.json",
+      "./answers.json"
+    ]);
+    var answers = await tryFetchJson([
+      ASSETS + "/answers.json",
+      ASSETS + "/answer.json",
+      "./answers.json"
+    ]);
 
-      handleRowChange(event) {
-        currentRowIndex = parseInt(event.target.value, 10) || 0;
-        rebuild();
-        setStatus(`Выбран: ${rows[currentRowIndex] && rows[currentRowIndex][0]}`, "ok");
-        const overlay = document.getElementById("design-preview-overlay");
-        if (overlay && overlay.classList.contains("active")) {
-          this.showPreview();
-        }
-      },
+    if (!quests && !QUEST_DATA.length) {
+      throw new Error("Не найден questtable.json. Путь: " + ASSETS + "/ или загрузите файл кнопкой.");
+    }
+    if (!answers && !Object.keys(ANSWER_DATA).length) {
+      throw new Error("Не найден answers.json. Путь: " + ASSETS + "/ или загрузите файл кнопкой.");
+    }
 
-      showPreview() {
-        if (!lastHTML) {
-          setStatus("Сначала загрузите JSON дизайн", "err");
-          return;
-        }
-        const overlay = document.getElementById("design-preview-overlay");
-        const frame = document.getElementById("design-preview-frame");
-        frame.srcdoc = lastHTML;
-        overlay.classList.add("active");
-        document.getElementById("btn-hide-design").style.display = "block";
-      },
+    if (quests) QUEST_DATA = normalizeQuests(quests);
+    if (answers) ANSWER_DATA = normalizeAnswers(answers);
 
-      hidePreview() {
-        const overlay = document.getElementById("design-preview-overlay");
-        overlay.classList.remove("active");
-        document.getElementById("design-preview-frame").srcdoc = "";
-        document.getElementById("btn-hide-design").style.display = "none";
-      },
+    if (!QUEST_DATA.length) throw new Error("questtable.json пуст или неверный формат");
+  }
 
-      exportDesignHTML() {
-        if (!lastHTML) return;
-        const blob = new Blob([lastHTML], { type: "text/html;charset=utf-8" });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        const name = (rows[currentRowIndex] && rows[currentRowIndex][0]) || "design";
-        a.download = name + ".html";
-        a.click();
-        URL.revokeObjectURL(a.href);
-      },
+  function handleQuestFile(event) {
+    var file = event.target.files && event.target.files[0];
+    if (!file) return;
+    readFileAsJson(file).then(function(data) {
+      QUEST_DATA = normalizeQuests(data);
+      questFileLoaded = true;
+      setStatus("questtable: " + QUEST_DATA.length + " квестов" + (answersFileLoaded ? " • answers OK" : " • нужен answers.json"), questFileLoaded && answersFileLoaded ? "ok" : "");
+    }).catch(function(e) {
+      setStatus("Ошибка questtable: " + e.message, "err");
+    });
+    event.target.value = "";
+  }
 
-      getLastHTML() { return lastHTML; },
-      getCurrentPrefab() {
-        if (!rows.length) return null;
-        return parsePrefab(rows[currentRowIndex]);
-      },
-      getHeaders() { return headers.slice(); },
-      getRows() { return rows; },
-      loadJSON,
+  function handleAnswersFile(event) {
+    var file = event.target.files && event.target.files[0];
+    if (!file) return;
+    readFileAsJson(file).then(function(data) {
+      ANSWER_DATA = normalizeAnswers(data);
+      answersFileLoaded = true;
+      var n = Object.keys(ANSWER_DATA).length;
+      setStatus((questFileLoaded ? "questtable OK • " : "нужен questtable.json • ") + "answers: " + n, questFileLoaded && answersFileLoaded ? "ok" : "");
+    }).catch(function(e) {
+      setStatus("Ошибка answers: " + e.message, "err");
+    });
+    event.target.value = "";
+  }
+
+  function startTimer(seconds) {
+    clearInterval(timerId);
+    var bar = $("sim-timer-bar");
+    if (!seconds || seconds <= 0) { if (bar) bar.style.width = "100%"; return; }
+    timeLeft = seconds;
+    var total = seconds;
+    if (bar) bar.style.width = "100%";
+    timerId = setInterval(function(){
+      timeLeft--;
+      if (bar) bar.style.width = (timeLeft / total * 100) + "%";
+      if (timeLeft <= 0) {
+        clearInterval(timerId);
+        showReaction("⏳", "Время вышло! Попробуйте снова.", "Закрыть", function(){ stop(); });
+      }
+    }, 1000);
+  }
+  function stopTimer() { clearInterval(timerId); }
+
+  function showReaction(sign, text, btnText, callback) {
+    $("sim-reaction-sign").textContent = sign || "✦";
+    $("sim-reaction-text").innerHTML = stripTags(text);
+    $("sim-reaction-btn").textContent = btnText || "Дальше";
+    $("sim-reaction").classList.add("active");
+    $("sim-reaction-btn").onclick = function(){
+      $("sim-reaction").classList.remove("active");
+      if (callback) callback();
     };
-  })();
+  }
 
-  window.addEventListener("DOMContentLoaded", () => {
-    if (!window.__editor) window.__editor = {};
+  function loadQuest(qid) {
+    var quest = QUEST_DATA.find(function(q){ return q.id === qid; });
+    if (!quest) { setStatus("Квест не найден: " + qid, "err"); return; }
+    currentQuest = quest;
+    selectedOptionIdx = -1;
+    carouselIdx = 0;
+    inputValue = "";
+    var masterAns = quest.answers && quest.answers[0] ? ANSWER_DATA[quest.answers[0]] : null;
 
-    window.__editor.handleJsonDesignSelect = (e) => DesignBuilder.handleJsonFile(e);
-    window.__editor.handleJsonRowChange = (e) => DesignBuilder.handleRowChange(e);
-  });
+    $("sim-title-text").innerHTML = stripTags(
+      (masterAns && masterAns.title) || ((quest.question || "").substring(0, 70) + "...")
+    );
+    $("sim-quest-badge").textContent = quest.id;
+    $("sim-help-up").querySelector("div").innerHTML = stripTags(
+      (masterAns && masterAns.helpUp) || "Когда найдено испытание, здесь отображается задание."
+    );
+    $("sim-help-down").querySelector("div").innerHTML = stripTags(
+      (masterAns && masterAns.helpDown) || "Перед наведением на AR-цель осмотрись камерой вокруг."
+    );
+    $("sim-right-help").querySelector("div").innerHTML = stripTags((masterAns && masterAns.question) || "");
+    $("sim-narrative").innerHTML = stripTags(quest.question || "");
+    $("sim-ar-hint").textContent = "Наведи камеру на AR-метку • " + quest.id +
+      (quest.goalIndex != null ? " • " + (quest.goalIndex + 1) + " / " + QUEST_DATA.length : "");
+
+    renderTask();
+    startTimer(quest.timer || 0);
+    applyDesign();
+  }
+
+  function renderTask() {
+    var task = currentQuest.task;
+    var ansIds = currentQuest.answers || [];
+    var master = ansIds[0] ? ANSWER_DATA[ansIds[0]] : null;
+    var mainContent = $("sim-main-content");
+    var btnArea = $("sim-buttons-area");
+    mainContent.innerHTML = "";
+    btnArea.innerHTML = "";
+
+    if (master && master.mainText) {
+      var div = document.createElement("div");
+      div.className = "main-text";
+      div.innerHTML = stripTags(master.mainText);
+      mainContent.appendChild(div);
+    }
+
+    var p = DesignBuilder.getCurrentPrefab && DesignBuilder.getCurrentPrefab();
+    var nextLabel = (p && p.btn_next_text) || "Дальше";
+    var ph = (p && p.input_ph_text) || "ВВЕДИТЕ ОТВЕТ";
+
+    if (task === 1) {
+      var options = ansIds.slice(1);
+      var masterType = (master && master.type) || "Slide";
+
+      if (masterType === "Slide" && options.length > 0) {
+        var wrap = document.createElement("div");
+        wrap.className = "carousel-wrap";
+        var leftBtn = document.createElement("button");
+        leftBtn.className = "carousel-btn"; leftBtn.innerHTML = "◀";
+        var display = document.createElement("div");
+        display.className = "carousel-display";
+        var rightBtn = document.createElement("button");
+        rightBtn.className = "carousel-btn"; rightBtn.innerHTML = "▶";
+        function updateCarousel() {
+          var opt = ANSWER_DATA[options[carouselIdx]];
+          display.innerHTML = stripTags((opt && opt.mainText) || "...");
+          display.classList.toggle("active-opt", carouselIdx === selectedOptionIdx);
+          leftBtn.disabled = carouselIdx === 0;
+          rightBtn.disabled = carouselIdx >= options.length - 1;
+        }
+        leftBtn.onclick = function(){ if (carouselIdx > 0) { carouselIdx--; updateCarousel(); } };
+        rightBtn.onclick = function(){ if (carouselIdx < options.length - 1) { carouselIdx++; updateCarousel(); } };
+        display.onclick = function(){ selectedOptionIdx = carouselIdx; updateCarousel(); };
+        updateCarousel();
+        wrap.appendChild(leftBtn); wrap.appendChild(display); wrap.appendChild(rightBtn);
+        btnArea.appendChild(wrap);
+        var ok = document.createElement("button");
+        ok.className = "action-btn"; ok.textContent = "ОК";
+        ok.onclick = function(){ checkAnswer(options[selectedOptionIdx], selectedOptionIdx + 1); };
+        btnArea.appendChild(ok);
+      } else if (masterType === "InputField" && options.length > 0) {
+        var iwrap = document.createElement("div");
+        iwrap.className = "input-wrap";
+        var inp = document.createElement("input");
+        inp.className = "q-input"; inp.placeholder = ph; inp.type = "text";
+        inp.oninput = function(e){ inputValue = e.target.value; };
+        inp.onkeydown = function(e){ if (e.key === "Enter") checkInput(); };
+        var ok2 = document.createElement("button");
+        ok2.className = "action-btn"; ok2.textContent = "ОК"; ok2.onclick = checkInput;
+        iwrap.appendChild(inp); iwrap.appendChild(ok2);
+        btnArea.appendChild(iwrap);
+      } else {
+        var grid = document.createElement("div");
+        grid.className = "btn-grid";
+        options.forEach(function(oid, idx){
+          var opt = ANSWER_DATA[oid];
+          var btn = document.createElement("button");
+          btn.className = "q-btn";
+          btn.innerHTML = stripTags((opt && opt.mainText) || oid);
+          btn.onclick = function(){ checkAnswer(oid, idx + 1); };
+          grid.appendChild(btn);
+        });
+        btnArea.appendChild(grid);
+      }
+    } else if (task === 2) {
+      var art = document.createElement("div");
+      art.className = "art-screen";
+      art.innerHTML = "<h2>✦ Артефакт</h2><p>" + stripTags((master && master.mainText) || "Продолжай путь...") + "</p>";
+      mainContent.appendChild(art);
+      var next = document.createElement("button");
+      next.className = "action-btn"; next.textContent = nextLabel;
+      next.onclick = function(){ goTo(currentQuest.rightQuest || currentQuest.nextQuest); };
+      btnArea.appendChild(next);
+    } else if (task === 3) {
+      var art3 = document.createElement("div");
+      art3.className = "art-screen";
+      art3.innerHTML = "<h2>⚠️ Тупик</h2><p>" + stripTags((master && master.mainText) || "Ах, пусто...") + "</p>";
+      mainContent.appendChild(art3);
+      var next3 = document.createElement("button");
+      next3.className = "action-btn"; next3.textContent = "Вернуться";
+      next3.onclick = function(){ goTo(currentQuest.wrongQuest || currentQuest.nextQuest); };
+      btnArea.appendChild(next3);
+    }
+  }
+
+  function checkAnswer(answerId, optionIndex) {
+    if (optionIndex < 1) return;
+    var rightIndices = currentQuest.rightIndices || [];
+    var isCorrect = rightIndices.length === 0 || rightIndices.indexOf(optionIndex) !== -1;
+    if (isCorrect) {
+      showReaction(currentQuest.rightReactionSign || "✦", currentQuest.rightReaction || "Верно!", "Дальше",
+        function(){ goTo(currentQuest.rightQuest); });
+    } else {
+      showReaction(currentQuest.wrongReactionSign || "✖", currentQuest.wrongReaction || "Неправильно.", "Повторить", function(){});
+    }
+  }
+
+  function checkInput() {
+    var options = (currentQuest.answers || []).slice(1);
+    var val = inputValue.trim().toLowerCase();
+    var isCorrect = false;
+    options.forEach(function(oid){
+      var opt = ANSWER_DATA[oid];
+      var optText = ((opt && opt.mainText) || "").trim().toLowerCase();
+      if (optText && (optText === val || val.indexOf(optText) !== -1 || optText.indexOf(val) !== -1)) isCorrect = true;
+    });
+    if (isCorrect) {
+      showReaction(currentQuest.rightReactionSign || "✦", currentQuest.rightReaction || "Верно!", "Дальше",
+        function(){ goTo(currentQuest.rightQuest); });
+    } else {
+      showReaction(currentQuest.wrongReactionSign || "✖", currentQuest.wrongReaction || "Неправильно.", "Повторить", function(){});
+    }
+  }
+
+  function goTo(qid) {
+    if (!qid) { setStatus("Нет следующего квеста", "err"); return; }
+    stopTimer();
+    loadQuest(qid);
+  }
+
+  async function start() {
+    setStatus("Загрузка данных...", "");
+    try {
+      await loadData();
+      if (DesignBuilder.hidePreview) DesignBuilder.hidePreview();
+      $("sim-overlay").classList.add("active");
+      var startId = (QUEST_DATA[0] && QUEST_DATA[0].id) || "Start";
+      loadQuest(startId);
+      setStatus("Симуляция: " + QUEST_DATA.length + " квестов", "ok");
+      $("sim-toolbar-title").textContent = "Симуляция • " + QUEST_DATA.length + " квестов";
+    } catch (e) {
+      setStatus(e.message, "err");
+      console.error(e);
+    }
+  }
+
+  function stop() {
+    stopTimer();
+    $("sim-overlay").classList.remove("active");
+    $("sim-reaction").classList.remove("active");
+    setStatus("", "");
+  }
+
+  function restart() {
+    stopTimer();
+    $("sim-reaction").classList.remove("active");
+    if (QUEST_DATA.length) loadQuest((QUEST_DATA[0] && QUEST_DATA[0].id) || "Start");
+  }
+
+  return {
+    start: start,
+    stop: stop,
+    restart: restart,
+    handleQuestFile: handleQuestFile,
+    handleAnswersFile: handleAnswersFile
+  };
+})();
+
+
+
+// Compatibility: старые вызовы window.__editor.handleJsonDesignSelect / handleJsonRowChange
+window.addEventListener("DOMContentLoaded", () => {
+  if (!window.__editor) window.__editor = {};
+
+  window.__editor.handleJsonDesignSelect = (e) => DesignBuilder.handleJsonFile(e);
+  window.__editor.handleJsonRowChange = (e) => DesignBuilder.handleRowChange(e);
+
+  // Optional: auto-load if arprefabsdesign.json is next to page (same-origin)
+  // fetch('./arprefabsdesign.json').then(r => r.json()).then(d => DesignBuilder.loadJSON(d)).catch(() => {});
+});
 </script>
 
 <script type="module" src="./js/main.js"></script>
