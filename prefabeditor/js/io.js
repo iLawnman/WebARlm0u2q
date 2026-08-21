@@ -1,115 +1,164 @@
-/** Загрузка / сохранение префабов, иерархия сцены */
+/**
+ * js/io.js
+ * Модуль загрузки/сохранения префабов (file:// и http://)
+ */
+(function (global) {
+    'use strict';
 
-import { normalizePath, encodeHtmlB64, decodeHtmlB64, getDataset } from './utils.js';
-import {
-    clearEditableObjects, addEditableObject, selectObject,
-    getEditableObjects, getSelectedObject
-} from './scene.js';
-import { createObjectMesh, createPanelMesh, createVideoMesh, createHtmlMesh } from './objects.js';
+    var PREFAB_STORAGE_KEY = '__editor_local_prefab_data';
 
-export const localDefaultTemplate = `<template id="ar-target">
-  <model name="Object_Main" data-src="./assets/target.obj" data-position="0,0.05,0" data-rotation="0,0,0"></model>
-  <panel name="UI_TextPanel" data-width="0.2" data-height="0.2" data-position="-0.15,0.1,0" data-rotation="0,0,0">
-    <div class="panel text-panel">
-      <div class="border"></div>
-      <div class="label">Header</div>
-      <div class="name">Title</div>
-      <div class="sub">Subtitle</div>
-    </div>
-  </panel>
-</template>`;
-
-export function loadLocalPrefab() {
-    parseAndBuildPrefab(localDefaultTemplate);
-}
-
-export function parseAndBuildPrefab(htmlContent) {
-    clearEditableObjects();
-
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(htmlContent, 'text/html');
-    const template = doc.querySelector('template#ar-target');
-    const root = template ? template.content : doc.body;
-
-    Array.from(root.children).forEach(node => {
-        const tag = node.tagName.toLowerCase();
-        let mesh = null;
-
-        if (tag === 'model') {
-            mesh = createObjectMesh(getDataset(node));
-        } else if (tag === 'panel') {
-            mesh = createPanelMesh(getDataset(node), node.innerHTML);
-        } else if (tag === 'video') {
-            mesh = createVideoMesh(getDataset(node));
-        } else if (tag === 'htmlblock') {
-            const ds = getDataset(node);
-            const raw = ds.rawB64 ? decodeHtmlB64(ds.rawB64) : (ds.html || '');
-            mesh = createHtmlMesh(ds, raw);
+    function parseAndBuildPrefab(designData) {
+        var SceneModule = global.SceneModule;
+        if (!SceneModule) {
+            console.error('[IOModule] SceneModule не найден!');
+            return;
         }
 
-        if (mesh) {
-            addEditableObject(mesh);
+        SceneModule.clearScene();
+        if (!designData) return;
+
+        var rows = designData.rows || (Array.isArray(designData) ? designData : [designData]);
+
+        rows.forEach(function (row, index) {
+            var meta = row.meta || {};
+            var name = meta.name || meta.id || ('Prefab_Object_' + (index + 1));
+
+            var geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+            var material = new THREE.MeshStandardMaterial({
+                color: Math.random() * 0xffffff,
+                roughness: 0.4,
+                metalness: 0.1
+            });
+
+            var mesh = new THREE.Mesh(geometry, material);
+            mesh.name = name;
+            mesh.position.set((index - (rows.length - 1) / 2) * 2.5, 0.75, 0);
+            mesh.userData = {
+                id: meta.id || ('id_' + index),
+                groups: row.groups || {},
+                customProps: {}
+            };
+
+            SceneModule.addSceneObject(mesh);
+        });
+
+        updateHierarchyTree();
+    }
+
+    function updateHierarchyTree() {
+        var treeContainer = document.getElementById('tree');
+        if (!treeContainer) return;
+
+        var SceneModule = global.SceneModule;
+        if (!SceneModule) return;
+
+        var objects = SceneModule.getSceneObjects();
+        var selected = SceneModule.getSelectedObject();
+
+        treeContainer.innerHTML = '';
+
+        var ul = document.createElement('ul');
+        ul.className = 'hierarchy-list';
+        ul.style.listStyle = 'none';
+        ul.style.padding = '0';
+        ul.style.margin = '0';
+
+        objects.forEach(function (obj) {
+            var li = document.createElement('li');
+            li.className = 'hierarchy-item' + (obj === selected ? ' active' : '');
+            li.textContent = obj.name || 'Unnamed Object';
+            li.style.padding = '6px 8px';
+            li.style.cursor = 'pointer';
+            li.style.borderRadius = '4px';
+            li.style.fontSize = '13px';
+            if (obj === selected) {
+                li.style.background = 'rgba(201, 162, 39, 0.25)';
+                li.style.color = '#e8c84a';
+            }
+            li.onclick = function (e) {
+                e.stopPropagation();
+                SceneModule.selectObject(obj);
+            };
+            ul.appendChild(li);
+        });
+
+        treeContainer.appendChild(ul);
+    }
+
+    function loadLocalPrefab() {
+        try {
+            var raw = localStorage.getItem(PREFAB_STORAGE_KEY);
+            if (raw) {
+                var parsed = JSON.parse(raw);
+                parseAndBuildPrefab(parsed);
+                console.log('[IOModule] Префаб загружен из localStorage');
+            }
+        } catch (e) {
+            console.warn('[IOModule] Не удалось загрузить localStorage:', e);
         }
-    });
+    }
 
-    updateHierarchyTree();
-}
+    function handleFileSelect(event) {
+        var file = event.target.files && event.target.files[0];
+        if (!file) return;
 
-export function handleFileSelect(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => parseAndBuildPrefab(e.target.result);
-    reader.readAsText(file);
-}
+        var reader = new FileReader();
+        reader.onload = function (e) {
+            try {
+                var jsonData = JSON.parse(e.target.result);
 
-export function updateHierarchyTree() {
-    const treeContainer = document.getElementById('tree');
-    treeContainer.innerHTML = '';
+                // Если есть DesignBuilder (inline) — можно использовать его parse
+                if (global.DesignBuilder && typeof global.DesignBuilder.loadJSON === 'function' && Array.isArray(jsonData)) {
+                    // Для 3D-сцены используем простой parse
+                    parseAndBuildPrefab(jsonData);
+                } else {
+                    parseAndBuildPrefab(jsonData);
+                }
 
-    getEditableObjects().forEach(obj => {
-        const div = document.createElement('div');
-        div.className = 'tree-item' + (getSelectedObject() === obj ? ' active' : '');
-        div.innerHTML = `<span>${obj.name}</span><span>${obj.userData.type}</span>`;
-        div.onclick = () => selectObject(obj);
-        treeContainer.appendChild(div);
-    });
-}
+                localStorage.setItem(PREFAB_STORAGE_KEY, JSON.stringify(jsonData));
+            } catch (err) {
+                console.error('[IOModule] Ошибка парсинга JSON:', err);
+                alert('Ошибка чтения JSON: ' + err.message);
+            }
+        };
+        reader.readAsText(file);
+    }
 
-export function exportHTML() {
-    let output = `<template id="ar-target">\n`;
+    function exportHTML() {
+        var SceneModule = global.SceneModule;
+        if (!SceneModule) return;
 
-    getEditableObjects().forEach(obj => {
-        const pos = `${obj.position.x.toFixed(3)},${obj.position.y.toFixed(3)},${obj.position.z.toFixed(3)}`;
-        const rotDegX = THREE.MathUtils.radToDeg(obj.rotation.x);
-        const rotDegY = THREE.MathUtils.radToDeg(obj.rotation.y);
-        const rotDegZ = THREE.MathUtils.radToDeg(obj.rotation.z);
-        const rot = `${rotDegX.toFixed(0)},${rotDegY.toFixed(0)},${rotDegZ.toFixed(0)}`;
-        const scl = `${obj.scale.x.toFixed(3)},${obj.scale.y.toFixed(3)},${obj.scale.z.toFixed(3)}`;
+        var objects = SceneModule.getSceneObjects();
+        var exportData = objects.map(function (obj) {
+            return {
+                name: obj.name,
+                position: obj.position.toArray(),
+                rotation: [obj.rotation.x, obj.rotation.y, obj.rotation.z],
+                scale: obj.scale.toArray(),
+                userData: obj.userData
+            };
+        });
 
-        if (obj.userData.type === 'object3d') {
-            output += `  <model\n    name="${obj.name}"\n    data-src="${normalizePath(obj.userData.src || '')}"\n    data-position="${pos}"\n    data-rotation="${rot}"\n    data-scale="${scl}"\n  ></model>\n`;
-        } else if (obj.userData.type === 'panel') {
-            const pw = obj.userData.width != null ? obj.userData.width : (obj.userData.rawData && obj.userData.rawData.width) || '0.3';
-            const ph = obj.userData.height != null ? obj.userData.height : (obj.userData.rawData && obj.userData.rawData.height) || '0.3';
-            const cssAttr = obj.userData.customCSS
-                ? `\n    data-css="${encodeHtmlB64(obj.userData.customCSS)}"`
-                : '';
-            output += `  <panel\n    name="${obj.name}"\n    data-width="${pw}"\n    data-height="${ph}"\n    data-position="${pos}"\n    data-rotation="${rot}"\n    data-scale="${scl}"${cssAttr}\n  >\n`;
-            output += obj.userData.innerHTML || `    <div class="panel"></div>\n`;
-            output += `  </panel>\n`;
-        } else if (obj.userData.type === 'video') {
-            output += `  <video\n    name="${obj.name}"\n    data-src="${normalizePath(obj.userData.src || '')}"\n    data-label="${obj.userData.label || ''}"\n    data-width="${obj.userData.width}"\n    data-height="${obj.userData.height}"\n    data-position="${pos}"\n    data-rotation="${rot}"\n    data-scale="${scl}"\n  ></video>\n`;
-        } else if (obj.userData.type === 'html') {
-            output += `  <htmlblock\n    name="${obj.name}"\n    data-raw-b64="${encodeHtmlB64(obj.userData.html || '')}"\n    data-width="${obj.userData.width}"\n    data-height="${obj.userData.height}"\n    data-position="${pos}"\n    data-rotation="${rot}"\n    data-scale="${scl}"\n  ></htmlblock>\n`;
-        }
-    });
+        var jsonStr = JSON.stringify(exportData, null, 2);
+        var blob = new Blob([jsonStr], { type: 'application/json' });
+        var url = URL.createObjectURL(blob);
 
-    output += `</template>`;
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'prefab-export.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
 
-    const blob = new Blob([output], { type: 'text/html' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'artarget.html';
-    a.click();
-}
+    var API = {
+        parseAndBuildPrefab: parseAndBuildPrefab,
+        updateHierarchyTree: updateHierarchyTree,
+        loadLocalPrefab: loadLocalPrefab,
+        handleFileSelect: handleFileSelect,
+        exportHTML: exportHTML
+    };
+
+    global.IOModule = API;
+})(typeof window !== 'undefined' ? window : this);

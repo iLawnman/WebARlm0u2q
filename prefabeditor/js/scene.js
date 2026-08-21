@@ -1,217 +1,194 @@
-/** 3D-сцена: инициализация, камера, контролы, выбор объектов + CSS3DRenderer */
+/**
+ * js/scene.js
+ * Модуль 3D-сцены на Three.js (file:// и http://)
+ */
+(function (global) {
+    'use strict';
 
-export let scene, camera, renderer, css3dRenderer, orbitControls, transformControls;
-export let selectedObject = null;
-export const editableObjects = [];
+    let scene, camera, renderer, raycaster, mouse;
+    let selectedObject = null;
+    let sceneObjects = [];
+    let callbacks = {
+        onSelect: function () {},
+        onDeselect: function () {},
+        onTransformChange: function () {}
+    };
 
-// алиас для старого имени
-export let css2dRenderer;
-
-let onSelectCallback = null;
-let onDeselectCallback = null;
-let onTransformChangeCallback = null;
-
-export function setSceneCallbacks({ onSelect, onDeselect, onTransformChange }) {
-    onSelectCallback = onSelect;
-    onDeselectCallback = onDeselect;
-    onTransformChangeCallback = onTransformChange;
-}
-
-/** Подгрузить CSS3DRenderer, если его нет (нужен, чтобы панели не смотрели на камеру) */
-function ensureCSS3DRenderer() {
-    return new Promise((resolve, reject) => {
-        if (typeof THREE !== 'undefined' && typeof THREE.CSS3DRenderer === 'function') {
-            resolve();
-            return;
-        }
-        const rev = (typeof THREE !== 'undefined' && THREE.REVISION) ? THREE.REVISION : '160';
-        const urls = [
-            `https://cdn.jsdelivr.net/npm/three@0.${rev}.0/examples/js/renderers/CSS3DRenderer.js`,
-            'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/renderers/CSS3DRenderer.js',
-            'https://unpkg.com/three@0.160.0/examples/js/renderers/CSS3DRenderer.js'
-        ];
-        let i = 0;
-        const tryNext = () => {
-            if (i >= urls.length) {
-                reject(new Error('Не удалось загрузить CSS3DRenderer.js'));
+    function init3D() {
+        return new Promise(function (resolve) {
+            var canvas = document.getElementById('canvas3d');
+            if (!canvas) {
+                console.error('[SceneModule] #canvas3d не найден');
+                resolve();
                 return;
             }
-            const s = document.createElement('script');
-            s.src = urls[i++];
-            s.onload = () => {
-                if (typeof THREE.CSS3DRenderer === 'function') resolve();
-                else tryNext();
-            };
-            s.onerror = tryNext;
-            document.head.appendChild(s);
-        };
-        tryNext();
-    });
-}
 
-export function init3D() {
-    const container = document.getElementById('viewport');
+            var container = canvas.parentElement || document.body;
+            var width = container.clientWidth || window.innerWidth;
+            var height = container.clientHeight || window.innerHeight;
 
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0b1120);
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0a0e);
 
-    camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.01, 100);
-    camera.position.set(0, 0.3, 0.5);
+            camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
+            camera.position.set(0, 5, 10);
+            camera.lookAt(0, 0, 0);
 
-    renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas3d'), antialias: true });
-    renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
+            renderer = new THREE.WebGLRenderer({
+                canvas: canvas,
+                antialias: true,
+                preserveDrawingBuffer: true,
+                alpha: true
+            });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-    scene.add(ambientLight);
+            var ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
-    dirLight.position.set(5, 10, 7);
-    scene.add(dirLight);
+            var dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(5, 10, 7);
+            scene.add(dirLight);
 
-    const grid = new THREE.GridHelper(1, 20, 0x1e293b, 0x111827);
-    scene.add(grid);
+            var gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
+            scene.add(gridHelper);
 
-    orbitControls = new THREE.OrbitControls(camera, renderer.domElement);
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
 
-    transformControls = new THREE.TransformControls(camera, renderer.domElement);
-    transformControls.size = 0.75;
-    transformControls.addEventListener('dragging-changed', (event) => {
-        orbitControls.enabled = !event.value;
-    });
-    transformControls.addEventListener('change', () => {
-        if (onTransformChangeCallback) onTransformChangeCallback();
-    });
-    scene.add(transformControls);
+            canvas.addEventListener('pointerdown', onPointerDown);
+            window.addEventListener('resize', onWindowResize);
 
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
+            function animate() {
+                requestAnimationFrame(animate);
+                if (renderer && scene && camera) {
+                    renderer.render(scene, camera);
+                }
+            }
+            animate();
 
-    renderer.domElement.addEventListener('pointerdown', (e) => {
-        if (transformControls.dragging) return;
+            console.log('[SceneModule] 3D сцена инициализирована (#canvas3d)');
+            resolve();
+        });
+    }
 
-        const rect = renderer.domElement.getBoundingClientRect();
-        mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-        mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    function onWindowResize() {
+        if (!camera || !renderer) return;
+        var canvas = document.getElementById('canvas3d');
+        var container = (canvas && canvas.parentElement) || document.body;
+        var width = container.clientWidth || window.innerWidth;
+        var height = container.clientHeight || window.innerHeight;
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+        renderer.setSize(width, height);
+    }
+
+    function onPointerDown(event) {
+        if (event.button !== 0) return;
+        var canvas = renderer.domElement;
+        var rect = canvas.getBoundingClientRect();
+        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
         raycaster.setFromCamera(mouse, camera);
-        const intersects = raycaster.intersectObjects(editableObjects, true);
+        var intersects = raycaster.intersectObjects(sceneObjects, true);
 
         if (intersects.length > 0) {
-            const root = resolveEditableRoot(intersects[0].object);
-            if (root) selectObject(root);
+            var hit = intersects[0].object;
+            while (hit.parent && hit.parent !== scene && sceneObjects.indexOf(hit) === -1) {
+                hit = hit.parent;
+            }
+            selectObject(hit);
         } else {
             deselectObject();
         }
-    });
-
-    window.addEventListener('resize', onWindowResize);
-
-    // CSS3D — после загрузки скрипта (return Promise)
-    return ensureCSS3DRenderer().then(() => {
-        css3dRenderer = new THREE.CSS3DRenderer();
-        css2dRenderer = css3dRenderer;
-        css3dRenderer.setSize(container.clientWidth, container.clientHeight);
-        css3dRenderer.domElement.style.position = 'absolute';
-        css3dRenderer.domElement.style.top = '0';
-        css3dRenderer.domElement.style.left = '0';
-        css3dRenderer.domElement.style.pointerEvents = 'none';
-        container.appendChild(css3dRenderer.domElement);
-        animate();
-    }).catch(err => {
-        console.error(err);
-        if (typeof THREE.CSS2DRenderer === 'function') {
-            console.warn('Fallback: CSS2DRenderer (панели billboard)');
-            css3dRenderer = new THREE.CSS2DRenderer();
-            css2dRenderer = css3dRenderer;
-            css3dRenderer.setSize(container.clientWidth, container.clientHeight);
-            css3dRenderer.domElement.style.position = 'absolute';
-            css3dRenderer.domElement.style.top = '0';
-            css3dRenderer.domElement.style.left = '0';
-            css3dRenderer.domElement.style.pointerEvents = 'none';
-            container.appendChild(css3dRenderer.domElement);
-            window.__useCSS2DFallback = true;
-            animate();
-        } else {
-            alert('Не найден CSS3DRenderer. Подключите examples/js/renderers/CSS3DRenderer.js');
-        }
-    });
-}
-
-function resolveEditableRoot(obj) {
-    let cur = obj;
-    while (cur) {
-        if (editableObjects.includes(cur)) return cur;
-        cur = cur.parent;
     }
-    return null;
-}
 
-function animate() {
-    requestAnimationFrame(animate);
-    if (orbitControls) orbitControls.update();
-    if (renderer && scene && camera) renderer.render(scene, camera);
-    if (css3dRenderer && scene && camera) css3dRenderer.render(scene, camera);
-}
-
-function onWindowResize() {
-    const container = document.getElementById('viewport');
-    if (!camera || !container) return;
-    camera.aspect = container.clientWidth / container.clientHeight;
-    camera.updateProjectionMatrix();
-    if (renderer) renderer.setSize(container.clientWidth, container.clientHeight);
-    if (css3dRenderer) css3dRenderer.setSize(container.clientWidth, container.clientHeight);
-}
-
-export function selectObject(obj) {
-    selectedObject = obj;
-    if (transformControls) transformControls.attach(obj);
-    if (onSelectCallback) onSelectCallback(obj);
-}
-
-export function deselectObject() {
-    selectedObject = null;
-    if (transformControls) transformControls.detach();
-    if (onDeselectCallback) onDeselectCallback();
-}
-
-export function clearEditableObjects() {
-    editableObjects.forEach(obj => {
-        scene.remove(obj);
-        if (obj.userData.css2dObject && obj.userData.css2dObject.element) {
-            obj.userData.css2dObject.element.remove();
+    function selectObject(obj) {
+        if (selectedObject === obj) return;
+        deselectObject();
+        selectedObject = obj;
+        if (selectedObject) {
+            if (!selectedObject.userData.helper) {
+                var helper = new THREE.BoxHelper(selectedObject, 0x00ff00);
+                scene.add(helper);
+                selectedObject.userData.helper = helper;
+            }
+            callbacks.onSelect(selectedObject);
         }
-        if (obj.userData.cssUid) {
-            const st = document.getElementById('ar-css-' + obj.userData.cssUid);
-            if (st) st.remove();
+    }
+
+    function deselectObject() {
+        if (selectedObject) {
+            if (selectedObject.userData.helper) {
+                scene.remove(selectedObject.userData.helper);
+                if (selectedObject.userData.helper.dispose) {
+                    selectedObject.userData.helper.dispose();
+                }
+                delete selectedObject.userData.helper;
+            }
+            selectedObject = null;
+            callbacks.onDeselect();
         }
-    });
-    editableObjects.length = 0;
-    deselectObject();
-}
-
-export function addEditableObject(mesh) {
-    scene.add(mesh);
-    editableObjects.push(mesh);
-}
-
-export function removeEditableObject(obj) {
-    const index = editableObjects.indexOf(obj);
-    if (index > -1) editableObjects.splice(index, 1);
-    scene.remove(obj);
-    if (obj.userData.css2dObject && obj.userData.css2dObject.element) {
-        obj.userData.css2dObject.element.remove();
     }
-    if (obj.userData.cssUid) {
-        const st = document.getElementById('ar-css-' + obj.userData.cssUid);
-        if (st) st.remove();
+
+    function setSceneCallbacks(cbs) {
+        if (cbs) {
+            if (cbs.onSelect) callbacks.onSelect = cbs.onSelect;
+            if (cbs.onDeselect) callbacks.onDeselect = cbs.onDeselect;
+            if (cbs.onTransformChange) callbacks.onTransformChange = cbs.onTransformChange;
+        }
     }
-}
 
-export function getEditableObjects() {
-    return editableObjects;
-}
+    function addSceneObject(mesh) {
+        if (!mesh) return;
+        scene.add(mesh);
+        sceneObjects.push(mesh);
+        selectObject(mesh);
+    }
 
-export function getSelectedObject() {
-    return selectedObject;
-}
+    function removeSceneObject(mesh) {
+        if (!mesh) return;
+        if (selectedObject === mesh) deselectObject();
+        scene.remove(mesh);
+        var idx = sceneObjects.indexOf(mesh);
+        if (idx !== -1) sceneObjects.splice(idx, 1);
+        if (mesh.geometry) mesh.geometry.dispose();
+        if (mesh.material) {
+            if (Array.isArray(mesh.material)) {
+                mesh.material.forEach(function (m) { m.dispose(); });
+            } else {
+                mesh.material.dispose();
+            }
+        }
+    }
+
+    function clearScene() {
+        deselectObject();
+        var toRemove = sceneObjects.slice();
+        toRemove.forEach(function (obj) { removeSceneObject(obj); });
+        sceneObjects = [];
+    }
+
+    // Алиасы для inspector.js
+    function addEditableObject(mesh) { addSceneObject(mesh); }
+    function removeEditableObject(mesh) { removeSceneObject(mesh); }
+
+    var API = {
+        init3D: init3D,
+        setSceneCallbacks: setSceneCallbacks,
+        selectObject: selectObject,
+        deselectObject: deselectObject,
+        addSceneObject: addSceneObject,
+        removeSceneObject: removeSceneObject,
+        addEditableObject: addEditableObject,
+        removeEditableObject: removeEditableObject,
+        clearScene: clearScene,
+        getSelectedObject: function () { return selectedObject; },
+        getSceneObjects: function () { return sceneObjects; },
+        getScene: function () { return scene; },
+        getCamera: function () { return camera; }
+    };
+
+    global.SceneModule = API;
+})(typeof window !== 'undefined' ? window : this);
