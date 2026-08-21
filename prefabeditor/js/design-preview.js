@@ -79,6 +79,53 @@
     let currentSelectedRow = 0;
 
     const DesignPreview = {
+        /** Загружает JSON программно (вызывается из QuestSim) */
+        loadJSON: function(jsonData) {
+            console.log('[DesignPreview.loadJSON] called, data length:', jsonData ? jsonData.length : 0);
+            try {
+                parsedRows = parseDesignJson(jsonData);
+                console.log('[DesignPreview.loadJSON] parsedRows count:', parsedRows.length);
+                currentSelectedRow = 0;
+
+                const statusEl = document.getElementById('json-status');
+                if (statusEl) statusEl.innerText = `Загружено вариантов: ${parsedRows.length}`;
+
+                const selector = document.getElementById('json-row-selector');
+                if (selector) {
+                    selector.innerHTML = '';
+                    parsedRows.forEach((r, idx) => {
+                        const opt = document.createElement('option');
+                        opt.value = idx;
+                        opt.textContent = `${idx + 1}. ${r.meta.id || r.meta.name || 'Вариант'}`;
+                        selector.appendChild(opt);
+                    });
+                    selector.style.display = parsedRows.length > 1 ? 'block' : 'none';
+                }
+
+                const btnHide = document.getElementById('btn-hide-design');
+                if (btnHide) btnHide.style.display = 'inline-block';
+
+                this.showPreview();
+            } catch (err) {
+                console.error('Ошибка обработки JSON-дизайна:', err);
+            }
+        },
+
+        /** Возвращает текущий префаб в формате, который понимает QuestSim */
+        getCurrentPrefab: function() {
+            console.log('[DesignPreview.getCurrentPrefab] called, parsedRows:', parsedRows ? parsedRows.length : 0, 'currentSelectedRow:', currentSelectedRow);
+            if (!parsedRows || !parsedRows.length) { console.log('[DesignPreview.getCurrentPrefab] no parsedRows, returning null'); return null; }
+            const row = parsedRows[currentSelectedRow] || parsedRows[0];
+            console.log('[DesignPreview.getCurrentPrefab] selected row meta:', row.meta);
+            if (window.QuestSim && typeof window.QuestSim.designGroupsToPrefab === 'function') {
+                const prefab = window.QuestSim.designGroupsToPrefab(row.groups);
+                console.log('[DesignPreview.getCurrentPrefab] prefab:', prefab);
+                return prefab;
+            }
+            console.log('[DesignPreview.getCurrentPrefab] QuestSim.designGroupsToPrefab not available');
+            return null;
+        },
+
         handleJsonFile: function(event) {
             const file = event.target.files && event.target.files[0];
             if (!file) return;
@@ -129,6 +176,17 @@
             if (!parsedRows || parsedRows.length === 0) return;
 
             const row = parsedRows[currentSelectedRow] || parsedRows[0];
+
+            // Передаём текущий дизайн в QuestSim
+            console.log('[DesignPreview.showPreview] passing design to QuestSim, row:', row.meta);
+            if (window.QuestSim && typeof window.QuestSim.setDesignPrefab === 'function' && window.QuestSim.designGroupsToPrefab) {
+                const prefab = window.QuestSim.designGroupsToPrefab(row.groups);
+                console.log('[DesignPreview.showPreview] prefab to QuestSim:', prefab);
+                window.QuestSim.setDesignPrefab(prefab);
+            } else {
+                console.log('[DesignPreview.showPreview] QuestSim.setDesignPrefab NOT available');
+            }
+
             const overlay = document.getElementById('design-preview-overlay');
             const iframe = document.getElementById('design-preview-frame');
             const titleEl = document.getElementById('preview-title');

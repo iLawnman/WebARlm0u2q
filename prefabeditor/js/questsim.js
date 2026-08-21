@@ -4,6 +4,7 @@ const QuestSim = (() => {
     let QUEST_DATA = [], ANSWER_DATA = {}, currentQuest = null;
     let selectedOptionIdx = -1, carouselIdx = 0, timerId = null, timeLeft = 0, inputValue = "";
     let currentOptions = [];
+    let currentDesignPrefab = null;
 
     function $(id) { return document.getElementById(id); }
 
@@ -59,9 +60,52 @@ const QuestSim = (() => {
         el.style.backgroundImage = url ? "url('" + url + "')" : "";
     }
 
+    function setDesignPrefab(prefab) {
+        console.log('[QuestSim.setDesignPrefab] called, prefab:', prefab);
+        currentDesignPrefab = prefab;
+        const overlay = $("sim-overlay");
+        console.log('[QuestSim.setDesignPrefab] overlay active:', overlay ? overlay.classList.contains("active") : 'no overlay');
+        if (overlay && overlay.classList.contains("active")) {
+            applyDesign();
+        }
+    }
+
+    function designGroupsToPrefab(groups) {
+        const getter = (group, prop, def) => {
+            if (!groups || !groups[group]) return def;
+            const val = groups[group][prop];
+            return (val !== undefined && val !== null && val !== '') ? val : def;
+        };
+        return {
+            back_image: getter('BackGradient', 'image') || getter('BackImage', 'image'),
+            title_bg_color: getter('TitleText_bg', 'color'),
+            title_bg_image: getter('TitleText_bg', 'image'),
+            title_color: getter('TitleText', 'color', '#FFD700'),
+            title_corner_image: getter('TitleText_4corner_decor_Corner', 'image') || 'RusStyleElement',
+            main_corner: getter('MainText_4corner_decor_Corner', 'image') || 'RusStyleElement',
+            main_bg_color: getter('MainText_bg', 'color', 'rgba(7,7,7,0.93)'),
+            main_bg_image: getter('MainText_bg', 'image', 'MainTextPanelDark'),
+            main_decor1: getter('MainText_Decor_2lines_line1', 'image', 'Line2S'),
+            main_decor2: getter('MainText_Decor_2lines_line2', 'image', 'Line2S'),
+            left_bg_color: getter('LeftPanel_bgLeftPanel', 'color', 'rgba(7,7,7,0.93)'),
+            left_bg_image: getter('LeftPanel_bgLeftPanel', 'image', 'MainTextPanelDark'),
+            left_help_color: getter('LeftPanel_HelpUp', 'color', '#FF69B4'),
+            left_corner: getter('LeftPanel_4corner_decor_Corner', 'image') || 'RusStyleElement',
+            right_bg_color: getter('RightPanel_bgRight_Panel', 'color', 'rgba(7,7,7,0.93)'),
+            right_bg_image: getter('RightPanel_bgRight_Panel', 'image', 'MainTextPanelDark'),
+            right_corner: getter('RightPanel_4corner_decor_Corner', 'image') || 'RusStyleElement',
+            buttons_bg_color: getter('Buttons_bgButtonsPanel', 'color', 'rgba(7,7,7,0.93)'),
+            buttons_bg_image: getter('Buttons_bgButtonsPanel', 'image', 'ButtonPanelBG'),
+            btn_next_text: getter('Buttons_Button_NEXT_Text', 'text', 'Дальше'),
+            input_ph_text: getter('Buttons_InputField', 'text') || getter('Buttons_InputField_Placeholder', 'text', 'ВВЕДИТЕ ОТВЕТ')
+        };
+    }
+
     function applyDesign() {
-        const p = (typeof DesignBuilder !== "undefined" && DesignBuilder.getCurrentPrefab) ? DesignBuilder.getCurrentPrefab() : null;
-        if (!p) return;
+        console.log('[QuestSim.applyDesign] called, currentDesignPrefab:', currentDesignPrefab);
+        const p = currentDesignPrefab || ((typeof DesignPreview !== "undefined" && DesignPreview.getCurrentPrefab) ? DesignPreview.getCurrentPrefab() : null);
+        console.log('[QuestSim.applyDesign] resolved prefab:', p);
+        if (!p) { console.log('[QuestSim.applyDesign] NO PREFAB, aborting'); return; }
         const bg = $("sim-bg");
         if (bg && p.back_image) bg.style.backgroundImage = "url('" + normalizeAsset(p.back_image) + "')";
         const titleBar = $("sim-title-bar");
@@ -130,6 +174,7 @@ const QuestSim = (() => {
                 btnArea.style.backgroundSize = "cover";
             }
         }
+        console.log('[QuestSim.applyDesign] design applied successfully');
     }
 
     function normalizeQuests(quests) {
@@ -267,12 +312,22 @@ const QuestSim = (() => {
             if (!aData) aData = await tryFetchJson("./answers.json") || await tryFetchJson("./assets/answers.json");
             if (aData) ANSWER_DATA = normalizeAnswers(aData);
             if (!designData) designData = await tryFetchJson("./arprefabsdesign.json") || await tryFetchJson("./assets/arprefabsdesign.json");
-            if (designData && typeof DesignBuilder !== "undefined" && DesignBuilder.loadJSON) DesignBuilder.loadJSON(designData);
+            console.log('[QuestSim.handleBundleFiles] designData loaded:', designData ? 'yes (length:' + (designData.length || 'obj') + ')' : 'no');
+            if (designData && typeof DesignPreview !== "undefined" && DesignPreview.loadJSON) {
+                console.log('[QuestSim.handleBundleFiles] calling DesignPreview.loadJSON');
+                DesignPreview.loadJSON(designData);
+            } else {
+                console.log('[QuestSim.handleBundleFiles] NOT calling DesignPreview.loadJSON, reason:', designData ? 'DesignPreview unavailable' : 'no designData');
+            }
             if (!QUEST_DATA.length) throw new Error("Нет квестов (questtable.json)");
             var ansCount = Object.keys(ANSWER_DATA).length;
             setStatus("Квестов: " + QUEST_DATA.length + ", ответов: " + ansCount +
                 (ansCount ? "" : " — загрузите answers.json!"), ansCount ? "ok" : "err");
             showStartBtn(true);
+            // Автостарт, если загружен дизайн
+            if (designData) {
+                setTimeout(function() { start(); }, 50);
+            }
         } catch (e) {
             setStatus("Ошибка: " + e.message, "err");
             console.error(e);
@@ -384,17 +439,20 @@ const QuestSim = (() => {
 
         renderTask();
         startTimer(quest.timer || 0);
+        console.log('[QuestSim.loadQuest] calling applyDesign for quest:', qid);
         applyDesign();
     }
 
     function renderTask() {
+        console.log('[QuestSim.renderTask] called for quest:', currentQuest ? currentQuest.id : 'none');
         var task = currentQuest.task;
         var ansIds = currentQuest.answers || [];
         var master = ansIds[0] ? getAnswer(ansIds[0]) : null;
         var btnArea = $("sim-buttons-area");
         btnArea.innerHTML = "";
 
-        var p = (typeof DesignBuilder !== "undefined" && DesignBuilder.getCurrentPrefab) ? DesignBuilder.getCurrentPrefab() : null;
+        var p = (typeof DesignPreview !== "undefined" && DesignPreview.getCurrentPrefab) ? DesignPreview.getCurrentPrefab() : null;
+        console.log('[QuestSim.renderTask] design prefab for buttons:', p);
         var nextLabel = (p && p.btn_next_text) || "Дальше";
         var ph = (p && p.input_ph_text) || "ВВЕДИТЕ ОТВЕТ";
 
@@ -553,8 +611,10 @@ const QuestSim = (() => {
     }
 
     function start() {
-        if (typeof DesignBuilder !== "undefined" && DesignBuilder.hidePreview) DesignBuilder.hidePreview();
+        console.log('[QuestSim.start] called, currentDesignPrefab:', currentDesignPrefab);
+        if (typeof DesignPreview !== "undefined" && DesignPreview.hidePreview) DesignPreview.hidePreview();
         $("sim-overlay").classList.add("active");
+        console.log('[QuestSim.start] overlay activated');
         showStartBtn(false);
         var startId = (QUEST_DATA[0] && QUEST_DATA[0].id) || "Start";
         loadQuest(startId);
@@ -621,6 +681,11 @@ const QuestSim = (() => {
         stop: stop,
         restart: restart,
         exportHTML: exportHTML,
-        handleBundleFiles: handleBundleFiles
+        handleBundleFiles: handleBundleFiles,
+        setDesignPrefab: setDesignPrefab,
+        designGroupsToPrefab: designGroupsToPrefab
     };
 })();
+
+// Экспонируем в window для DesignPreview
+window.QuestSim = QuestSim;
