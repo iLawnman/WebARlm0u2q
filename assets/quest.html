@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quest Map</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --panel-bg: #334155;
+      --accent: #eab308;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --correct: #22c55e;
+      --wrong: #ef4444;
+    }
+    body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg-color); color: var(--text); margin: 0; padding: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 30px; }
+    .quest-card { background: var(--card-bg); border-radius: 12px; padding: 24px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); border: 1px solid #475569; }
+    .header-panel { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--accent); padding-bottom: 12px; margin-bottom: 20px; }
+    .badge { background: var(--accent); color: #000; font-weight: bold; padding: 4px 12px; border-radius: 20px; }
+    .quest-body { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+    .panel { background: var(--panel-bg); padding: 16px; border-radius: 8px; }
+    .panel h3 { margin-top: 0; color: var(--accent); font-size: 1.1rem; border-bottom: 1px solid #475569; padding-bottom: 6px; }
+    .answers-grid { display: flex; flex-direction: column; gap: 10px; }
+    .answer-card { background: #1e293b; padding: 10px; border-radius: 6px; border-left: 4px solid #64748b; }
+    .answer-card.correct { border-left-color: var(--correct); background: #14532d33; }
+    .answer-type { font-size: 0.8rem; color: var(--text-muted); }
+    .nav-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .nav-box { padding: 10px; border-radius: 6px; font-size: 0.9rem; }
+    .nav-box.right { background: #14532d55; }
+    .nav-box.wrong { background: #7f1d1d55; }
+    ul { padding-left: 20px; margin: 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Квест Карта</h1>
+    
+      <section class="quest-card">
+        
+      <div class="panel header-panel">
+        <div class="badge">Quest ID: Start</div>
+        <h2>Первое задание - тренировочное</h2>
+      </div>
+        <div class="quest-body">
+          
+        <div class="panel context-panel">
+          <h3>Описание и условия</h3>
+          <div class="quest-text">...Ваня, владелец кафешки, говорит, <br>что уже 2 дня Аленку не видел. <br><br>- Однако ж, помочь могу. Помнишь, блюдечко с голубой каемочкой? <br>Вот тебе аналог с искусственным интеллектом, R4. Правда, вредный он, прямо не ведет, но подсказки дает. <br>Как никак, помощь. <br>Успей! Время помощи ограничено.<br><br><br><i>Закрывай окошко и наводи камеру на картинку.</i></div>
+          <div class="main-txt-extra" style="margin-top:10px; opacity:0.9;"><b>Привет!</b><br><br>R4 начинает обучаться работе с тобой. <br><br>Чтобы Аленку найти, надо куда-то пойти. <br><br><b>Выбирай!</b><br><br>Прямо пойдешь - ничего не найдешь<br><br><br><br><br>Направо пойдешь - время потеряешь<br><br><br><br><br>Налево выберешь - деньги потратишь<br><br><br></div>
+        </div>
+          
+        <div class="panel media-panel">
+          <h3>Медиа и Ресурсы</h3>
+          <ul><li><strong>Звук:</strong> q1sound_oneshot</li><li><strong>Музыка:</strong> Q1music_loop</li><li><strong>Музыка:</strong> Q2music_loop</li><li><strong>Изображение:</strong> angle-double-up</li><li><strong>Музыка:</strong> Q3music_loop</li><li><strong>Изображение:</strong> angle-double-right</li><li><strong>Музыка:</strong> Q4music_loop</li><li><strong>Изображение:</strong> angle-double-left</li></ul>
+        </div>
+          
+        <div class="panel answers-panel">
+          <h3>Варианты ответов / Действия</h3>
+          <div class="answers-grid">
+          <div class="answer-card correct">
+            <div class="answer-type">Slide (ID: A01)</div>
+            <div class="answer-content">Когда найдено испытание, здесь отображается задание и все, что с ним связано. Ответы можно выбрать кнопкой OK, кнопкой с ответом или ввести в поле</div>
+          </div>
+          <div class="answer-card correct">
+            <div class="answer-type">Option (ID: A02)</div>
+            <div class="answer-content">Это вариант вашего решения задачи. Их несколько, минимум 2 варианта. Листай их стрелками, они идут друг за другом по кругу, пока не дойдут до условий задания</div>
+          </div>
+          <div class="answer-card correct">
+            <div class="answer-type">Option (ID: A03)</div>
+            <div class="answer-content">Это вариант вашего решения задачи. Их несколько, минимум 2 варианта. Листай их стрелками, они идут друг за другом по кругу, пока не дойдут до условий задания</div>
+          </div>
+          <div class="answer-card ">
+            <div class="answer-type">Option (ID: A04)</div>
+            <div class="answer-content">Это вариант вашего решения задачи. Их несколько, минимум 2 варианта. Листай их стрелками, они идут друг за другом по кругу, пока не дойдут до условий задания</div>
+          </div></div>
+        </div>
+          
+        <div class="panel nav-panel">
+          <h3>Переходы и Реакции</h3>
+          <div class="nav-grid">
+            <div class="nav-box right">
+              <strong>Успех (Переход -> Q03):</strong>
+              <p>Голова - всему начало!<br><br>Верный ответ. Продолжай в том же духе. <br><br>Скорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!<br><br>А сейчас в путь, выбирай, куда ещё пойдёшь.<br><br>Вперёд иди, да назад не оглядывайся!<br><br>Пройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!</p>
+            </div>
+            <div class="nav-box wrong">
+              <strong>Ошибка (Переход -> Q03):</strong>
+              <p>Эх, просто сказка сказывается, да непросто дело делается. <br><br>В другой раз пуcть будет правильный ответ!<br><br>А сейчас в путь, выбирай, куда ещё пойдёшь.<br><br>Вперёд иди, да назад не оглядывайся!<br><br>Пройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!</p>
+            </div>
+          </div>
+        </div>
+        </div>
+      </section>
+      <section class="quest-card">
+        
+      <div class="panel header-panel">
+        <div class="badge">Quest ID: Q02</div>
+        <h2>Q02</h2>
+      </div>
+        <div class="quest-body">
+          
+        <div class="panel context-panel">
+          <h3>Описание и условия</h3>
+          <div class="quest-text">- Привет! Да, это я, Надя.<br><br>- Знаю я, где Аленка. Вовремя ты! Услуга за услугу. <br><br>- Ты мне Ослепляющее кольцо раздобудь, а я тебе ее координаты сообщу. Срочно оно нужно, завтра смогу вернуть. <br><br>- Кольцо у Василича. Ты его знаешь, придется тебе постараться его уговорить. Удачи!</div>
+          <div class="main-txt-extra" style="margin-top:10px; opacity:0.9;">Отлично, звоним! <br><br>Надя, скорее ответь, <br>на тебя надежда великая!</div>
+        </div>
+          
+        <div class="panel media-panel">
+          <h3>Медиа и Ресурсы</h3>
+          <ul><li><strong>Звук:</strong> Q2sound_oneshot</li></ul>
+        </div>
+          
+        <div class="panel answers-panel">
+          <h3>Варианты ответов / Действия</h3>
+          <div class="answers-grid">
+          <div class="answer-card ">
+            <div class="answer-type">Art (ID: A43)</div>
+            <div class="answer-content">Отлично, звоним! <br><br>Надя, скорее ответь, <br>на тебя надежда великая!</div>
+          </div></div>
+        </div>
+          
+        <div class="panel nav-panel">
+          <h3>Переходы и Реакции</h3>
+          <div class="nav-grid">
+            <div class="nav-box right">
+              <strong>Успех (Переход -> Q05):</strong>
+              <p>Продолжайте прогулку. Ищите стенды с информацией для продолжения квеста. Телефон можно перевести в режим сна</p>
+            </div>
+            <div class="nav-box wrong">
+              <strong>Ошибка (Переход -> Q05):</strong>
+              <p>Продолжайте прогулку. Ищите стенды с информацией для продолжения квеста. Телефон можно перевести в режим сна</p>
+            </div>
+          </div>
+        </div>
+        </div>
+      </section>
+      <section class="quest-card">
+        
+      <div class="panel header-panel">
+        <div class="badge">Quest ID: Q03</div>
+        <h2>Дорога привела тебя к сказочной красоты поляне</h2>
+      </div>
+        <div class="quest-body">
+          
+        <div class="panel context-panel">
+          <h3>Описание и условия</h3>
+          <div class="quest-text">Пришло письмо от клиента:<br><br>"Мы хотели отправить курьера, но не смогли связаться с Аленой. Уточните, пожалуйста, куда следует ему приехать, чтобы привезти реквизит для сегодняшней съемки. <br><br>Сообщаем также, что в задании на съемку планируем внести небольшое изменение, будьте внимательны!"</div>
+          <div class="main-txt-extra" style="margin-top:10px; opacity:0.9;">На поляне ты встретил коня! <br>Копытом бьет, красавец.<br><br>	- Отпусти меня! К плохому хозяину я попал... <br>	- Слышал, мясокомбинат у него есть. <br>	- Страшно мне. <br>	- Помоги, а я тебе пригожусь!<br><br>Как ты поступишь?<br> <br><b>Выбирай!</b><br><br>Отпущу коня, жаль его. <br>Говорящий!<br><br>Мясокомбинат <br>серьезной структуре принадлежит. <br><br>Можно без бизнеса остаться.</div>
+        </div>
+          
+        <div class="panel media-panel">
+          <h3>Медиа и Ресурсы</h3>
+          <ul><li><strong>Звук:</strong> Q3sound_oneshot</li></ul>
+        </div>
+          
+        <div class="panel answers-panel">
+          <h3>Варианты ответов / Действия</h3>
+          <div class="answers-grid">
+          <div class="answer-card correct">
+            <div class="answer-type">Slide (ID: A05)</div>
+            <div class="answer-content">Оглянись вокруг! Вдруг, найдешь что-то, что может пригодиться</div>
+          </div>
+          <div class="answer-card ">
+            <div class="answer-type">Option (ID: A06)</div>
+            <div class="answer-content">Оглянись вокруг! Вдруг, найдешь что-то, что может пригодиться</div>
+          </div>
+          <div class="answer-card ">
+            <div class="answer-type">Option (ID: A07)</div>
+            <div class="answer-content">Оглянись вокруг! Вдруг, найдешь что-то, что может пригодиться</div>
+          </div></div>
+        </div>
+          
+        <div class="panel nav-panel">
+          <h3>Переходы и Реакции</h3>
+          <div class="nav-grid">
+            <div class="nav-box right">
+              <strong>Успех (Переход -> Q04):</strong>
+              <p>Голова - всему начало!<br><br>Верный ответ. Продолжай в том же духе. <br><br>Скорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!<br><br>А сейчас в путь, выбирай, куда ещё пойдёшь.<br><br>Вперёд иди, да назад не оглядывайся!<br><br>Пройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!</p>
+            </div>
+            <div class="nav-box wrong">
+              <strong>Ошибка (Переход -> Q04):</strong>
+              <p>Эх, просто сказка сказывается, да непросто дело делается. <br><br>В другой раз пуcть будет правильный ответ!<br><br>А сейчас в путь, выбирай, куда ещё пойдёшь.<br><br>Вперёд иди, да назад не оглядывайся!<br><br>Пройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!</p>
+            </div>
+          </div>
+        </div>
+        </div>
+      </section>
+      <section class="quest-card">
+        
+      <div class="panel header-panel">
+        <div class="badge">Quest ID: Q04</div>
+        <h2>Мероприятие... куда Аленка могла собраться? <br>И с кем?</h2>
+      </div>
+        <div class="quest-body">
+          
+        <div class="panel context-panel">
+          <h3>Описание и условия</h3>
+          <div class="quest-text">- Спасибо тебе, дружище!, - сказал конь.<br><br>- Знаю про твою беду. Слышал я от ветра, что встречал он девушку заколдованную, на мероприятии с нетворкингом. Волшебный коктейль она выпила, чувство времени потеряла. И телефон.<br><br>- Надо, чтобы она последнее фото в нем увидела, тогда и расколдуется!</div>
+          <div class="main-txt-extra" style="margin-top:10px; opacity:0.9;"><size=-2>Надо Наде позвонить, подруге ее. Номер только бы вспомнить, последние 3 цифры.<br><br>+7 903 123 -4Х-ХХ<br><br>        571<size=-2> – правильна одна цифра и находится <br>в правильном месте<br>        503<size=-2> – правильна одна цифра, но находится в неправильном месте<br>        195<size=-2> – правильны две цифры, но обе расположены не на своем месте<br>        627<size=-2> – все цифры неправильные<br>        <size=-2>Число из подсказки в прошлом ходе — правильна одна цифра, но находится в неправильном месте.<br><br>301<br><br>931<br><br>503<br><br>193</div>
+        </div>
+          
+        <div class="panel media-panel">
+          <h3>Медиа и Ресурсы</h3>
+          <ul><li><strong>Звук:</strong> Q4sound_oneshot</li></ul>
+        </div>
+          
+        <div class="panel answers-panel">
+          <h3>Варианты ответов / Действия</h3>
+          <div class="answers-grid">
+          <div class="answer-card ">
+            <div class="answer-type">Button (ID: A08)</div>
+            <div class="answer-content">Нажми на кнопку с недостающими цифрами</div>
+          </div>
+          <div class="answer-card correct">
+            <div class="answer-type">Option (ID: A09)</div>
+            <div class="answer-content">301</div>
+          </div>
+          <div class="answer-card ">
+            <div class="answer-type">Option (ID: A10)</div>
+            <div class="answer-content">931</div>
+          </div>
+          <div class="answer-card ">
+            <div class="answer-type">Option (ID: A11)</div>
+            <div class="answer-content">503</div>
+          </div>
+          <div class="answer-card ">
+            <div class="answer-type">Option (ID: A12)</div>
+            <div class="answer-content">193</div>
+          </div></div>
+        </div>
+          
+        <div class="panel nav-panel">
+          <h3>Переходы и Реакции</h3>
+          <div class="nav-grid">
+            <div class="nav-box right">
+              <strong>Успех (Переход -> Q02):</strong>
+              <p>Голова - всему начало!<br><br>Верный ответ. Продолжай в том же духе. <br><br>Скорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!<br><br>А сейчас в путь, выбирай, куда ещё пойдёшь.<br><br>Вперёд иди, да назад не оглядывайся!<br><br>Пройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!</p>
+            </div>
+            <div class="nav-box wrong">
+              <strong>Ошибка (Переход -> Q02):</strong>
+              <p>Эх, просто сказка сказывается, да непросто дело делается. <br><br>В другой раз пуcть будет правильный ответ!<br><br>А сейчас в путь, выбирай, куда ещё пойдёшь.<br><br>Вперёд иди, да назад не оглядывайся!<br><br>Пройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!</p>
+            </div>
+          </div>
+        </div>
+        </div>
+      </section>
+      <section class="quest-card">
+        
+      <div class="panel header-panel">
+        <div class="badge">Quest ID: Q05</div>
+        <h2>Василич, известный в городе ювелир, <br>ничего не делает просто так</h2>
+      </div>
+        <div class="quest-body">
+          
+        <div class="panel context-panel">
+          <h3>Описание и условия</h3>
+          <div class="quest-text">Сообщение от партнера:<br><br>"Долгожданное уточнение к заданию: <br><br>Требуется крупный план с кольцом. <br>Это единственый экземпляр, оригинал баснословной цены, поэтому за кольцом мы Емелю отправили. Сейчас он направляется за ним. <br><br>Очень ждем информацию, где и во сколько ему быть, чтобы передать реквизит.<br><br>Напоминаем о Вашей ответственности за своевременное размещение публикации."</div>
+          <div class="main-txt-extra" style="margin-top:10px; opacity:0.9;">	- Кольцо, говоришь, нужно? Рисковано его сейчас отдавать. Есть у меня на него клиент, <br>жду согласования. <br>	- Помочь могу, время потяну, но и ты выручи. <br>	- Есть у меня план в производство вложиться. Надо, чтобы экономика сошлась. <br><br>	- График производства есть у меня, никак не соображу, сколько стоит товар... Посчитаешь, пойдем в банк, в ячейке кольцо хранится.<br><br>Цена за комплект "Кoльцо, серьги и браслет" - $370.<br>Серьги стоят в 2 раза больше кольца, <br>браслет - на $50 дороже серег.<br><br>Кольцо стоит $62<br><br>Серьги стоят $133<br><br>Браслет стоит $178</div>
+        </div>
+          
+        <div class="panel media-panel">
+          <h3>Медиа и Ресурсы</h3>
+          <ul><li><strong>Изображение:</strong> Numbertask</li><li><strong>Изображение:</strong> Numbertask</li></ul>
+        </div>
+          
+        <div class="panel answers-panel">
+          <h3>Варианты ответов / Действия</h3>
+          <div class="answers-grid">
+          <div class="answer-card ">
+            <div class="answer-type">Slide (ID: A16)</div>
+            <div class="answer-content">	- Кольцо, говоришь, нужно? Рисковано его сейчас отдавать. Есть у меня на него клиент, <br>жду согласования. <br>	- Помочь могу, время потяну, но и ты выручи. <br>	- Есть у меня план в производство вложиться. Надо, чтобы экономика сошлась. <br><br>	- График производства есть у меня, никак не соображу, сколько стоит товар... Посчитаешь, пойдем в банк, в ячейке кольцо хранится.</div>
+          </div>
+          <div class="answer-card ">
+            <div class="answer-type">Option (ID: A17)</div>
+            <div class="answer-content">Специальное упражнение для продвинутых - посчитать оборот по графику</div>
+          </div>
+          <div class="answer-card ">
+            <div class="answer-type">Option (ID: A18)</div>
+            <div class="answer-content">Кольцо стоит $62</div>
+          </div>
+          <div class="answer-card correct">
+            <div class="answer-type">Option (ID: A19)</div>
+            <div class="answer-content">Серьги стоят $133</div>
+          </div>
+          <div class="answer-card ">
+            <div class="answer-type">Option (ID: A20)</div>
+            <div class="answer-content">Браслет стоит $178</div>
+          </div></div>
+        </div>
+          
+        <div class="panel nav-panel">
+          <h3>Переходы и Реакции</h3>
+          <div class="nav-grid">
+            <div class="nav-box right">
+              <strong>Успех (Переход -> Q07):</strong>
+              <p>Голова - всему начало!<br><br>Верный ответ. Продолжай в том же духе. <br><br>Скорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!<br><br>А сейчас в путь, выбирай, куда ещё пойдёшь.<br><br>Вперёд иди, да назад не оглядывайся!<br><br>Пройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!</p>
+            </div>
+            <div class="nav-box wrong">
+              <strong>Ошибка (Переход -> Q07):</strong>
+              <p>Эх, просто сказка сказывается, да непросто дело делается. <br><br>В другой раз пуcть будет правильный ответ!<br><br>А сейчас в путь, выбирай, куда ещё пойдёшь.<br><br>Вперёд иди, да назад не оглядывайся!<br><br>Пройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!</p>
+            </div>
+          </div>
+        </div>
+        </div>
+      </section>
+      <section class="quest-card">
+        
+      <div class="panel header-panel">
+        <div class="badge">Quest ID: Q06</div>
+        <h2>Q06</h2>
+      </div>
+        <div class="quest-body">
+          
+        <div class="panel context-panel">
+          <h3>Описание и условия</h3>
+          <div class="quest-text">Дела налаживаются! Кольцо нашлось. Отдам его Наде, узнаю, где Аленка.<br><br>Вообще, странно, что Наде именно это кольцо понадобилось и именно сегодня. Уж не хочет ли она нашу сделку сорвать?<br><br>Еще Аленкин телефон найти бы! Конь говорил, Аленка заколодована, и расколудет ее последнее селфи. Где же искать этот телефон?</div>
+          
+        </div>
+          
+        <div class="panel media-panel">
+          <h3>Медиа и Ресурсы</h3>
+          <ul><li><strong>Звук:</strong> ArtFound_oneshot</li></ul>
+        </div>
+          
+        <div class="panel answers-panel">
+          <h3>Варианты ответов / Действия</h3>
+          <div class="answers-grid">
+          <div class="answer-card ">
+            <div class="answer-type">Art (ID: A44)</div>
+            <div class="answer-content">A44</div>
+          </div></div>
+        </div>
+          
+        <div class="panel nav-panel">
+          <h3>Переходы и Реакции</h3>
+          <div class="nav-grid">
+            <div class="nav-box right">
+              <strong>Успех (Переход -> Q14):</strong>
+              <p>Продолжайте прогулку. Ищите стенды с информацией для продолжения квеста. Телефон можно перевести в режим сна</p>
+            </div>
+            <div class="nav-box wrong">
+              <strong>Ошибка (Переход -> Q14):</strong>
+              <p>Продолжайте прогулку. Ищите стенды с информацией для продолжения квеста. Телефон можно перевести в режим сна</p>
+            </div>
+          </div>
+        </div>
+        </div>
+      </section>
+      <section class="quest-card">
+        
+      <div class="panel header-panel">
+        <div class="badge">Quest ID: Q07</div>
+        <h2>У Нади нет причин требовать кольцо <br>именно сегодня</h2>
+      </div>
+        <div class="quest-body">
+          
+        <div class="panel context-panel">
+          <h3>Описание и условия</h3>
+          <div class="quest-text">- Спасибо тебе за добрый совет! <br><br>- А ты знаешь, что Надя тоже хотела<br>на твоего клиента работать, а Аленка ее обошла в конкурсе. Так что, если Аленка провалится, Наде проект достанется. Кстати, от них согласование и жду, <br>должны прислать человека с залогом. <br><br>... Вот так поворот!<br>Как бы устроить так, чтобы все довольны остались?...</div>
+          <div class="main-txt-extra" style="margin-top:10px; opacity:0.9;">- Так уж и быть, кольцо можешь забрать, <br>- сказал ювелир.<br>- Надо только пароль ввести. Это количество квадратов на картинке.<br><br>51</div>
+        </div>
+          
+        <div class="panel media-panel">
+          <h3>Медиа и Ресурсы</h3>
+          <ul><li><strong>Изображение:</strong> Squaretask</li></ul>
+        </div>
+          
+        <div class="panel answers-panel">
+          <h3>Варианты ответов / Действия</h3>
+          <div class="answers-grid">
+          <div class="answer-card ">
+            <div class="answer-type">InputField (ID: A25)</div>
+            <div class="answer-content">- Так уж и быть, кольцо можешь забрать, <br>- сказал ювелир.<br>- Надо только пароль ввести. Это количество квадратов на картинке.</div>
+          </div>
+          <div class="answer-card ">
+            <div class="answer-type">Option (ID: A26)</div>
+            <div class="answer-content">51</div>
+          </div></div>
+        </div>
+          
+        <div class="panel nav-panel">
+          <h3>Переходы и Реакции</h3>
+          <div class="nav-grid">
+            <div class="nav-box right">
+              <strong>Успех (Переход -> Q06):</strong>
+              <p>Голова - всему начало!<br><br>Верный ответ. Продолжай в том же духе. <br><br>Скорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!<br><br>А сейчас в путь, выбирай, куда ещё пойдёшь.<br><br>Вперёд иди, да назад не оглядывайся!<br><br>Пройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!</p>
+            </div>
+            <div class="nav-box wrong">
+              <strong>Ошибка (Переход -> Q06):</strong>
+              <p>Эх, просто сказка сказывается, да непросто дело делается. <br><br>В другой раз пуcть будет правильный ответ!<br><br>А сейчас в путь, выбирай, куда ещё пойдёшь.<br><br>Вперёд иди, да назад не оглядывайся!<br><br>Пройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!</p>
+            </div>
+          </div>
+        </div>
+        </div>
+      </section>
+      <section class="quest-card">
+        
+      <div class="panel header-panel">
+        <div class="badge">Quest ID: Q08</div>
+        <h2>Надо выбрать, как поступить</h2>
+      </div>
+        <div class="quest-body">
+          
+        <div class="panel context-panel">
+          <h3>Описание и условия</h3>
+          <div class="quest-text">Вот и ваш с Аленкой офис. У дверей Емеля грустный уже стоит, с реквизитом.<br><br>- Привет, - говорит. <br><br>- Был я у Василича, должен был кольцо забрать редкое, а не успел. Уволят меня теперь. Что делать, не знаю!</div>
+          <div class="main-txt-extra" style="margin-top:10px; opacity:0.9;">Емеля не знает, что у тебя кольцо.<br><br>Если кольцо Наде отдать, то Емелю уволят, но ты найдешь Аленку. Съемка будет не то, <br>что надо и важно клиенту. <br>Жаль Емелю, семеро по лавкам у него детей.  <br><br>А если кольцо Емеле отдать? Придется признаться, что Аленка потерялась, и ты не можешь сообщить время и место съемки, <br>это провал! <br><br>Отдать кольцо Емеле. <br>Будущее проекта под вопросом.<br><br>Лучше найти Аленку и сохранить лицо.<br>Но клиент не получит желаемое, а Емелю уволят.</div>
+        </div>
+          
+          
+        <div class="panel answers-panel">
+          <h3>Варианты ответов / Действия</h3>
+          <div class="answers-grid">
+          <div class="answer-card correct">
+            <div class="answer-type">Slide (ID: A27)</div>
+            <div class="answer-content">Оглянись вокруг, найди, что запомнить</div>
+          </div>
+          <div class="answer-card ">
+            <div class="answer-type">Option (ID: A28)</div>
+            <div class="answer-content">Оглянись вокруг, найди, что запомнить</div>
+          </div>
+          <div class="answer-card ">
+            <div class="answer-type">Option (ID: A29)</div>
+            <div class="answer-content">Оглянись вокруг, найди, что запомнить</div>
+          </div></div>
+        </div>
+          
+        <div class="panel nav-panel">
+          <h3>Переходы и Реакции</h3>
+          <div class="nav-grid">
+            <div class="nav-box right">
+              <strong>Успех (Переход -> Q10):</strong>
+              <p>Голова - всему начало!<br><br>Верный ответ. Продолжай в том же духе. <br><br>Скорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!<br><br>А сейчас в путь, выбирай, куда ещё пойдёшь.<br><br>Вперёд иди, да назад не оглядывайся!<br><br>Пройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!</p>
+            </div>
+            <div class="nav-box wrong">
+              <strong>Ошибка (Переход -> Q10):</strong>
+              <p>Эх, просто сказка сказывается, да непросто дело делается. <br><br>В другой раз пуcть будет правильный ответ!<br><br>А сейчас в путь, выбирай, куда ещё пойдёшь.<br><br>Вперёд иди, да назад не оглядывайся!<br><br>Пройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!</p>
+            </div>
+          </div>
+        </div>
+        </div>
+      </section>
+      <section class="quest-card">
+        
+      <div class="panel header-panel">
+        <div class="badge">Quest ID: Q09</div>
+        <h2>Q09</h2>
+      </div>
+        <div class="quest-body">
+          
+        <div class="panel context-panel">
+          <h3>Описание и условия</h3>
+          <div class="quest-text">Теперь все у нас есть!<br><br>Осталось выяснить у Нади, где Аленка.</div>
+          
+        </div>
+          
+        <div class="panel media-panel">
+          <h3>Медиа и Ресурсы</h3>
+          <ul><li><strong>Звук:</strong> ArtFound_oneshot</li></ul>
+        </div>
+          
+        <div class="panel answers-panel">
+          <h3>Варианты ответов / Действия</h3>
+          <div class="answers-grid">
+          <div class="answer-card ">
+            <div class="answer-type">Art (ID: A45)</div>
+            <div class="answer-content">A45</div>
+          </div></div>
+        </div>
+          
+        <div class="panel nav-panel">
+          <h3>Переходы и Реакции</h3>
+          <div class="nav-grid">
+            <div class="nav-box right">
+              <strong>Успех (Переход -> Q11):</strong>
+              <p>Продолжайте прогулку. Ищите стенды с информацией для продолжения квеста. Телефон можно перевести в режим сна</p>
+            </div>
+            <div class="nav-box wrong">
+              <strong>Ошибка (Переход -> Q11):</strong>
+              <p>Продолжайте прогулку. Ищите стенды с информацией для продолжения квеста. Телефон можно перевести в режим сна</p>
+            </div>
+          </div>
+        </div>
+        </div>
+      </section>
+      <section class="quest-card">
+        
+      <div class="panel header-panel">
+        <div class="badge">Quest ID: Q10</div>
+        <h2>Пароль, пароль) </h2>
+      </div>
+        <div class="quest-body">
+          
+        <div class="panel context-panel">
+          <h3>Описание и условия</h3>
+          <div class="quest-text">Емеля - добрый человек, решил помочь тебе, вместе отправиться к Наде. Что она скажет, интересно, представителю клиента? <br><br>А пока вы в офис зашли, сначала телефон найти же нужно. <br><br>Главное, с количеством попыток ввода пароля не переусердствовать!</div>
+          <div class="main-txt-extra" style="margin-top:10px; opacity:0.9;">Что было, вспоминай, <br>листай вперед, <br>фигуры выбирай!<br><br>Визуальный код доступа<br>Выбери, чтобы пройти!<br><br>Визуальный код доступа<br>Выбери, чтобы пройти!<br><br>Визуальный код доступа<br>Выбери, чтобы пройти!</div>
+        </div>
+          
+          
+        <div class="panel answers-panel">
+          <h3>Варианты ответов / Действия</h3>
+          <div class="answers-grid">
+          <div class="answer-card correct">
+            <div class="answer-type">Slide (ID: A30)</div>
+            <div class="answer-content">Помни, что подсказки можно найти, осмотревшись)</div>
+          </div>
+          <div class="answer-card ">
+            <div class="answer-type">Option (ID: A31)</div>
+            <div class="answer-content">Помни, что подсказки можно найти, осмотревшись)</div>
+          </div>
+          <div class="answer-card ">
+            <div class="answer-type">Option (ID: A32)</div>
+            <div class="answer-content">Помни, что подсказки можно найти, осмотревшись)</div>
+          </div>
+          <div class="answer-card ">
+            <div class="answer-type">Option (ID: A33)</div>
+            <div class="answer-content">Помни, что подсказки можно найти, осмотревшись)</div>
+          </div></div>
+        </div>
+          
+        <div class="panel nav-panel">
+          <h3>Переходы и Реакции</h3>
+          <div class="nav-grid">
+            <div class="nav-box right">
+              <strong>Успех (Переход -> Q12):</strong>
+              <p>Голова - всему начало!<br><br>Верный ответ. Продолжай в том же духе. <br><br>Скорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!<br><br>А сейчас в путь, выбирай, куда ещё пойдёшь.<br><br>Вперёд иди, да назад не оглядывайся!<br><br>Пройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!</p>
+            </div>
+            <div class="nav-box wrong">
+              <strong>Ошибка (Переход -> Q12):</strong>
+              <p>Эх, просто сказка сказывается, да непросто дело делается. <br><br>В другой раз пуcть будет правильный ответ!<br><br>А сейчас в путь, выбирай, куда ещё пойдёшь.<br><br>Вперёд иди, да назад не оглядывайся!<br><br>Пройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!</p>
+            </div>
+          </div>
+        </div>
+        </div>
+      </section>
+      <section class="quest-card">
+        
+      <div class="panel header-panel">
+        <div class="badge">Quest ID: Q11</div>
+        <h2>Улыбнулась Надя хитро и говорит:</h2>
+      </div>
+        <div class="quest-body">
+          
+        <div class="panel context-panel">
+          <h3>Описание и условия</h3>
+          <div class="quest-text">Принесли Наде кольцо желанное. <br><br>- Условие твое выполнено. Но надо договориться.<br><br>- Нужно нам сейчас и кольцо, и Аленку найти. Неужели встанешь у нас на пути?<br><br>На Емеле мерч фирменный, и лого бренда желанного на планшете так и светится. <br><br>... Условие выполнено, но до конца ли? Можно ли кольцо до завтра оставить?</div>
+          <div class="main-txt-extra" style="margin-top:10px; opacity:0.9;">        - Уговор дороже денег. Раз кольцо здесь, пусть здесь с Емелей и будет. Емелю я не приглашала, значит, и тебе неожиданный поворот.<br><br>        - Есть у меня 12 подарков и 13 гостей. Хочу, чтобы никто не обиделся, но есть среди них один не очень приятный человек. Гости встанут в круг, и надо будет им раздать подарки, каждому девятому. <br><br>        - Подойдет твой совет, значит договоримся! <br>Будет у тебя все вовремя, и кольцо, и Аленка.<br><br>На каком месте поставить того человека?<br><br>3<br><br>11<br><br>2<br><br>5<br><br>7</div>
+        </div>
+          
+          
+        <div class="panel answers-panel">
+          <h3>Варианты ответов / Действия</h3>
+          <div class="answers-grid">
+          <div class="answer-card ">
+            <div class="answer-type">Button (ID: A34)</div>
+            <div class="answer-content">        - Уговор дороже денег. Раз кольцо здесь, пусть здесь с Емелей и будет. Емелю я не приглашала, значит, и тебе неожиданный поворот.<br><br>        - Есть у меня 12 подарков и 13 гостей. Хочу, чтобы никто не обиделся, но есть среди них один не очень приятный человек. Гости встанут в круг, и надо будет им раздать подарки, каждому девятому. <br><br>        - Подойдет твой совет, значит договоримся! <br>Будет у тебя все вовремя, и кольцо, и Аленка.<br><br>На каком месте поставить того человека?</div>
+          </div>
+          <div class="answer-card ">
+            <div class="answer-type">Option (ID: A35)</div>
+            <div class="answer-content">3</div>
+          </div>
+          <div class="answer-card correct">
+            <div class="answer-type">Option (ID: A36)</div>
+            <div class="answer-content">11</div>
+          </div>
+          <div class="answer-card ">
+            <div class="answer-type">Option (ID: A37)</div>
+            <div class="answer-content">2</div>
+          </div>
+          <div class="answer-card ">
+            <div class="answer-type">Option (ID: A38)</div>
+            <div class="answer-content">5</div>
+          </div>
+          <div class="answer-card ">
+            <div class="answer-type">Option (ID: A39)</div>
+            <div class="answer-content">7</div>
+          </div></div>
+        </div>
+          
+        <div class="panel nav-panel">
+          <h3>Переходы и Реакции</h3>
+          <div class="nav-grid">
+            <div class="nav-box right">
+              <strong>Успех (Переход -> Finish):</strong>
+              <p>Голова - всему начало!<br><br>Верный ответ. Продолжай в том же духе. <br><br>Скорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!<br><br>А сейчас в путь, выбирай, куда ещё пойдёшь.<br><br>Вперёд иди, да назад не оглядывайся!<br><br>Пройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!</p>
+            </div>
+            <div class="nav-box wrong">
+              <strong>Ошибка (Переход -> Finish):</strong>
+              <p>Эх, просто сказка сказывается, да непросто дело делается. <br><br>В другой раз пуcть будет правильный ответ!<br><br>А сейчас в путь, выбирай, куда ещё пойдёшь.<br><br>Вперёд иди, да назад не оглядывайся!<br><br>Пройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!</p>
+            </div>
+          </div>
+        </div>
+        </div>
+      </section>
+      <section class="quest-card">
+        
+      <div class="panel header-panel">
+        <div class="badge">Quest ID: Q12</div>
+        <h2>Q12</h2>
+      </div>
+        <div class="quest-body">
+          
+        <div class="panel context-panel">
+          <h3>Описание и условия</h3>
+          <div class="quest-text">Хороши технологии, вот и адрес, где телефон Алёнкин, дом красивый, яркий, окна резные, это ж её бабушки дом! <br><br>Добрая она, Любовь Андреевна, всегда пирожком угостит. <br><br>Только калитка закрыта, а на ней записка...</div>
+          <div class="main-txt-extra" style="margin-top:10px; opacity:0.9;">Кто свой, проходи, а не свой, уходи! <br>Калитка откроется, <br>если ответ дашь верный: <br><br>Что за чудо:<br>четыре ноги, два уха, <br>один нос да брюхо?<br><br>самовар<br><br>Самовар</div>
+        </div>
+          
+          
+        <div class="panel answers-panel">
+          <h3>Варианты ответов / Действия</h3>
+          <div class="answers-grid">
+          <div class="answer-card ">
+            <div class="answer-type">InputField (ID: A40)</div>
+            <div class="answer-content">Кто свой, проходи, а не свой, уходи! <br>Калитка откроется, <br>если ответ дашь верный: <br><br>Что за чудо:<br>четыре ноги, два уха, <br>один нос да брюхо?</div>
+          </div>
+          <div class="answer-card ">
+            <div class="answer-type">Option (ID: A41)</div>
+            <div class="answer-content">самовар</div>
+          </div>
+          <div class="answer-card ">
+            <div class="answer-type">Option (ID: A42)</div>
+            <div class="answer-content">Самовар</div>
+          </div></div>
+        </div>
+          
+        <div class="panel nav-panel">
+          <h3>Переходы и Реакции</h3>
+          <div class="nav-grid">
+            <div class="nav-box right">
+              <strong>Успех (Переход -> Q09):</strong>
+              <p>Голова - всему начало!<br><br>Верный ответ. Продолжай в том же духе. <br><br>Скорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!<br><br>А сейчас в путь, выбирай, куда ещё пойдёшь.<br><br>Вперёд иди, да назад не оглядывайся!<br><br>Пройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!</p>
+            </div>
+            <div class="nav-box wrong">
+              <strong>Ошибка (Переход -> Q09):</strong>
+              <p>Эх, просто сказка сказывается, да непросто дело делается. <br><br>В другой раз пуcть будет правильный ответ!<br><br>А сейчас в путь, выбирай, куда ещё пойдёшь.<br><br>Вперёд иди, да назад не оглядывайся!<br><br>Пройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!</p>
+            </div>
+          </div>
+        </div>
+        </div>
+      </section>
+      <section class="quest-card">
+        
+      <div class="panel header-panel">
+        <div class="badge">Quest ID: Q13</div>
+        <h2>Кот чёрный у дверей прохаживается, гостей встречает. </h2>
+      </div>
+        <div class="quest-body">
+          
+        <div class="panel context-panel">
+          <h3>Описание и условия</h3>
+          <div class="quest-text">Сказала Надя, где Аленку искать. <br><br>Вот это новость, это же офис нашего партнёра, студия звукозаписи, и Тик-Ток кабинки для трансляций здесь в разных дизайнах.<br><br>Чего только нет в нашем славном месте!<br><br>Каким волшебством мы обладаем, рядом и новое, и старое, и родное, и зарубежное в ладу живут.<br><br>И привратник - Кот</div>
+          <div class="main-txt-extra" style="margin-top:10px; opacity:0.9;">	- Мяу, господа, добро пожаловать! Видел я вашу Алёнку, ну и хитрая у неё схема все Тик-Ток кабинки красивые попробовать. Выбирала на каждый час разные.<br><br>	- На 9 часов выбрала 6 кабинку, на 12 часов выбрала 10 кабинку. Схема у неё какая-то была.<br>Сейчас 14 часов. <br><br>Поди, угадай, в какой она сейчас?<br><br>18<br><br>7<br><br>12<br><br>5</div>
+        </div>
+          
+          
+        <div class="panel answers-panel">
+          <h3>Варианты ответов / Действия</h3>
+          <div class="answers-grid">
+          <div class="answer-card ">
+            <div class="answer-type">Button (ID: A46)</div>
+            <div class="answer-content">	- Мяу, господа, добро пожаловать! Видел я вашу Алёнку, ну и хитрая у неё схема все Тик-Ток кабинки красивые попробовать. Выбирала на каждый час разные.<br><br>	- На 9 часов выбрала 6 кабинку, на 12 часов выбрала 10 кабинку. Схема у неё какая-то была.<br>Сейчас 14 часов. <br><br>Поди, угадай, в какой она сейчас?</div>
+          </div>
+          <div class="answer-card ">
+            <div class="answer-type">Option (ID: A47)</div>
+            <div class="answer-content">18</div>
+          </div>
+          <div class="answer-card correct">
+            <div class="answer-type">Option (ID: A48)</div>
+            <div class="answer-content">7</div>
+          </div>
+          <div class="answer-card ">
+            <div class="answer-type">Option (ID: A49)</div>
+            <div class="answer-content">12</div>
+          </div>
+          <div class="answer-card ">
+            <div class="answer-type">Option (ID: A50)</div>
+            <div class="answer-content">5</div>
+          </div></div>
+        </div>
+          
+        <div class="panel nav-panel">
+          <h3>Переходы и Реакции</h3>
+          <div class="nav-grid">
+            <div class="nav-box right">
+              <strong>Успех (Переход -> —):</strong>
+              <p>Голова - всему начало!<br><br>Верный ответ. Продолжай в том же духе. <br><br>Скорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!<br><br>А сейчас в путь, выбирай, куда ещё пойдёшь.<br><br>Вперёд иди, да назад не оглядывайся!<br><br>Пройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!</p>
+            </div>
+            <div class="nav-box wrong">
+              <strong>Ошибка (Переход -> —):</strong>
+              <p>Эх, просто сказка сказывается, да непросто дело делается. <br><br>В другой раз путь будет правильный ответ!<br><br>А сейчас в путь, выбирай, куда ещё пойдёшь.<br><br>Вперёд иди, да назад не оглядывайся!<br><br>Пройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!</p>
+            </div>
+          </div>
+        </div>
+        </div>
+      </section>
+      <section class="quest-card">
+        
+      <div class="panel header-panel">
+        <div class="badge">Quest ID: Q14</div>
+        <h2>Q14</h2>
+      </div>
+        <div class="quest-body">
+          
+        <div class="panel context-panel">
+          <h3>Описание и условия</h3>
+          <div class="quest-text">Ах, пусто</div>
+          <div class="main-txt-extra" style="margin-top:10px; opacity:0.9;">Ты на середине пути, <br>еще столько же пройти.<br><br>Что же ответить на вопрос:<br>"Где Аленка, и когда будет съемка?"<br><br>Что сказать?<br><br>...Что же, пусть Емеля в офис едет, <br>пока обернется, <br>Аленка, авось, и найдется!...</div>
+        </div>
+          
+        <div class="panel media-panel">
+          <h3>Медиа и Ресурсы</h3>
+          <ul><li><strong>Звук:</strong> NoArtFound_oneshot</li></ul>
+        </div>
+          
+        <div class="panel answers-panel">
+          <h3>Варианты ответов / Действия</h3>
+          <div class="answers-grid">
+          <div class="answer-card ">
+            <div class="answer-type">AntiArt (ID: A51)</div>
+            <div class="answer-content">На авось надейся, а сам не плошай!</div>
+          </div></div>
+        </div>
+          
+        <div class="panel nav-panel">
+          <h3>Переходы и Реакции</h3>
+          <div class="nav-grid">
+            <div class="nav-box right">
+              <strong>Успех (Переход -> Q08):</strong>
+              <p>Продолжайте прогулку. Ищите стенды с информацией для продолжения квеста. Телефон можно перевести в режим сна</p>
+            </div>
+            <div class="nav-box wrong">
+              <strong>Ошибка (Переход -> Q08):</strong>
+              <p>Продолжайте прогулку. Ищите стенды с информацией для продолжения квеста. Телефон можно перевести в режим сна</p>
+            </div>
+          </div>
+        </div>
+        </div>
+      </section>
+      <section class="quest-card">
+        
+      <div class="panel header-panel">
+        <div class="badge">Quest ID: Finish</div>
+        <h2>Finish</h2>
+      </div>
+        <div class="quest-body">
+          
+        <div class="panel context-panel">
+          <h3>Описание и условия</h3>
+          <div class="quest-text">Сдержала Надя слово, <br><br>тут же и Аленка нашлась, и все хорошо сложилось. <br><br><br><b>УРА !!!</b></div>
+          <div class="main-txt-extra" style="margin-top:10px; opacity:0.9;">Победа</div>
+        </div>
+          
+        <div class="panel media-panel">
+          <h3>Медиа и Ресурсы</h3>
+          <ul><li><strong>Звук:</strong> ArtFound_oneshot</li></ul>
+        </div>
+          
+        <div class="panel answers-panel">
+          <h3>Варианты ответов / Действия</h3>
+          <div class="answers-grid">
+          <div class="answer-card ">
+            <div class="answer-type">Art (ID: A52)</div>
+            <div class="answer-content">Победа</div>
+          </div></div>
+        </div>
+          
+        <div class="panel nav-panel">
+          <h3>Переходы и Реакции</h3>
+          <div class="nav-grid">
+            <div class="nav-box right">
+              <strong>Успех (Переход -> —):</strong>
+              <p>Ах, красота какая, квест завршен, цели достигнуты! Ура!</p>
+            </div>
+            <div class="nav-box wrong">
+              <strong>Ошибка (Переход -> —):</strong>
+              <p>Эх, просто сказка сказывается, да непросто дело делается. <br><br>В другой раз пуcть будет правильный ответ!<br><br>А сейчас в путь, выбирай, куда ещё пойдёшь.<br><br>Вперёд иди, да назад не оглядывайся!<br><br>Пройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!</p>
+            </div>
+          </div>
+        </div>
+        </div>
+      </section>
+  </div>
+</body>
+</html>

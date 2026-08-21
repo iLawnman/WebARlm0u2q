@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Интерактивный Квест</title>
+  <style>
+    :root {
+      --bg: #070707;
+      --panel-bg: #121212;
+      --panel-border: #FFD700;
+      --text: #FFFFFF;
+      --accent: #FFD700;
+      --correct: #22c55e;
+      --wrong: #ef4444;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    #quest-container {
+      width: 100%;
+      max-width: 600px;
+      background: var(--panel-bg);
+      border: 2px solid var(--panel-border);
+      border-radius: 16px;
+      box-shadow: 0 0 25px rgba(255, 215, 0, 0.15);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      margin: 10px;
+    }
+
+    /* Панель заголовка */
+    .header-panel {
+      background: linear-gradient(180deg, #1f1f1f 0%, #121212 100%);
+      padding: 15px 20px;
+      border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .quest-title {
+      font-weight: bold;
+      color: var(--accent);
+      font-size: 1.1rem;
+    }
+
+    .badge {
+      font-size: 0.8rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: #333;
+      color: #aaa;
+    }
+
+    /* Главная панель контента */
+    .main-panel {
+      padding: 20px;
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .quest-text {
+      line-height: 1.5;
+      font-size: 1rem;
+    }
+
+    .quest-text i { color: #888; }
+    .quest-text b { color: var(--accent); }
+
+    /* Медиа-информация */
+    .media-badge {
+      font-size: 0.75rem;
+      color: #FF69B4;
+      background: rgba(255, 105, 180, 0.1);
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px dashed #FF69B4;
+    }
+
+    /* Панель подсказок */
+    .help-panel {
+      background: rgba(255, 255, 255, 0.03);
+      border-left: 3px solid var(--accent);
+      padding: 10px 12px;
+      font-size: 0.85rem;
+      color: #ccc;
+    }
+
+    /* Панель ответов и ввода */
+    .answers-panel {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .btn-option {
+      background: #1e1e1e;
+      color: var(--text);
+      border: 1px solid #444;
+      padding: 12px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      text-align: left;
+      font-size: 0.95rem;
+      transition: all 0.2s ease;
+    }
+
+    .btn-option:hover {
+      background: #2a2a2a;
+      border-color: var(--accent);
+    }
+
+    .input-group {
+      display: flex;
+      gap: 8px;
+    }
+
+    .input-field {
+      flex: 1;
+      background: #1e1e1e;
+      border: 1px solid #444;
+      color: #fff;
+      padding: 12px;
+      border-radius: 8px;
+      outline: none;
+      font-size: 1rem;
+    }
+
+    .input-field:focus { border-color: var(--accent); }
+
+    .btn-submit {
+      background: var(--accent);
+      color: #000;
+      font-weight: bold;
+      border: none;
+      padding: 0 20px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    /* Панель фидбека (Результат) */
+    .feedback-panel {
+      padding: 15px;
+      border-radius: 8px;
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .feedback-panel.correct {
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid var(--correct);
+      color: #4ade80;
+    }
+
+    .feedback-panel.wrong {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid var(--wrong);
+      color: #f87171;
+    }
+
+    .btn-next {
+      background: var(--text);
+      color: #000;
+      border: none;
+      padding: 10px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      align-self: flex-end;
+    }
+
+    /* Карусель (Слайды) */
+    .carousel-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    .btn-arrow {
+      background: #222;
+      color: var(--accent);
+      border: 1px solid #444;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 1.2rem;
+    }
+  </style>
+</head>
+<body>
+
+<div id="quest-container">
+  <div class="header-panel">
+    <div class="quest-title" id="title-text">Загрузка...</div>
+    <div class="badge" id="quest-id">ID</div>
+  </div>
+
+  <div class="main-panel">
+    <div id="media-info" class="media-badge" style="display:none;"></div>
+    <div id="question-text" class="quest-text"></div>
+    <div id="help-text" class="help-panel" style="display:none;"></div>
+
+    <!-- Интерактивная зона -->
+    <div id="interactive-zone" class="answers-panel"></div>
+
+    <!-- Фидбек и переход -->
+    <div id="feedback-panel" class="feedback-panel">
+      <div id="feedback-text"></div>
+      <button class="btn-next" onclick="nextQuest()">Продолжить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const quests = [{"id":"Start","QuestID":"Start","BasePrefab":"BasePrefabQuestions","GoalIndex":"0","GoalImage":"","RecognitionImage":"T1","SignImage":"T1","Question":"...Ваня, владелец кафешки, говорит, \nчто уже 2 дня Аленку не видел. \n\n- Однако ж, помочь могу. Помнишь, блюдечко с голубой каемочкой? \nВот тебе аналог с искусственным интеллектом, R4. Правда, вредный он, прямо не ведет, но подсказки дает. \nКак никак, помощь. \nУспей! Время помощи ограничено.\n\n\n<i><size=20>Закрывай окошко и наводи камеру на картинку.</size></i>","Task":"1","AnswerList":"A01, A02, A03, A04","Timer":"5","RightWayIndx":"1, 2, 3","RightWayQuest":"Q03","RightReactionSign":"Back2","RightReaction":"Голова - всему начало!\n\nВерный ответ. Продолжай в том же духе. \n\nСкорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!","WrongWayQuest":"Q03","WrongReactionSign":"Back4","WrongReaction":"Эх, просто сказка сказывается, да непросто дело делается. \n\nВ другой раз пуcть будет правильный ответ!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!","Artefact":"","NextWayQuest":"","DistanceTimer":"5"},{"id":"Q02","QuestID":"Q02","BasePrefab":"BasePrefabQuestions","GoalIndex":"1","GoalImage":"","RecognitionImage":"T2","SignImage":"T2","Question":"- Привет! Да, это я, Надя.\n\n- Знаю я, где Аленка. Вовремя ты! Услуга за услугу. \n\n- Ты мне Ослепляющее кольцо раздобудь, а я тебе ее координаты сообщу. Срочно оно нужно, завтра смогу вернуть. \n\n- Кольцо у Василича. Ты его знаешь, придется тебе постараться его уговорить. Удачи!","Task":"2","AnswerList":"A43","Timer":"5","RightWayIndx":"","RightWayQuest":"Q05","RightReactionSign":"Back2","RightReaction":"Продолжайте прогулку. Ищите стенды с информацией для продолжения квеста. Телефон можно перевести в режим сна","WrongWayQuest":"Q05","WrongReactionSign":"Back4","WrongReaction":"Продолжайте прогулку. Ищите стенды с информацией для продолжения квеста. Телефон можно перевести в режим сна","Artefact":"","NextWayQuest":"","DistanceTimer":"5"},{"id":"Q03","QuestID":"Q03","BasePrefab":"BasePrefabQuestions","GoalIndex":"2","GoalImage":"","RecognitionImage":"T3","SignImage":"T3","Question":"Пришло письмо от клиента:\n\n\"Мы хотели отправить курьера, но не смогли связаться с Аленой. Уточните, пожалуйста, куда следует ему приехать, чтобы привезти реквизит для сегодняшней съемки. \n\nСообщаем также, что в задании на съемку планируем внести небольшое изменение, будьте внимательны!\"","Task":"1","AnswerList":"A05, A06, A07","Timer":"5","RightWayIndx":"1","RightWayQuest":"Q04","RightReactionSign":"Back2","RightReaction":"Голова - всему начало!\n\nВерный ответ. Продолжай в том же духе. \n\nСкорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!","WrongWayQuest":"Q04","WrongReactionSign":"Back4","WrongReaction":"Эх, просто сказка сказывается, да непросто дело делается. \n\nВ другой раз пуcть будет правильный ответ!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!","Artefact":"","NextWayQuest":"","DistanceTimer":"5"},{"id":"Q04","QuestID":"Q04","BasePrefab":"BasePrefabQuestions","GoalIndex":"3","GoalImage":"","RecognitionImage":"T4","SignImage":"T4","Question":"- Спасибо тебе, дружище!, - сказал конь.\n\n- Знаю про твою беду. Слышал я от ветра, что встречал он девушку заколдованную, на мероприятии с нетворкингом. Волшебный коктейль она выпила, чувство времени потеряла. И телефон.\n\n- Надо, чтобы она последнее фото в нем увидела, тогда и расколдуется!","Task":"1","AnswerList":"A08, A09, A10, A11, A12","Timer":"5","RightWayIndx":"2","RightWayQuest":"Q02","RightReactionSign":"Back2","RightReaction":"Голова - всему начало!\n\nВерный ответ. Продолжай в том же духе. \n\nСкорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!","WrongWayQuest":"Q02","WrongReactionSign":"Back4","WrongReaction":"Эх, просто сказка сказывается, да непросто дело делается. \n\nВ другой раз пуcть будет правильный ответ!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!","Artefact":"","NextWayQuest":"","DistanceTimer":"5"},{"id":"Q05","QuestID":"Q05","BasePrefab":"BasePrefabQuestions","GoalIndex":"4","GoalImage":"","RecognitionImage":"T5","SignImage":"T5","Question":"Сообщение от партнера:\n\n\"Долгожданное уточнение к заданию: \n\nТребуется крупный план с кольцом. \nЭто единственый экземпляр, оригинал баснословной цены, поэтому за кольцом мы Емелю отправили. Сейчас он направляется за ним. \n\nОчень ждем информацию, где и во сколько ему быть, чтобы передать реквизит.\n\nНапоминаем о Вашей ответственности за своевременное размещение публикации.\"","Task":"1","AnswerList":"A16, A17, A18, A19, A20","Timer":"5","RightWayIndx":"4","RightWayQuest":"Q07","RightReactionSign":"Back2","RightReaction":"Голова - всему начало!\n\nВерный ответ. Продолжай в том же духе. \n\nСкорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!","WrongWayQuest":"Q07","WrongReactionSign":"Back4","WrongReaction":"Эх, просто сказка сказывается, да непросто дело делается. \n\nВ другой раз пуcть будет правильный ответ!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!","Artefact":"","NextWayQuest":"","DistanceTimer":"5"},{"id":"Q06","QuestID":"Q06","BasePrefab":"BasePrefabQuestions","GoalIndex":"5","GoalImage":"","RecognitionImage":"T6","SignImage":"T6","Question":"Дела налаживаются! Кольцо нашлось. Отдам его Наде, узнаю, где Аленка.\n\nВообще, странно, что Наде именно это кольцо понадобилось и именно сегодня. Уж не хочет ли она нашу сделку сорвать?\n\nЕще Аленкин телефон найти бы! Конь говорил, Аленка заколодована, и расколудет ее последнее селфи. Где же искать этот телефон?","Task":"2","AnswerList":"A44","Timer":"5","RightWayIndx":"","RightWayQuest":"Q14","RightReactionSign":"Back2","RightReaction":"Продолжайте прогулку. Ищите стенды с информацией для продолжения квеста. Телефон можно перевести в режим сна","WrongWayQuest":"Q14","WrongReactionSign":"Back4","WrongReaction":"Продолжайте прогулку. Ищите стенды с информацией для продолжения квеста. Телефон можно перевести в режим сна","Artefact":"","NextWayQuest":"","DistanceTimer":"5"},{"id":"Q07","QuestID":"Q07","BasePrefab":"BasePrefabQuestions","GoalIndex":"6","GoalImage":"","RecognitionImage":"T7","SignImage":"T7","Question":"- Спасибо тебе за добрый совет! \n\n- А ты знаешь, что Надя тоже хотела\nна твоего клиента работать, а Аленка ее обошла в конкурсе. Так что, если Аленка провалится, Наде проект достанется. Кстати, от них согласование и жду, \nдолжны прислать человека с залогом. \n\n... Вот так поворот!\nКак бы устроить так, чтобы все довольны остались?...","Task":"1","AnswerList":"A25, A26","Timer":"5","RightWayIndx":"","RightWayQuest":"Q06","RightReactionSign":"Back2","RightReaction":"Голова - всему начало!\n\nВерный ответ. Продолжай в том же духе. \n\nСкорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!","WrongWayQuest":"Q06","WrongReactionSign":"Back4","WrongReaction":"Эх, просто сказка сказывается, да непросто дело делается. \n\nВ другой раз пуcть будет правильный ответ!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!","Artefact":"","NextWayQuest":"","DistanceTimer":"5"},{"id":"Q08","QuestID":"Q08","BasePrefab":"BasePrefabQuestions","GoalIndex":"7","GoalImage":"","RecognitionImage":"T8","SignImage":"T8","Question":"Вот и ваш с Аленкой офис. У дверей Емеля грустный уже стоит, с реквизитом.\n\n- Привет, - говорит. \n\n- Был я у Василича, должен был кольцо забрать редкое, а не успел. Уволят меня теперь. Что делать, не знаю!","Task":"1","AnswerList":"A27, A28, A29","Timer":"5","RightWayIndx":"1","RightWayQuest":"Q10","RightReactionSign":"Back2","RightReaction":"Голова - всему начало!\n\nВерный ответ. Продолжай в том же духе. \n\nСкорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!","WrongWayQuest":"Q10","WrongReactionSign":"Back4","WrongReaction":"Эх, просто сказка сказывается, да непросто дело делается. \n\nВ другой раз пуcть будет правильный ответ!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!","Artefact":"","NextWayQuest":"","DistanceTimer":"5"},{"id":"Q09","QuestID":"Q09","BasePrefab":"BasePrefabQuestions","GoalIndex":"8","GoalImage":"","RecognitionImage":"T9","SignImage":"T9","Question":"Теперь все у нас есть!\n\nОсталось выяснить у Нади, где Аленка.","Task":"2","AnswerList":"A45","Timer":"5","RightWayIndx":"","RightWayQuest":"Q11","RightReactionSign":"Back2","RightReaction":"Продолжайте прогулку. Ищите стенды с информацией для продолжения квеста. Телефон можно перевести в режим сна","WrongWayQuest":"Q11","WrongReactionSign":"Back4","WrongReaction":"Продолжайте прогулку. Ищите стенды с информацией для продолжения квеста. Телефон можно перевести в режим сна","Artefact":"","NextWayQuest":"","DistanceTimer":"5"},{"id":"Q10","QuestID":"Q10","BasePrefab":"BasePrefabQuestions","GoalIndex":"9","GoalImage":"","RecognitionImage":"T10","SignImage":"T10","Question":"Емеля - добрый человек, решил помочь тебе, вместе отправиться к Наде. Что она скажет, интересно, представителю клиента? \n\nА пока вы в офис зашли, сначала телефон найти же нужно. \n\nГлавное, с количеством попыток ввода пароля не переусердствовать!","Task":"1","AnswerList":"A30, A31, A32, A33","Timer":"5","RightWayIndx":"1","RightWayQuest":"Q12","RightReactionSign":"Back2","RightReaction":"Голова - всему начало!\n\nВерный ответ. Продолжай в том же духе. \n\nСкорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!","WrongWayQuest":"Q12","WrongReactionSign":"Back4","WrongReaction":"Эх, просто сказка сказывается, да непросто дело делается. \n\nВ другой раз пуcть будет правильный ответ!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!","Artefact":"","NextWayQuest":"","DistanceTimer":"5"},{"id":"Q11","QuestID":"Q11","BasePrefab":"BasePrefabQuestions","GoalIndex":"10","GoalImage":"","RecognitionImage":"T11","SignImage":"T11","Question":"Принесли Наде кольцо желанное. \n\n- Условие твое выполнено. Но надо договориться.\n\n- Нужно нам сейчас и кольцо, и Аленку найти. Неужели встанешь у нас на пути?\n\nНа Емеле мерч фирменный, и лого бренда желанного на планшете так и светится. \n\n... Условие выполнено, но до конца ли? Можно ли кольцо до завтра оставить?","Task":"1","AnswerList":"A34, A35, A36, A37, A38, A39","Timer":"5","RightWayIndx":"3","RightWayQuest":"Finish","RightReactionSign":"Back2","RightReaction":"Голова - всему начало!\n\nВерный ответ. Продолжай в том же духе. \n\nСкорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!","WrongWayQuest":"Finish","WrongReactionSign":"Back4","WrongReaction":"Эх, просто сказка сказывается, да непросто дело делается. \n\nВ другой раз пуcть будет правильный ответ!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!","Artefact":"","NextWayQuest":"","DistanceTimer":"5"},{"id":"Q12","QuestID":"Q12","BasePrefab":"BasePrefabQuestions","GoalIndex":"11","GoalImage":"","RecognitionImage":"T12","SignImage":"T12","Question":"Хороши технологии, вот и адрес, где телефон Алёнкин, дом красивый, яркий, окна резные, это ж её бабушки дом! \n\nДобрая она, Любовь Андреевна, всегда пирожком угостит. \n\nТолько калитка закрыта, а на ней записка...","Task":"1","AnswerList":"A40, A41, A42","Timer":"5","RightWayIndx":"","RightWayQuest":"Q09","RightReactionSign":"Back2","RightReaction":"Голова - всему начало!\n\nВерный ответ. Продолжай в том же духе. \n\nСкорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!","WrongWayQuest":"Q09","WrongReactionSign":"Back4","WrongReaction":"Эх, просто сказка сказывается, да непросто дело делается. \n\nВ другой раз пуcть будет правильный ответ!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!","Artefact":"","NextWayQuest":"","DistanceTimer":"5"},{"id":"Q13","QuestID":"Q13","BasePrefab":"BasePrefabQuestions","GoalIndex":"12","GoalImage":"","RecognitionImage":"T13","SignImage":"T13","Question":"Сказала Надя, где Аленку искать. \n\nВот это новость, это же офис нашего партнёра, студия звукозаписи, и Тик-Ток кабинки для трансляций здесь в разных дизайнах.\n\nЧего только нет в нашем славном месте!\n\nКаким волшебством мы обладаем, рядом и новое, и старое, и родное, и зарубежное в ладу живут.\n\nИ привратник - Кот","Task":"1","AnswerList":"A46, A47, A48, A49, A50","Timer":"5","RightWayIndx":"3","RightWayQuest":"","RightReactionSign":"Back2","RightReaction":"Голова - всему начало!\n\nВерный ответ. Продолжай в том же духе. \n\nСкорее найди Алёнку, уже пора бы ответить на сообщения, сроки горят!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!","WrongWayQuest":"","WrongReactionSign":"Back4","WrongReaction":"Эх, просто сказка сказывается, да непросто дело делается. \n\nВ другой раз путь будет правильный ответ!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!","Artefact":"","NextWayQuest":"","DistanceTimer":"5"},{"id":"Q14","QuestID":"Q14","BasePrefab":"BasePrefabQuestions","GoalIndex":"13","GoalImage":"","RecognitionImage":"T14","SignImage":"T14","Question":"Ах, пусто","Task":"3","AnswerList":"A51","Timer":"5","RightWayIndx":"","RightWayQuest":"Q08","RightReactionSign":"Back2","RightReaction":"Продолжайте прогулку. Ищите стенды с информацией для продолжения квеста. Телефон можно перевести в режим сна","WrongWayQuest":"Q08","WrongReactionSign":"Back4","WrongReaction":"Продолжайте прогулку. Ищите стенды с информацией для продолжения квеста. Телефон можно перевести в режим сна","Artefact":"","NextWayQuest":"","DistanceTimer":"5"},{"id":"Finish","QuestID":"Finish","BasePrefab":"BasePrefabQuestions","GoalIndex":"14","GoalImage":"","RecognitionImage":"T15","SignImage":"T15","Question":"Сдержала Надя слово, \n\nтут же и Аленка нашлась, и все хорошо сложилось. \n\n\n<b><size=+15>УРА !!!</size></b>","Task":"2","AnswerList":"A52","Timer":"5","RightWayIndx":"","RightWayQuest":"","RightReactionSign":"Back2","RightReaction":"Ах, красота какая, квест завршен, цели достигнуты! Ура!","WrongWayQuest":"","WrongReactionSign":"","WrongReaction":"Эх, просто сказка сказывается, да непросто дело делается. \n\nВ другой раз пуcть будет правильный ответ!\n\nА сейчас в путь, выбирай, куда ещё пойдёшь.\n\nВперёд иди, да назад не оглядывайся!\n\nПройденное место все подсказки уже сообщило, пусто теперь там. Выбирай на карте новое место!","Artefact":"","NextWayQuest":"","DistanceTimer":"5"}];
+  const answers = [{"id":"A01","AnswerID":"A01","AnswerType":"Slide","Question":"...Ваня, владелец кафешки, говорит, \nчто уже 2 дня Аленку не видел. \n\n- Однако ж, помочь могу. Помнишь, блюдечко с голубой каемочкой? \nВот тебе аналог с искусственным интеллектом, R4. Правда, вредный он, прямо не ведет, но подсказки дает. \nКак никак, помощь. \nУспей! Время помощи ограничено.\n\n\n<i><size=20>Закрывай окошко и наводи камеру на картинку.</size></i>","MainTxt_Text":"<size=+5><b>Привет!</b></size>\n\nR4 начинает обучаться работе с тобой. \n\nЧтобы Аленку найти, надо куда-то пойти. \n\n<size=+5><b>Выбирай!</b></size>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"1","MainText_4corner_decor_Image":"1","MainText_Decor_IfEmpty_Image":"Back1","AdditionalImg_Image":"","TitleText_Text":"Первое задание - тренировочное","TitleBackEmptyImg_Image":"","HelpUpText_Text":"Когда найдено испытание, здесь отображается задание и все, что с ним связано. Ответы можно выбрать кнопкой OK, кнопкой с ответом или ввести в поле","HelpDownText_Text":"Перед наведением на AR-цель осмотрись камерой вокруг, так дополненная реальность лучше размещается в пространстве","LeftPanel_If_Title_Empty_Image":"1","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"1","AdditionalPrefab_Prefab":"","Sound_Sound":"q1sound_oneshot","Music_Music":"Q1music_loop","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A02","AnswerID":"A02","AnswerType":"","Question":"","MainTxt_Text":"Прямо пойдешь - ничего не найдешь\n\n\n","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"1","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"Back2","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"Это вариант вашего решения задачи. Их несколько, минимум 2 варианта. Листай их стрелками, они идут друг за другом по кругу, пока не дойдут до условий задания","HelpDownText_Text":"Определись с решением, \nподтверди выбор кнопкой ОК","LeftPanel_If_Title_Empty_Image":"1","AnswerPicture_Image":"angle-double-up","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"Q2music_loop","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A03","AnswerID":"A03","AnswerType":"","Question":"","MainTxt_Text":"Направо пойдешь - время потеряешь\n\n\n","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"1","MainText_Decor_IfEmpty_Image":"Back3","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"Это вариант вашего решения задачи. Их несколько, минимум 2 варианта. Листай их стрелками, они идут друг за другом по кругу, пока не дойдут до условий задания","HelpDownText_Text":"Определись с решением, \nподтверди выбор кнопкой ОК","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"angle-double-right","RightPanel_If_Title_Empty_Image":"1","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"Q3music_loop","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A04","AnswerID":"A04","AnswerType":"","Question":"","MainTxt_Text":"Налево выберешь - деньги потратишь\n\n\n","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"Back2","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"Это вариант вашего решения задачи. Их несколько, минимум 2 варианта. Листай их стрелками, они идут друг за другом по кругу, пока не дойдут до условий задания","HelpDownText_Text":"Определись с решением, \nподтверди выбор кнопкой ОК","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"angle-double-left","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"Q4music_loop","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A05","AnswerID":"A05","AnswerType":"Slide","Question":"Пришло письмо от клиента:\n\n\"Мы хотели отправить курьера, но не смогли связаться с Аленой. Уточните, пожалуйста, куда следует ему приехать, чтобы привезти реквизит для сегодняшней съемки. \n\nСообщаем также, что в задании на съемку планируем внести небольшое изменение, будьте внимательны!\"","MainTxt_Text":"На поляне ты встретил коня! \nКопытом бьет, красавец.\n<align=left>\n\t- Отпусти меня! К плохому хозяину я попал... \n\t- Слышал, мясокомбинат у него есть. \n\t- Страшно мне. \n\t- Помоги, а я тебе пригожусь!\n</align>\nКак ты поступишь?\n \n<size=+5><b>Выбирай!</b></size>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"Дорога привела тебя к сказочной красоты поляне","TitleBackEmptyImg_Image":"","HelpUpText_Text":"Оглянись вокруг! Вдруг, найдешь что-то, что может пригодиться","HelpDownText_Text":"Ищи подсказки в дополненной реальности","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"Q3sound_oneshot","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A06","AnswerID":"A06","AnswerType":"","Question":"","MainTxt_Text":"<size=+5>Отпущу коня, жаль его. \nГоворящий!</size>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"Оглянись вокруг! Вдруг, найдешь что-то, что может пригодиться","HelpDownText_Text":"Ищи подсказки в дополненной реальности","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A07","AnswerID":"A07","AnswerType":"","Question":"","MainTxt_Text":"<size=+5>Мясокомбинат \nсерьезной структуре принадлежит. \n\nМожно без бизнеса остаться.</size>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"Оглянись вокруг! Вдруг, найдешь что-то, что может пригодиться","HelpDownText_Text":"Ищи подсказки в дополненной реальности","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A08","AnswerID":"A08","AnswerType":"Button","Question":"- Спасибо тебе, дружище!, - сказал конь.\n\n- Знаю про твою беду. Слышал я от ветра, что встречал он девушку заколдованную, на мероприятии с нетворкингом. Волшебный коктейль она выпила, чувство времени потеряла. И телефон.\n\n- Надо, чтобы она последнее фото в нем увидела, тогда и расколдуется!","MainTxt_Text":"<size=-2>Надо Наде позвонить, подруге ее. Номер только бы вспомнить, последние 3 цифры.</size>\n\n<size=+3>+7 903 123 -4<color=red>Х-ХХ</color></size>\n<align=\"left\">\n        <color=red><size=+3>571</size></color><size=-2> – правильна одна цифра и находится \nв правильном месте</size>\n        <color=red><size=+3>503</size></color><size=-2> – правильна одна цифра, но находится в неправильном месте</size>\n        <color=red><size=+3>195</size></color><size=-2> – правильны две цифры, но обе расположены не на своем месте</size>\n        <color=red><size=+3>627</size></color><size=-2> – все цифры неправильные</size>\n        <size=-2><color=red>Число из подсказки в прошлом ходе</color> — правильна одна цифра, но находится в неправильном месте.</size>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"Мероприятие... куда Аленка могла собраться? \nИ с кем?","TitleBackEmptyImg_Image":"","HelpUpText_Text":"Нажми на кнопку с недостающими цифрами","HelpDownText_Text":"Оглянись, может, где-то есть ценная информаци","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"Q4sound_oneshot","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A09","AnswerID":"A09","AnswerType":"","Question":"","MainTxt_Text":"301","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A10","AnswerID":"A10","AnswerType":"","Question":"","MainTxt_Text":"931","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A11","AnswerID":"A11","AnswerType":"","Question":"","MainTxt_Text":"503","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A12","AnswerID":"A12","AnswerType":"","Question":"","MainTxt_Text":"193","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A13","AnswerID":"A13","AnswerType":"","Question":"","MainTxt_Text":"Надо Наде позвонить, подруге ее. \nКакая же у Нади фамилия? \n\n<size=+5>Круглой формы голова, \nТой же формы буква… </size>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"Мероприятие... куда Аленка могла собраться? \nИ с кем?","TitleBackEmptyImg_Image":"","HelpUpText_Text":"Кликай на поле, и вводи ответ","HelpDownText_Text":"После ввода подтверди результат на клавиатуре","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A14","AnswerID":"A14","AnswerType":"","Question":"","MainTxt_Text":"О","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A15","AnswerID":"A15","AnswerType":"","Question":"","MainTxt_Text":"о","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A16","AnswerID":"A16","AnswerType":"Slide","Question":"Сообщение от партнера:\n\n\"Долгожданное уточнение к заданию: \n\nТребуется крупный план с кольцом. \nЭто единственый экземпляр, оригинал баснословной цены, поэтому за кольцом мы Емелю отправили. Сейчас он направляется за ним. \n\nОчень ждем информацию, где и во сколько ему быть, чтобы передать реквизит.\n\nНапоминаем о Вашей ответственности за своевременное размещение публикации.\"","MainTxt_Text":"<align=left>\t- Кольцо, говоришь, нужно? Рисковано его сейчас отдавать. Есть у меня на него клиент, \nжду согласования. \n\t- Помочь могу, время потяну, но и ты выручи. \n\t- Есть у меня план в производство вложиться. Надо, чтобы экономика сошлась. \n\n\t- График производства есть у меня, никак не соображу, сколько стоит товар... Посчитаешь, пойдем в банк, в ячейке кольцо хранится.</align>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"Василич, известный в городе ювелир, \nничего не делает просто так","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"Numbertask","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A17","AnswerID":"A17","AnswerType":"","Question":"","MainTxt_Text":"<size=+5>Цена за комплект \"Кoльцо, серьги и браслет\" - <color=red>$370</color>.\nСерьги стоят в 2 раза больше кольца, \nбраслет - на $50 дороже серег.</size>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"Специальное упражнение для продвинутых - посчитать оборот по графику","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"Numbertask","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A18","AnswerID":"A18","AnswerType":"","Question":"","MainTxt_Text":"<size=+15>Кольцо стоит $62</size>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A19","AnswerID":"A19","AnswerType":"","Question":"","MainTxt_Text":"<size=+15>Серьги стоят $133</size>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A20","AnswerID":"A20","AnswerType":"","Question":"","MainTxt_Text":"<size=+15>Браслет стоит $178</size>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A22","AnswerID":"A22","AnswerType":"","Question":"","MainTxt_Text":"<align=left> \n\t- Кольцо, говоришь, нужно? Рисковано его сейчас отдавать. Есть у меня на него клиент, жду согласования. \n\t- Помочь могу, время потяну, но и ты выручи, подскажи-ка, кто таков: </align>\n<size=+5>\nГость гостил,\nНа реке мост мостил.\nБез гвоздей и топора,\nБез молота и долота </size>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"Василич, известный в городе ювелир, \nничего не делает просто так","TitleBackEmptyImg_Image":"","HelpUpText_Text":"Под задачей поле для ввода ответа, коснись его, и  откроется клавиатура","HelpDownText_Text":"Коснись прямоугольника ниже, напечатай, что думаешь, нажми ввод на клавиатуре","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A23","AnswerID":"A23","AnswerType":"","Question":"","MainTxt_Text":"Мороз","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A24","AnswerID":"A24","AnswerType":"","Question":"","MainTxt_Text":"мороз","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A25","AnswerID":"A25","AnswerType":"InputField","Question":"- Спасибо тебе за добрый совет! \n\n- А ты знаешь, что Надя тоже хотела\nна твоего клиента работать, а Аленка ее обошла в конкурсе. Так что, если Аленка провалится, Наде проект достанется. Кстати, от них согласование и жду, \nдолжны прислать человека с залогом. \n\n... Вот так поворот!\nКак бы устроить так, чтобы все довольны остались?...","MainTxt_Text":"- Так уж и быть, кольцо можешь забрать, \n- сказал ювелир.\n- Надо только пароль ввести. Это количество квадратов на картинке.","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"У Нади нет причин требовать кольцо \nименно сегодня","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"Squaretask","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A26","AnswerID":"A26","AnswerType":"","Question":"","MainTxt_Text":"51","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A27","AnswerID":"A27","AnswerType":"Slide","Question":"Вот и ваш с Аленкой офис. У дверей Емеля грустный уже стоит, с реквизитом.\n\n- Привет, - говорит. \n\n- Был я у Василича, должен был кольцо забрать редкое, а не успел. Уволят меня теперь. Что делать, не знаю!","MainTxt_Text":"Емеля не знает, что у тебя кольцо.\n\nЕсли кольцо Наде отдать, то Емелю уволят, но ты найдешь Аленку. Съемка будет не то, \nчто надо и важно клиенту. \nЖаль Емелю, семеро по лавкам у него детей.  \n\nА если кольцо Емеле отдать? Придется признаться, что Аленка потерялась, и ты не можешь сообщить время и место съемки, \nэто провал! ","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"Надо выбрать, как поступить","TitleBackEmptyImg_Image":"","HelpUpText_Text":"Оглянись вокруг, найди, что запомнить","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A28","AnswerID":"A28","AnswerType":"","Question":"","MainTxt_Text":"Отдать кольцо Емеле. \nБудущее проекта под вопросом.","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"Оглянись вокруг, найди, что запомнить","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A29","AnswerID":"A29","AnswerType":"","Question":"","MainTxt_Text":"Лучше найти Аленку и сохранить лицо.\nНо клиент не получит желаемое, а Емелю уволят.","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"Оглянись вокруг, найди, что запомнить","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A30","AnswerID":"A30","AnswerType":"Slide","Question":"Емеля - добрый человек, решил помочь тебе, вместе отправиться к Наде. Что она скажет, интересно, представителю клиента? \n\nА пока вы в офис зашли, сначала телефон найти же нужно. \n\nГлавное, с количеством попыток ввода пароля не переусердствовать!","MainTxt_Text":"<size=+15>Что было, вспоминай, \nлистай вперед, \nфигуры выбирай!</size>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"Пароль, пароль) ","TitleBackEmptyImg_Image":"","HelpUpText_Text":"Помни, что подсказки можно найти, осмотревшись)","HelpDownText_Text":"Оглянись, может, где-то есть ценная информаци","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A31","AnswerID":"A31","AnswerType":"","Question":"","MainTxt_Text":"Визуальный код доступа\nВыбери, чтобы пройти!","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"Помни, что подсказки можно найти, осмотревшись)","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A32","AnswerID":"A32","AnswerType":"","Question":"","MainTxt_Text":"Визуальный код доступа\nВыбери, чтобы пройти!","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"Помни, что подсказки можно найти, осмотревшись)","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A33","AnswerID":"A33","AnswerType":"","Question":"","MainTxt_Text":"Визуальный код доступа\nВыбери, чтобы пройти!","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"Помни, что подсказки можно найти, осмотревшись)","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A34","AnswerID":"A34","AnswerType":"Button","Question":"Принесли Наде кольцо желанное. \n\n- Условие твое выполнено. Но надо договориться.\n\n- Нужно нам сейчас и кольцо, и Аленку найти. Неужели встанешь у нас на пути?\n\nНа Емеле мерч фирменный, и лого бренда желанного на планшете так и светится. \n\n... Условие выполнено, но до конца ли? Можно ли кольцо до завтра оставить?","MainTxt_Text":"<align=left>        - Уговор дороже денег. Раз кольцо здесь, пусть здесь с Емелей и будет. Емелю я не приглашала, значит, и тебе неожиданный поворот.\n\n        - Есть у меня 12 подарков и 13 гостей. Хочу, чтобы никто не обиделся, но есть среди них один не очень приятный человек. Гости встанут в круг, и надо будет им раздать подарки, каждому девятому. \n\n        - Подойдет твой совет, значит договоримся! \nБудет у тебя все вовремя, и кольцо, и Аленка.</align>\n\n<size=40>На каком месте поставить того человека?</size>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"Улыбнулась Надя хитро и говорит:","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A35","AnswerID":"A35","AnswerType":"","Question":"","MainTxt_Text":"<size=+75>3</size>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A36","AnswerID":"A36","AnswerType":"","Question":"","MainTxt_Text":"<size=+75>11</size>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A37","AnswerID":"A37","AnswerType":"","Question":"","MainTxt_Text":"<size=+75>2</size>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A38","AnswerID":"A38","AnswerType":"","Question":"","MainTxt_Text":"<size=+75>5</size>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A39","AnswerID":"A39","AnswerType":"","Question":"","MainTxt_Text":"<size=+75>7</size>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A40","AnswerID":"A40","AnswerType":"InputField","Question":"Хороши технологии, вот и адрес, где телефон Алёнкин, дом красивый, яркий, окна резные, это ж её бабушки дом! \n\nДобрая она, Любовь Андреевна, всегда пирожком угостит. \n\nТолько калитка закрыта, а на ней записка...","MainTxt_Text":"Кто свой, проходи, а не свой, уходи! \nКалитка откроется, \nесли ответ дашь верный: \n\n<size=+5>Что за чудо:\nчетыре ноги, два уха, \nодин нос да брюхо?</size>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A41","AnswerID":"A41","AnswerType":"","Question":"","MainTxt_Text":"самовар","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A42","AnswerID":"A42","AnswerType":"","Question":"","MainTxt_Text":"Самовар","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A43","AnswerID":"A43","AnswerType":"Art","Question":"- Привет! Да, это я, Надя.\n\n- Знаю я, где Аленка. Вовремя ты! Услуга за услугу. \n\n- Ты мне Ослепляющее кольцо раздобудь, а я тебе ее координаты сообщу. Срочно оно нужно, завтра смогу вернуть. \n\n- Кольцо у Василича. Ты его знаешь, придется тебе постараться его уговорить. Удачи!","MainTxt_Text":"<size=+5>Отлично, звоним! \n\nНадя, скорее ответь, \nна тебя надежда великая!</size>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"Q2sound_oneshot","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A44","AnswerID":"A44","AnswerType":"Art","Question":"Дела налаживаются! Кольцо нашлось. Отдам его Наде, узнаю, где Аленка.\n\nВообще, странно, что Наде именно это кольцо понадобилось и именно сегодня. Уж не хочет ли она нашу сделку сорвать?\n\nЕще Аленкин телефон найти бы! Конь говорил, Аленка заколодована, и расколудет ее последнее селфи. Где же искать этот телефон?","MainTxt_Text":"","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"ArtFound_oneshot","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A45","AnswerID":"A45","AnswerType":"Art","Question":"Теперь все у нас есть!\n\nОсталось выяснить у Нади, где Аленка.","MainTxt_Text":"","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"ArtFound_oneshot","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A46","AnswerID":"A46","AnswerType":"Button","Question":"Сказала Надя, где Аленку искать. \n\nВот это новость, это же офис нашего партнёра, студия звукозаписи, и Тик-Ток кабинки для трансляций здесь в разных дизайнах.\n\nЧего только нет в нашем славном месте!\n\nКаким волшебством мы обладаем, рядом и новое, и старое, и родное, и зарубежное в ладу живут.\n\nИ привратник - Кот","MainTxt_Text":"<align=left>\t- Мяу, господа, добро пожаловать! Видел я вашу Алёнку, ну и хитрая у неё схема все Тик-Ток кабинки красивые попробовать. Выбирала на каждый час разные.\n\n\t- На 9 часов выбрала 6 кабинку, на 12 часов выбрала 10 кабинку. Схема у неё какая-то была.\nСейчас 14 часов. </align>\n\n<size=+5>Поди, угадай, в какой она сейчас?</size>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"Кот чёрный у дверей прохаживается, гостей встречает. ","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A47","AnswerID":"A47","AnswerType":"","Question":"","MainTxt_Text":"<size=+15>18</size>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A48","AnswerID":"A48","AnswerType":"","Question":"","MainTxt_Text":"<size=+15>7</size>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A49","AnswerID":"A49","AnswerType":"","Question":"","MainTxt_Text":"<size=+15>12</size>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A50","AnswerID":"A50","AnswerType":"","Question":"","MainTxt_Text":"<size=+15>5</size>","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A51","AnswerID":"A51","AnswerType":"AntiArt","Question":"","MainTxt_Text":"<size=+3>Ты на середине пути, \nеще столько же пройти.\n\nЧто же ответить на вопрос:\n\"Где Аленка, и когда будет съемка?\"\n\nЧто сказать?</size>\n\n...Что же, пусть Емеля в офис едет, \nпока обернется, \nАленка, авось, и найдется!...","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"На авось надейся, а сам не плошай!","HelpDownText_Text":"Оглянись, может, где-то есть подсказка","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"NoArtFound_oneshot","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""},{"id":"A52","AnswerID":"A52","AnswerType":"Art","Question":"Сдержала Надя слово, \n\nтут же и Аленка нашлась, и все хорошо сложилось. \n\n\n<b><size=+15>УРА !!!</size></b>","MainTxt_Text":"Победа","VideoLink_VideoLink":"","VideoType_VideoType":"","MainText_Decor_2lines_Image":"","MainText_4corner_decor_Image":"","MainText_Decor_IfEmpty_Image":"","AdditionalImg_Image":"","TitleText_Text":"","TitleBackEmptyImg_Image":"","HelpUpText_Text":"","HelpDownText_Text":"","LeftPanel_If_Title_Empty_Image":"","AnswerPicture_Image":"","RightPanel_If_Title_Empty_Image":"","AdditionalPrefab_Prefab":"","Sound_Sound":"ArtFound_oneshot","Music_Music":"","StartAnimation_Animation":"","IdleAnimation_Animation":"","DeleteAnimation_Animation":"","Проверка наличия картинок":""}];
+
+  const questMap = new Map(quests.map(q => [q.QuestID, q]));
+  const answerMap = new Map(answers.map(a => [a.id, a]));
+
+  let currentQuestId = "Start";
+  let slideIndex = 0;
+  let currentAnswerIds = [];
+  let targetNextQuest = "";
+
+  function cleanFormatting(str) {
+    if (!str) return "";
+    return str
+      .replace(/<size=\+?\d+>/gi, "")
+      .replace(/<\/size>/gi, "")
+      .replace(/<color=[^>]+>/gi, "")
+      .replace(/<\/color>/gi, "")
+      .replace(/<align=[^>]+>/gi, "")
+      .replace(/<\/align>/gi, "")
+      .replace(/\n/g, "<br>");
+  }
+
+  function renderQuest(questId) {
+    const q = questMap.get(questId);
+    if (!q) {
+      alert("Квест завершен или не найден!");
+      return;
+    }
+
+    currentQuestId = questId;
+    slideIndex = 0;
+    document.getElementById("feedback-panel").style.display = "none";
+    document.getElementById("quest-id").innerText = q.QuestID;
+
+    // Парсим связанные ответы
+    currentAnswerIds = q.AnswerList ? q.AnswerList.split(',').map(s => s.trim()) : [];
+    const firstAns = answerMap.get(currentAnswerIds[0]) || {};
+
+    // Заголовок
+    document.getElementById("title-text").innerHTML = cleanFormatting(firstAns.TitleText_Text || q.QuestID);
+
+    // Главный текст
+    document.getElementById("question-text").innerHTML = cleanFormatting(q.Question || firstAns.MainTxt_Text);
+
+    // Медиа
+    const sounds = currentAnswerIds.map(id => answerMap.get(id)?.Sound_Sound || answerMap.get(id)?.Music_Music).filter(Boolean);
+    const mediaZone = document.getElementById("media-info");
+    if (sounds.length > 0) {
+      mediaZone.style.display = "block";
+      mediaZone.innerHTML = "🎵 Аудиосопровождение: " + sounds.join(", ");
+    } else {
+      mediaZone.style.display = "none";
+    }
+
+    // Подсказка
+    const helpMsg = firstAns.HelpUpText_Text || firstAns.HelpDownText_Text;
+    const helpZone = document.getElementById("help-text");
+    if (helpMsg) {
+      helpZone.style.display = "block";
+      helpZone.innerHTML = "💡 " + cleanFormatting(helpMsg);
+    } else {
+      helpZone.style.display = "none";
+    }
+
+    // Отрисовка интерактивной зоны (Кнопки / Ввод / Слайдер)
+    renderInteractiveZone(q);
+  }
+
+  function renderInteractiveZone(q) {
+    const zone = document.getElementById("interactive-zone");
+    zone.style.display = "flex";
+    zone.innerHTML = "";
+
+    const ansObjects = currentAnswerIds.map(id => answerMap.get(id)).filter(Boolean);
+    const primaryType = ansObjects[0]?.AnswerType || "";
+
+    // 1. Поле ввода текста
+    if (primaryType === "InputField" || ansObjects.some(a => a.MainTxt_Text && a.MainTxt_Text.length < 15 && !a.AnswerType)) {
+      zone.innerHTML = `
+        <div class="input-group">
+          <input type="text" id="user-input" class="input-field" placeholder="Введите ответ..." />
+          <button class="btn-submit" onclick="checkInputAnswer()">OK</button>
+        </div>
+      `;
+      return;
+    }
+
+    // 2. Слайдер / Выбор из нескольких с переключением
+    if (primaryType === "Slide" || ansObjects.length > 3) {
+      renderSlideOption(0);
+      return;
+    }
+
+    // 3. Стандартные кнопки ответов
+    ansObjects.forEach((ans, index) => {
+      const btn = document.createElement("button");
+      btn.className = "btn-option";
+      btn.innerHTML = cleanFormatting(ans.MainTxt_Text || ans.HelpUpText_Text || ("Вариант " + (index + 1)));
+      btn.onclick = () => selectOption(index + 1);
+      zone.appendChild(btn);
+    });
+  }
+
+  function renderSlideOption(index) {
+    const zone = document.getElementById("interactive-zone");
+    const ansObjects = currentAnswerIds.map(id => answerMap.get(id)).filter(Boolean);
+    
+    if (index < 0) slideIndex = ansObjects.length - 1;
+    else if (index >= ansObjects.length) slideIndex = 0;
+    else slideIndex = index;
+
+    const currentAns = ansObjects[slideIndex];
+
+    zone.innerHTML = `
+      <div style="text-align:center; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+        <div>${cleanFormatting(currentAns.MainTxt_Text || currentAns.HelpUpText_Text || "Вариант " + (slideIndex + 1))}</div>
+      </div>
+      <div class="carousel-controls">
+        <button class="btn-arrow" onclick="renderSlideOption(slideIndex - 1)">❮</button>
+        <button class="btn-submit" style="height: 40px;" onclick="selectOption(slideIndex + 1)">Выбрать OK</button>
+        <button class="btn-arrow" onclick="renderSlideOption(slideIndex + 1)">❯</button>
+      </div>
+    `;
+  }
+
+  function checkInputAnswer() {
+    const val = document.getElementById("user-input").value.trim().toLowerCase();
+    const ansObjects = currentAnswerIds.map(id => answerMap.get(id)).filter(Boolean);
+    
+    // Проверка текстовых ответов из JSON
+    const matchIndex = ansObjects.findIndex(a => a.MainTxt_Text && a.MainTxt_Text.trim().toLowerCase() === val);
+
+    if (matchIndex !== -1 || val.length > 0) {
+      selectOption(matchIndex !== -1 ? matchIndex + 1 : 1);
+    }
+  }
+
+  function selectOption(optionIndex) {
+    const q = questMap.get(currentQuestId);
+    const rightWays = q.RightWayIndx ? q.RightWayIndx.split(',').map(s => parseInt(s.trim())) : [];
+
+    const isCorrect = rightWays.length === 0 || rightWays.includes(optionIndex);
+
+    document.getElementById("interactive-zone").style.display = "none";
+    const feedbackPanel = document.getElementById("feedback-panel");
+    const feedbackText = document.getElementById("feedback-text");
+
+    feedbackPanel.style.display = "flex";
+
+    if (isCorrect) {
+      feedbackPanel.className = "feedback-panel correct";
+      feedbackText.innerHTML = cleanFormatting(q.RightReaction || "Правильно!");
+      targetNextQuest = q.RightWayQuest;
+    } else {
+      feedbackPanel.className = "feedback-panel wrong";
+      feedbackText.innerHTML = cleanFormatting(q.WrongReaction || "Неправильно!");
+      targetNextQuest = q.WrongWayQuest || q.RightWayQuest;
+    }
+
+    if (!targetNextQuest) {
+      targetNextQuest = q.NextWayQuest;
+    }
+  }
+
+  function nextQuest() {
+    if (targetNextQuest && questMap.has(targetNextQuest)) {
+      renderQuest(targetNextQuest);
+    } else {
+      alert("Конец интерактивного сценария!");
+    }
+  }
+
+  // Запуск первого квеста
+  window.onload = () => renderQuest("Start");
+</script>
+</body>
+</html>
