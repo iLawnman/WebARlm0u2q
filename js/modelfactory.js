@@ -6,5 +6,8 @@ export {
   ModelFactory,
   createArTarget,
   createArTargetSync,
-  default
+  default,
+  designGroupsToPrefab,
+  setArTargetDesignPrefab,
+  getArTargetDesignPrefab
 } from './artarget.js';
