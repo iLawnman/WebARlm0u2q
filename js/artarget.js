@@ -246,7 +246,7 @@ export class ModelFactory {
     make('RightBlock', 'ar-right-block', '0.115, 0.025, 0', '-90, -16, 0', '0.00048',
         `<img class="ar-panel-image" data-field="imageSrc" alt="" />
        <div class="ar-panel-help" data-field="imageCaption"></div>`);
-    make('ButtonsBlock', 'ar-buttons-block', '0, -0.11, 0', '-90, 0, 0', '0.0009',
+    make('ButtonsBlock', 'ar-buttons-block', '0, 0.1, 0', '-90, 0, 0', '0.0009',
         '<div class="ar-quest-body" data-field="buttons"></div>');
 
     return root;
