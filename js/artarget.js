@@ -5,6 +5,51 @@ import { ARInput } from './arinput.js';
 
 const DEFAULT_PREFAB_URL = './assets/artargetPrefabNew.html';
 
+// === Дизайн-префаб (перенесено из questsim.js: QuestSim.designGroupsToPrefab) ===
+// Тот же путь к ресурсам, что и в QuestSim, чтобы имена ассетов резолвились одинаково.
+const DESIGN_RES = './assets/resources';
+
+function normalizeDesignAsset(name) {
+  if (!name) return '';
+  const n = String(name).trim();
+  if (!n) return '';
+  if (/^(https?:|\/\/|\.\/|\/)/i.test(n)) return n;
+  return DESIGN_RES + '/' + n + (/\.[a-z0-9]+$/i.test(n) ? '' : '.png');
+}
+
+// Точная копия QuestSim.designGroupsToPrefab — не меняем логику получения полей,
+// чтобы дизайн-префаб, приходящий из тех же исходных "groups", давал идентичный результат.
+export function designGroupsToPrefab(groups) {
+  const getter = (group, prop, def) => {
+    if (!groups || !groups[group]) return def;
+    const val = groups[group][prop];
+    return (val !== undefined && val !== null && val !== '') ? val : def;
+  };
+  return {
+    back_image: getter('BackGradient', 'image') || getter('BackImage', 'image'),
+    title_bg_color: getter('TitleText_bg', 'color'),
+    title_bg_image: getter('TitleText_bg', 'image'),
+    title_color: getter('TitleText', 'color', '#FFD700'),
+    title_corner_image: getter('TitleText_4corner_decor_Corner', 'image') || 'RusStyleElement',
+    main_corner: getter('MainText_4corner_decor_Corner', 'image') || 'RusStyleElement',
+    main_bg_color: getter('MainText_bg', 'color', 'rgba(7,7,7,0.93)'),
+    main_bg_image: getter('MainText_bg', 'image', 'MainTextPanelDark'),
+    main_decor1: getter('MainText_Decor_2lines_line1', 'image', 'Line2S'),
+    main_decor2: getter('MainText_Decor_2lines_line2', 'image', 'Line2S'),
+    left_bg_color: getter('LeftPanel_bgLeftPanel', 'color', 'rgba(7,7,7,0.93)'),
+    left_bg_image: getter('LeftPanel_bgLeftPanel', 'image', 'MainTextPanelDark'),
+    left_help_color: getter('LeftPanel_HelpUp', 'color', '#FF69B4'),
+    left_corner: getter('LeftPanel_4corner_decor_Corner', 'image') || 'RusStyleElement',
+    right_bg_color: getter('RightPanel_bgRight_Panel', 'color', 'rgba(7,7,7,0.93)'),
+    right_bg_image: getter('RightPanel_bgRight_Panel', 'image', 'MainTextPanelDark'),
+    right_corner: getter('RightPanel_4corner_decor_Corner', 'image') || 'RusStyleElement',
+    buttons_bg_color: getter('Buttons_bgButtonsPanel', 'color', 'rgba(7,7,7,0.93)'),
+    buttons_bg_image: getter('Buttons_bgButtonsPanel', 'image', 'ButtonPanelBG'),
+    btn_next_text: getter('Buttons_Button_NEXT_Text', 'text', 'Дальше'),
+    input_ph_text: getter('Buttons_InputField', 'text') || getter('Buttons_InputField_Placeholder', 'text', 'ВВЕДИТЕ ОТВЕТ')
+  };
+}
+
 export class ModelFactory {
   constructor(defaults = {}) {
     this.prefabUrl = defaults.prefabUrl || DEFAULT_PREFAB_URL;
@@ -12,6 +57,21 @@ export class ModelFactory {
     this._debugSaveBtn = null;
     this._prefabSource = null; // 'server' | 'fallback-code' | null (ещё не загружен)
     this._prefabSourceUrl = null;
+    this._designPrefab = null; // текущий дизайн-префаб (см. setDesignPrefab)
+  }
+
+  /**
+   * Сохраняет дизайн-префаб (результат designGroupsToPrefab), который будет
+   * применяться к панелям при следующих вызовах createArTargetSync.
+   * Если префаб не задан — панели используют исходные стили из HTML-префаба (без изменений).
+   */
+  setDesignPrefab(prefab) {
+    console.log('[ModelFactory.setDesignPrefab] called, prefab:', prefab);
+    this._designPrefab = prefab;
+  }
+
+  getDesignPrefab() {
+    return this._designPrefab;
   }
 
   async createArTarget(targetData = '', options = {}) {
@@ -48,6 +108,7 @@ export class ModelFactory {
       );
       if (ui) ui.log(`[ModelFactory] Using cached prefab, source = ${this._prefabSource || 'unknown'}`, 'info');
     }
+    console.log('[ModelFactory] createArTargetSync: design prefab =', this._designPrefab);
 
     const group = new THREE.Group();
     group.name = `arTarget_${data.groupName}`;
@@ -92,6 +153,7 @@ export class ModelFactory {
 
       arInput.bindPanelEvents(el, name);
       this._fillPanel(el, name, data, handleAnswer, ui, arInput);
+      this._applyDesignToPanel(name, el, this._designPrefab);
 
       const pos = this._parseVec3(el.dataset.position, [0, 0, 0]);
       const rotDeg = this._parseVec3(el.dataset.rotation, [-90, 0, 0]);
@@ -342,6 +404,55 @@ export class ModelFactory {
     }
   }
 
+  /**
+   * Применяет дизайн-префаб к CSS3D-панели (аналог QuestSim.applyDesign,
+   * но вместо фиксированных id элементов оверлея — по имени панели/data-field).
+   * Ничего не делает, если префаб не задан (никакой регрессии для случая без дизайна).
+   */
+  _applyDesignToPanel(name, el, p) {
+    if (!p) return;
+    console.log('[ModelFactory._applyDesignToPanel] applying design to panel', name);
+
+    if (name === 'MainBlock') {
+      if (p.main_bg_color) el.style.backgroundColor = p.main_bg_color;
+      if (p.main_bg_image) {
+        el.style.backgroundImage = "url('" + normalizeDesignAsset(p.main_bg_image) + "')";
+        el.style.backgroundSize = 'cover';
+      }
+      const titleEl = el.querySelector('[data-field="title"]');
+      if (titleEl) {
+        if (p.title_color) titleEl.style.color = p.title_color;
+        if (p.title_bg_color) titleEl.style.backgroundColor = p.title_bg_color;
+        if (p.title_bg_image) {
+          titleEl.style.backgroundImage = "url('" + normalizeDesignAsset(p.title_bg_image) + "')";
+          titleEl.style.backgroundSize = 'cover';
+        }
+      }
+    } else if (name === 'LeftHelpBlock') {
+      if (p.left_bg_color) el.style.backgroundColor = p.left_bg_color;
+      if (p.left_bg_image) {
+        el.style.backgroundImage = "url('" + normalizeDesignAsset(p.left_bg_image) + "')";
+        el.style.backgroundSize = 'cover';
+      }
+      if (p.left_help_color) {
+        const helpEl = el.querySelector('[data-field="help"]') || el;
+        helpEl.style.color = p.left_help_color;
+      }
+    } else if (name === 'RightBlock') {
+      if (p.right_bg_color) el.style.backgroundColor = p.right_bg_color;
+      if (p.right_bg_image) {
+        el.style.backgroundImage = "url('" + normalizeDesignAsset(p.right_bg_image) + "')";
+        el.style.backgroundSize = 'cover';
+      }
+    } else if (name === 'ButtonsBlock') {
+      if (p.buttons_bg_color) el.style.backgroundColor = p.buttons_bg_color;
+      if (p.buttons_bg_image) {
+        el.style.backgroundImage = "url('" + normalizeDesignAsset(p.buttons_bg_image) + "')";
+        el.style.backgroundSize = 'cover';
+      }
+    }
+  }
+
   _buildQuestionBody(bodyEl, data, onAnswer, ui, arInput) {
     bodyEl.innerHTML = '';
     const type = data.answerType || 'Slide';
@@ -365,7 +476,7 @@ export class ModelFactory {
       const input = document.createElement('input');
       input.type = 'text';
       input.className = 'ar-quest-input';
-      input.placeholder = 'Введите ответ...';
+      input.placeholder = (this._designPrefab && this._designPrefab.input_ph_text) || 'Введите ответ...';
       arInput.bindInputField(input);
       input.addEventListener('keydown', (e) => {
         e.stopPropagation();
@@ -500,6 +611,21 @@ export function createArTargetSync(targetData, options = {}) {
 
 export async function createArTarget(targetData, options = {}) {
   return defaultFactory.createArTarget(targetData, options);
+}
+
+/**
+ * Устанавливает дизайн-префаб на дефолтную фабрику (singleton), используемую
+ * createArTargetSync/createArTarget. Аналог QuestSim.setDesignPrefab —
+ * можно вызывать с объектом от designGroupsToPrefab(groups) или напрямую
+ * с результатом DesignPreview.getCurrentPrefab().
+ * @param {object|null} prefab
+ */
+export function setArTargetDesignPrefab(prefab) {
+  defaultFactory.setDesignPrefab(prefab);
+}
+
+export function getArTargetDesignPrefab() {
+  return defaultFactory.getDesignPrefab();
 }
 
 /**
