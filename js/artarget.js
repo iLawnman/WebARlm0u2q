@@ -544,14 +544,18 @@ export class ModelFactory {
         setBg('title_bg_color', p.title_bg_color, titleEl, 'MainBlock > [data-field="title"]', false);
         setBg('title_bg_image', p.title_bg_image, titleEl, 'MainBlock > [data-field="title"]', true);
       }
+      this._applyCorners('main_corner', p.main_corner, el, applied, skippedNoValue);
+      this._applyMainDecorLines(p, el, applied, skippedNoValue);
     } else if (name === 'LeftHelpBlock') {
       setBg('left_bg_color', p.left_bg_color, el, 'LeftHelpBlock', false);
       setBg('left_bg_image', p.left_bg_image, el, 'LeftHelpBlock', true);
       const helpEl = el.querySelector('[data-field="help"]') || el;
       setColor('left_help_color', p.left_help_color, helpEl, 'LeftHelpBlock > [data-field="help"] (или сам блок)');
+      this._applyCorners('left_corner', p.left_corner, el, applied, skippedNoValue);
     } else if (name === 'RightBlock') {
       setBg('right_bg_color', p.right_bg_color, el, 'RightBlock', false);
       setBg('right_bg_image', p.right_bg_image, el, 'RightBlock', true);
+      this._applyCorners('right_corner', p.right_corner, el, applied, skippedNoValue);
     } else if (name === 'ButtonsBlock') {
       setBg('buttons_bg_color', p.buttons_bg_color, el, 'ButtonsBlock', false);
       setBg('buttons_bg_image', p.buttons_bg_image, el, 'ButtonsBlock', true);
@@ -566,6 +570,67 @@ export class ModelFactory {
         `skippedNoValue=[${skippedNoValue.join(', ') || '—'}] ` +
         `skippedNoElement=[${skippedNoElement.join(', ') || '—'}]`
     );
+  }
+
+  /**
+   * Создаёт 4 угловых декора (аналог panel-corner из редакторского HTML-экспорта:
+   * RusStyleElement.png с отражениями по углам). В отличие от редакторской 2D-разметки,
+   * где корни позиционируются с отрицательным офсетом (top:-2px; left:-2px), панели
+   * в artargetPrefabNew.html имеют `overflow: hidden`, поэтому такой офсет обрежется —
+   * ставим декор строго по внутренним краям (0/0), без нахлёста на border.
+   * Динамическая вставка (а не разметка в HTML-префабе) — чтобы не требовать правок
+   * в самом server-side prefab-файле.
+   */
+  _applyCorners(field, imageName, el, applied, skippedNoValue) {
+    if (!imageName) { skippedNoValue.push(field); return; }
+    const url = normalizeDesignAsset(imageName);
+    const corners = [
+      { pos: 'top:0; left:0;', transform: '' },
+      { pos: 'top:0; right:0;', transform: 'scaleX(-1)' },
+      { pos: 'bottom:0; left:0;', transform: 'scaleY(-1)' },
+      { pos: 'bottom:0; right:0;', transform: 'scale(-1)' }
+    ];
+    for (const c of corners) {
+      const d = document.createElement('div');
+      d.className = 'ar-panel-corner';
+      d.style.cssText =
+          `position:absolute; ${c.pos} width:14px; height:14px; ` +
+          `background-image:url('${url}'); background-size:contain; background-repeat:no-repeat; ` +
+          `pointer-events:none; transform:${c.transform};`;
+      el.appendChild(d);
+    }
+    applied.push(`${field}=${imageName} → ${url} (4 угла, offset 0/0 из-за overflow:hidden)`);
+  }
+
+  /**
+   * Декор-линии над/под содержимым MainBlock (аналог MainText_Decor_2lines_line1/line2
+   * из редакторского экспорта). Ставятся первым/последним ребёнком панели (обрамление
+   * всего блока сверху/снизу), а не между title/question/mainText — у AR-панели все три
+   * поля идут одним потоком, и точное позиционирование "вокруг main-text как в редакторе"
+   * потребовало бы менять сам HTML-префаб; это сознательное упрощение.
+   */
+  _applyMainDecorLines(p, el, applied, skippedNoValue) {
+    const mkLine = (imageName) => {
+      const url = normalizeDesignAsset(imageName);
+      const d = document.createElement('div');
+      d.className = 'ar-panel-decor-line';
+      d.style.cssText =
+          `width:80%; height:5px; margin:4px auto; align-self:center; ` +
+          `background-image:url('${url}'); background-size:contain; background-repeat:no-repeat; background-position:center;`;
+      return d;
+    };
+    if (p.main_decor1) {
+      el.insertBefore(mkLine(p.main_decor1), el.firstChild);
+      applied.push(`main_decor1=${p.main_decor1} (сверху)`);
+    } else {
+      skippedNoValue.push('main_decor1');
+    }
+    if (p.main_decor2) {
+      el.appendChild(mkLine(p.main_decor2));
+      applied.push(`main_decor2=${p.main_decor2} (снизу)`);
+    } else {
+      skippedNoValue.push('main_decor2');
+    }
   }
 
   _buildQuestionBody(bodyEl, data, onAnswer, ui, arInput) {
