@@ -16,13 +16,16 @@ export class ModelFactory {
 
   async createArTarget(targetData = '', options = {}) {
     const prefabUrl = options.prefabUrl || this.prefabUrl;
+    const ui = options.ui || null;
     console.log('[ModelFactory] createArTarget: requesting prefab from', prefabUrl);
-    await this._ensurePrefab(prefabUrl);
+    if (ui) ui.log(`[ModelFactory] Requesting prefab: ${prefabUrl}`, 'info');
+    await this._ensurePrefab(prefabUrl, ui);
     console.log(
         '[ModelFactory] createArTarget: prefab source =',
         this._prefabSource,
         '(url:', this._prefabSourceUrl, ')'
     );
+    if (ui) ui.log(`[ModelFactory] Prefab source: ${this._prefabSource}`, this._prefabSource === 'server' ? 'ok' : 'warn');
     return this.createArTargetSync(targetData, options);
   }
 
@@ -37,11 +40,13 @@ export class ModelFactory {
           '(createArTarget/_ensurePrefab was not awaited before this call). ' +
           'Falling back to built-in defaultPrefab from code, not from server.'
       );
+      if (ui) ui.log('[ModelFactory] No cached prefab → using built-in defaultPrefab from code (server not fetched)', 'warn');
     } else {
       console.log(
           '[ModelFactory] createArTargetSync: using cached prefab, source =',
           this._prefabSource || 'unknown'
       );
+      if (ui) ui.log(`[ModelFactory] Using cached prefab, source = ${this._prefabSource || 'unknown'}`, 'info');
     }
 
     const group = new THREE.Group();
@@ -56,7 +61,7 @@ export class ModelFactory {
       if (typeof onAnswer === 'function') onAnswer(value);
     };
 
-    const panelNodes = this._getPanelNodes();
+    const panelNodes = this._getPanelNodes(ui);
     const panels = {};
 
     console.log('[ModelFactory] Building panels from', panelNodes.length, 'nodes');
@@ -200,7 +205,7 @@ export class ModelFactory {
         .trim();
   }
 
-  async _ensurePrefab(url) {
+  async _ensurePrefab(url, ui = null) {
     if (this._prefabCache) {
       console.log(
           '[ModelFactory] _ensurePrefab: already cached, source =',
@@ -242,10 +247,9 @@ export class ModelFactory {
       this._prefabCache = tpl.content || tpl;
       this._prefabSource = 'server';
       this._prefabSourceUrl = url;
-      console.log(
-          '[ModelFactory] Prefab loaded OK from SERVER:', url,
-          '— nodes found:', this._prefabCache.querySelectorAll('[data-name]').length
-      );
+      const nodeCount = this._prefabCache.querySelectorAll('[data-name]').length;
+      console.log('[ModelFactory] Prefab loaded OK from SERVER:', url, '— nodes found:', nodeCount);
+      if (ui) ui.log(`[ModelFactory] Prefab loaded from SERVER: ${url} (${nodeCount} nodes)`, 'ok');
     } catch (e) {
       this._prefabSource = 'fallback-code';
       this._prefabSourceUrl = null;
@@ -253,11 +257,12 @@ export class ModelFactory {
           '[ModelFactory] Prefab fetch FAILED for', url,
           '→ using built-in defaultPrefab from code (NOT from server). Reason:', e
       );
+      if (ui) ui.log(`[ModelFactory] Prefab fetch FAILED (${url}) → using code fallback. ${e.message || e}`, 'warn');
       this._prefabCache = this._buildFallbackPrefab();
     }
   }
 
-  _getPanelNodes() {
+  _getPanelNodes(ui = null) {
     if (this._prefabCache) {
       console.log('[ModelFactory] _getPanelNodes: using prefab, source =', this._prefabSource);
       return Array.from(this._prefabCache.querySelectorAll('[data-name]'));
@@ -266,6 +271,7 @@ export class ModelFactory {
         '[ModelFactory] _getPanelNodes: no prefab cached yet → building defaultPrefab from code ' +
         '(server prefab was never fetched/awaited). This is the code-side fallback, not the server one.'
     );
+    if (ui) ui.log('[ModelFactory] _getPanelNodes: no cached prefab → building defaultPrefab from code', 'warn');
     this._prefabSource = 'fallback-code';
     this._prefabSourceUrl = null;
     this._prefabCache = this._buildFallbackPrefab();
@@ -494,6 +500,25 @@ export function createArTargetSync(targetData, options = {}) {
 
 export async function createArTarget(targetData, options = {}) {
   return defaultFactory.createArTarget(targetData, options);
+}
+
+/**
+ * Дожидается загрузки серверного prefab'а (artargetPrefabNew.html) один раз,
+ * до того как где-либо будет вызван синхронный createArTargetSync().
+ * Использует тот же defaultFactory (singleton), поэтому кэш переиспользуется
+ * во всех дальнейших синхронных вызовах createArTargetSync.
+ * @param {string} [url] — необязательный кастомный URL, иначе берётся DEFAULT_PREFAB_URL
+ * @param {import('./ui.js').UI} [ui] — если передан, диагностика дублируется в ui.log
+ */
+export async function preloadArTargetPrefab(url, ui = null) {
+  const prefabUrl = url || defaultFactory.prefabUrl;
+  console.log('[ModelFactory] preloadArTargetPrefab: preloading', prefabUrl);
+  if (ui) ui.log(`[ModelFactory] Preloading AR target prefab: ${prefabUrl}`, 'info');
+  await defaultFactory._ensurePrefab(prefabUrl, ui);
+  const source = defaultFactory._prefabSource;
+  console.log('[ModelFactory] preloadArTargetPrefab: done, source =', source);
+  if (ui) ui.log(`[ModelFactory] Prefab preload done, source = ${source}`, source === 'server' ? 'ok' : 'warn');
+  return source;
 }
 
 export { ModelFactory as default };

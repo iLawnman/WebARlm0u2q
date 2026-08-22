@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createArTargetSync } from './artarget.js';
+import { createArTargetSync, preloadArTargetPrefab } from './artarget.js';
 import { playSound } from './audio.js';
 import { QuestManager } from './quests.js';
 import { Policies } from './policies.js';
@@ -45,6 +45,12 @@ export class Recognition {
 
     this.policies.init();
     await this.imageReco.init();
+
+    this.ui.log('Preloading AR target prefab...', 'info');
+    const prefabSource = await preloadArTargetPrefab(undefined, this.ui);
+    if (prefabSource !== 'server') {
+      this.ui.log('AR target prefab NOT loaded from server → using built-in defaultPrefab from code', 'warn');
+    }
 
     this.ui.enableArButton();
     this.ui.log('state → waitingImage | ready', 'info');
