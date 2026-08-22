@@ -81,7 +81,23 @@
                 +   '<button type="button" onclick="window.__editor.updatePanelCSS(document.getElementById(\'panel-custom-css\').value)" style="width:100%;">Применить CSS</button>'
                 + '</div>';
 
-            if (obj.userData.panelData && obj.userData.panelData.props) {
+            if (obj.userData.isHtmlPrefab) {
+                var htmlVal = (obj.userData.html || '').replace(/</g, '&lt;');
+                var cssBlock = (obj.userData.prefabStyles && obj.userData.prefabStyles[0] || '').replace(/</g, '&lt;');
+                var classVal = obj.userData.panelType || (obj.userData.rawClasses ? obj.userData.rawClasses.join(' ') : '');
+
+                html += ''
+                    + '<hr style="border-color:#3c3c3c; margin: 12px 0;">'
+                    + '<div class="prop-group">'
+                    +   '<h3>HTML Префаб</h3>'
+                    +   '<label>CSS-классы</label>'
+                    +   '<input type="text" value="' + classVal + '" onchange="window.__editor.updateObjectProp(\'panelType\', this.value)">'
+                    +   '<label>HTML содержимое</label>'
+                    +   '<textarea rows="6" style="width:100%; background:#0f172a; border:1px solid #334155; color:#e2e8f0; font-family:ui-monospace,monospace; font-size:11px; margin-bottom:6px; border-radius:6px; padding:8px; line-height:1.4;" onchange="window.__editor.updateObjectProp(\'html\', this.value)">' + htmlVal + '</textarea>'
+                    +   '<label>CSS стили (общие)</label>'
+                    +   '<textarea rows="6" style="width:100%; background:#0f172a; border:1px solid #334155; color:#e2e8f0; font-family:ui-monospace,monospace; font-size:11px; margin-bottom:6px; border-radius:6px; padding:8px; line-height:1.4;" onchange="window.__editor.updateObjectProp(\'prefabStyles\', this.value)">' + cssBlock + '</textarea>'
+                    + '</div>';
+            } else if (obj.userData.panelData && obj.userData.panelData.props) {
                 var props = obj.userData.panelData.props;
                 html += ''
                     + '<hr style="border-color:#3c3c3c; margin: 12px 0;">'
@@ -150,7 +166,7 @@
         html += '<button class="btn-danger" onclick="window.__editor.deleteSelectedObject()" style="margin-top:16px; width:100%;">Удалить объект</button>';
         container.innerHTML = html;
 
-        if (obj.userData.type === 'panel' && !(obj.userData.panelData && obj.userData.panelData.props)) {
+        if (obj.userData.type === 'panel' && !obj.userData.isHtmlPrefab && !(obj.userData.panelData && obj.userData.panelData.props)) {
             renderUIElementsList();
         }
     }
@@ -362,6 +378,33 @@
                 if (!selectedObject.userData.rawData) selectedObject.userData.rawData = {};
                 selectedObject.userData.rawData[key] = String(num);
                 if (Objects.rebuildPlaneGeometry) Objects.rebuildPlaneGeometry(selectedObject);
+            } else if (key === 'panelType') {
+                selectedObject.userData.panelType = value;
+                selectedObject.userData.rawClasses = value.split(/\s+/).filter(function(c) { return c; });
+                if (selectedObject.userData.isHtmlPrefab && selectedObject.userData.domElement) {
+                    var dom = selectedObject.userData.domElement;
+                    dom.className = 'ar-css3d-panel';
+                    selectedObject.userData.rawClasses.forEach(function(c) { dom.classList.add(c); });
+                }
+            } else if (key === 'html') {
+                selectedObject.userData.html = value;
+                if (selectedObject.userData.isHtmlPrefab && selectedObject.userData.domElement) {
+                    selectedObject.userData.domElement.innerHTML = value;
+                }
+            } else if (key === 'prefabStyles') {
+                if (!selectedObject.userData.prefabStyles) selectedObject.userData.prefabStyles = [];
+                selectedObject.userData.prefabStyles[0] = value;
+                if (selectedObject.userData.isHtmlPrefab) {
+                    var styleEl = document.getElementById('ar-prefab-styles');
+                    if (styleEl) {
+                        styleEl.textContent = value;
+                    } else {
+                        var newStyle = document.createElement('style');
+                        newStyle.id = 'ar-prefab-styles';
+                        newStyle.textContent = value;
+                        document.head.appendChild(newStyle);
+                    }
+                }
             }
         } else if (type === 'object3d') {
             if (key === 'src') {

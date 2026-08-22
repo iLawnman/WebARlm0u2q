@@ -43,6 +43,42 @@
             renderer.setSize(width, height);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
+            // CSS3D Renderer
+            var cssRenderer = null;
+            if (typeof THREE !== 'undefined' && typeof THREE.CSS3DRenderer === 'function') {
+                cssRenderer = new THREE.CSS3DRenderer();
+                cssRenderer.setSize(width, height);
+                cssRenderer.domElement.style.position = 'absolute';
+                cssRenderer.domElement.style.top = '0';
+                cssRenderer.domElement.style.left = '0';
+                cssRenderer.domElement.style.width = '100%';
+                cssRenderer.domElement.style.height = '100%';
+                cssRenderer.domElement.style.pointerEvents = 'none';
+                container.style.position = 'relative';
+                container.appendChild(cssRenderer.domElement);
+            }
+
+            // OrbitControls
+            var orbitControls = null;
+            if (typeof THREE !== 'undefined' && typeof THREE.OrbitControls === 'function') {
+                orbitControls = new THREE.OrbitControls(camera, canvas);
+                orbitControls.enableDamping = true;
+                orbitControls.dampingFactor = 0.05;
+            }
+
+            // TransformControls
+            var transformControls = null;
+            if (typeof THREE !== 'undefined' && typeof THREE.TransformControls === 'function') {
+                transformControls = new THREE.TransformControls(camera, canvas);
+                transformControls.addEventListener('change', function () {
+                    if (callbacks.onTransformChange) callbacks.onTransformChange();
+                });
+                transformControls.addEventListener('dragging-changed', function (event) {
+                    if (orbitControls) orbitControls.enabled = !event.value;
+                });
+                scene.add(transformControls);
+            }
+
             var ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
             scene.add(ambientLight);
 
@@ -61,11 +97,21 @@
 
             function animate() {
                 requestAnimationFrame(animate);
+                if (orbitControls) orbitControls.update();
                 if (renderer && scene && camera) {
                     renderer.render(scene, camera);
                 }
+                if (cssRenderer && scene && camera) {
+                    cssRenderer.render(scene, camera);
+                }
             }
             animate();
+
+            global.__sceneRefs = {
+                cssRenderer: cssRenderer,
+                orbitControls: orbitControls,
+                transformControls: transformControls
+            };
 
             console.log('[SceneModule] 3D сцена инициализирована (#canvas3d)');
             resolve();
@@ -81,6 +127,10 @@
         camera.aspect = width / height;
         camera.updateProjectionMatrix();
         renderer.setSize(width, height);
+        var refs = global.__sceneRefs;
+        if (refs && refs.cssRenderer) {
+            refs.cssRenderer.setSize(width, height);
+        }
     }
 
     function onPointerDown(event) {
@@ -114,6 +164,8 @@
                 scene.add(helper);
                 selectedObject.userData.helper = helper;
             }
+            var tctrl = global.__sceneRefs && global.__sceneRefs.transformControls;
+            if (tctrl) tctrl.attach(selectedObject);
             callbacks.onSelect(selectedObject);
         }
     }
@@ -127,6 +179,8 @@
                 }
                 delete selectedObject.userData.helper;
             }
+            var tctrl = global.__sceneRefs && global.__sceneRefs.transformControls;
+            if (tctrl) tctrl.detach();
             selectedObject = null;
             callbacks.onDeselect();
         }
@@ -150,6 +204,30 @@
     function removeSceneObject(mesh) {
         if (!mesh) return;
         if (selectedObject === mesh) deselectObject();
+
+        // Явно удаляем CSS3DObject и чистим DOM
+        if (mesh.userData) {
+            if (mesh.userData.css2dObject) {
+                scene.remove(mesh.userData.css2dObject);
+                mesh.userData.css2dObject = null;
+            }
+            if (mesh.userData.domElement && mesh.userData.domElement.parentNode) {
+                mesh.userData.domElement.parentNode.removeChild(mesh.userData.domElement);
+                mesh.userData.domElement = null;
+            }
+            // Рекурсивно чистим детей
+            mesh.traverse(function(child) {
+                if (child.userData && child.userData.css2dObject) {
+                    scene.remove(child.userData.css2dObject);
+                    child.userData.css2dObject = null;
+                }
+                if (child.userData && child.userData.domElement && child.userData.domElement.parentNode) {
+                    child.userData.domElement.parentNode.removeChild(child.userData.domElement);
+                    child.userData.domElement = null;
+                }
+            });
+        }
+
         scene.remove(mesh);
         var idx = sceneObjects.indexOf(mesh);
         if (idx !== -1) sceneObjects.splice(idx, 1);
@@ -168,6 +246,8 @@
         var toRemove = sceneObjects.slice();
         toRemove.forEach(function (obj) { removeSceneObject(obj); });
         sceneObjects = [];
+        var styleEl = document.getElementById('ar-prefab-styles');
+        if (styleEl) styleEl.remove();
     }
 
     function addEditableObject(mesh) { addSceneObject(mesh); }
