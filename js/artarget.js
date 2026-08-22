@@ -10,11 +10,19 @@ export class ModelFactory {
     this.prefabUrl = defaults.prefabUrl || DEFAULT_PREFAB_URL;
     this._prefabCache = null;
     this._debugSaveBtn = null;
+    this._prefabSource = null; // 'server' | 'fallback-code' | null (ещё не загружен)
+    this._prefabSourceUrl = null;
   }
 
   async createArTarget(targetData = '', options = {}) {
     const prefabUrl = options.prefabUrl || this.prefabUrl;
+    console.log('[ModelFactory] createArTarget: requesting prefab from', prefabUrl);
     await this._ensurePrefab(prefabUrl);
+    console.log(
+        '[ModelFactory] createArTarget: prefab source =',
+        this._prefabSource,
+        '(url:', this._prefabSourceUrl, ')'
+    );
     return this.createArTargetSync(targetData, options);
   }
 
@@ -22,6 +30,19 @@ export class ModelFactory {
     const { onAnswer = null, ui = null } = options;
     const data = this._normalizeTargetData(targetData);
     const arInput = new ARInput(ui);
+
+    if (!this._prefabCache) {
+      console.warn(
+          '[ModelFactory] createArTargetSync called WITHOUT a cached prefab ' +
+          '(createArTarget/_ensurePrefab was not awaited before this call). ' +
+          'Falling back to built-in defaultPrefab from code, not from server.'
+      );
+    } else {
+      console.log(
+          '[ModelFactory] createArTargetSync: using cached prefab, source =',
+          this._prefabSource || 'unknown'
+      );
+    }
 
     const group = new THREE.Group();
     group.name = `arTarget_${data.groupName}`;
@@ -180,11 +201,22 @@ export class ModelFactory {
   }
 
   async _ensurePrefab(url) {
-    if (this._prefabCache) return;
+    if (this._prefabCache) {
+      console.log(
+          '[ModelFactory] _ensurePrefab: already cached, source =',
+          this._prefabSource, '(url:', this._prefabSourceUrl, ') — skipping fetch of', url
+      );
+      return;
+    }
+
+    console.log('[ModelFactory] _ensurePrefab: fetching from server →', url);
     try {
       const res = await fetch(url, { cache: 'no-cache' });
+      console.log('[ModelFactory] _ensurePrefab: fetch response', res.status, res.statusText, 'for', url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const html = await res.text();
+      console.log('[ModelFactory] _ensurePrefab: received', html.length, 'bytes of HTML from', url);
+
       const doc = new DOMParser().parseFromString(html, 'text/html');
       const tpl = doc.querySelector('#ar-target') || doc.querySelector('template');
       if (!tpl) throw new Error('No <template id="ar-target">');
@@ -208,17 +240,34 @@ export class ModelFactory {
       }
 
       this._prefabCache = tpl.content || tpl;
-      console.log('[ModelFactory] Prefab loaded OK:', url);
+      this._prefabSource = 'server';
+      this._prefabSourceUrl = url;
+      console.log(
+          '[ModelFactory] Prefab loaded OK from SERVER:', url,
+          '— nodes found:', this._prefabCache.querySelectorAll('[data-name]').length
+      );
     } catch (e) {
-      console.warn('[ModelFactory] Prefab failed → fallback', url, e);
+      this._prefabSource = 'fallback-code';
+      this._prefabSourceUrl = null;
+      console.warn(
+          '[ModelFactory] Prefab fetch FAILED for', url,
+          '→ using built-in defaultPrefab from code (NOT from server). Reason:', e
+      );
       this._prefabCache = this._buildFallbackPrefab();
     }
   }
 
   _getPanelNodes() {
     if (this._prefabCache) {
+      console.log('[ModelFactory] _getPanelNodes: using prefab, source =', this._prefabSource);
       return Array.from(this._prefabCache.querySelectorAll('[data-name]'));
     }
+    console.warn(
+        '[ModelFactory] _getPanelNodes: no prefab cached yet → building defaultPrefab from code ' +
+        '(server prefab was never fetched/awaited). This is the code-side fallback, not the server one.'
+    );
+    this._prefabSource = 'fallback-code';
+    this._prefabSourceUrl = null;
     this._prefabCache = this._buildFallbackPrefab();
     return Array.from(this._prefabCache.querySelectorAll('[data-name]'));
   }
