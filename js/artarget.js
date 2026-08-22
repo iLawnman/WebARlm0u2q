@@ -66,7 +66,17 @@ export class ModelFactory {
    * Если префаб не задан — панели используют исходные стили из HTML-префаба (без изменений).
    */
   setDesignPrefab(prefab) {
-    console.log('[ModelFactory.setDesignPrefab] called, prefab:', prefab);
+    if (!prefab) {
+      console.log('[ModelFactory.setDesignPrefab] called with', prefab, '→ design reset, panels will use default HTML-prefab styles');
+    } else {
+      const keys = Object.keys(prefab);
+      const filledKeys = keys.filter(k => prefab[k] !== undefined && prefab[k] !== null && prefab[k] !== '');
+      console.log(
+          `[ModelFactory.setDesignPrefab] received design prefab: ${filledKeys.length}/${keys.length} fields set →`,
+          filledKeys
+      );
+      console.log('[ModelFactory.setDesignPrefab] full prefab payload:', prefab);
+    }
     this._designPrefab = prefab;
   }
 
@@ -108,7 +118,13 @@ export class ModelFactory {
       );
       if (ui) ui.log(`[ModelFactory] Using cached prefab, source = ${this._prefabSource || 'unknown'}`, 'info');
     }
-    console.log('[ModelFactory] createArTargetSync: design prefab =', this._designPrefab);
+    if (this._designPrefab) {
+      console.log('[ModelFactory] createArTargetSync: design prefab IS SET → will style panels:', this._designPrefab);
+      if (ui) ui.log('[ModelFactory] Design prefab set → applying custom design to panels', 'info');
+    } else {
+      console.log('[ModelFactory] createArTargetSync: design prefab is NULL/unset → panels use default HTML-prefab styles');
+      if (ui) ui.log('[ModelFactory] No design prefab set → using default panel styles', 'info');
+    }
 
     const group = new THREE.Group();
     group.name = `arTarget_${data.groupName}`;
@@ -411,46 +427,67 @@ export class ModelFactory {
    */
   _applyDesignToPanel(name, el, p) {
     if (!p) return;
-    console.log('[ModelFactory._applyDesignToPanel] applying design to panel', name);
+
+    const applied = [];
+    const skippedNoValue = [];
+    const skippedNoElement = [];
+
+    // field: имя поля в префабе; value: значение; target: DOM-узел, к которому применяем (или null, если не найден)
+    // targetLabel: человекочитаемое имя узла для лога
+    const setBg = (field, value, target, targetLabel, isImage) => {
+      if (!target) { skippedNoElement.push(`${field} (нет узла "${targetLabel}")`); return; }
+      if (value === undefined || value === null || value === '') { skippedNoValue.push(field); return; }
+      if (isImage) {
+        const url = normalizeDesignAsset(value);
+        target.style.backgroundImage = `url('${url}')`;
+        target.style.backgroundSize = 'cover';
+        applied.push(`${field}=${value} → ${url}`);
+      } else {
+        target.style.backgroundColor = value;
+        applied.push(`${field}=${value}`);
+      }
+    };
+
+    const setColor = (field, value, target, targetLabel) => {
+      if (!target) { skippedNoElement.push(`${field} (нет узла "${targetLabel}")`); return; }
+      if (value === undefined || value === null || value === '') { skippedNoValue.push(field); return; }
+      target.style.color = value;
+      applied.push(`${field}=${value}`);
+    };
 
     if (name === 'MainBlock') {
-      if (p.main_bg_color) el.style.backgroundColor = p.main_bg_color;
-      if (p.main_bg_image) {
-        el.style.backgroundImage = "url('" + normalizeDesignAsset(p.main_bg_image) + "')";
-        el.style.backgroundSize = 'cover';
-      }
+      setBg('main_bg_color', p.main_bg_color, el, 'MainBlock', false);
+      setBg('main_bg_image', p.main_bg_image, el, 'MainBlock', true);
       const titleEl = el.querySelector('[data-field="title"]');
-      if (titleEl) {
-        if (p.title_color) titleEl.style.color = p.title_color;
-        if (p.title_bg_color) titleEl.style.backgroundColor = p.title_bg_color;
-        if (p.title_bg_image) {
-          titleEl.style.backgroundImage = "url('" + normalizeDesignAsset(p.title_bg_image) + "')";
-          titleEl.style.backgroundSize = 'cover';
-        }
+      if (!titleEl) {
+        skippedNoElement.push('title_color/title_bg_color/title_bg_image (нет узла [data-field="title"])');
+      } else {
+        setColor('title_color', p.title_color, titleEl, 'MainBlock > [data-field="title"]');
+        setBg('title_bg_color', p.title_bg_color, titleEl, 'MainBlock > [data-field="title"]', false);
+        setBg('title_bg_image', p.title_bg_image, titleEl, 'MainBlock > [data-field="title"]', true);
       }
     } else if (name === 'LeftHelpBlock') {
-      if (p.left_bg_color) el.style.backgroundColor = p.left_bg_color;
-      if (p.left_bg_image) {
-        el.style.backgroundImage = "url('" + normalizeDesignAsset(p.left_bg_image) + "')";
-        el.style.backgroundSize = 'cover';
-      }
-      if (p.left_help_color) {
-        const helpEl = el.querySelector('[data-field="help"]') || el;
-        helpEl.style.color = p.left_help_color;
-      }
+      setBg('left_bg_color', p.left_bg_color, el, 'LeftHelpBlock', false);
+      setBg('left_bg_image', p.left_bg_image, el, 'LeftHelpBlock', true);
+      const helpEl = el.querySelector('[data-field="help"]') || el;
+      setColor('left_help_color', p.left_help_color, helpEl, 'LeftHelpBlock > [data-field="help"] (или сам блок)');
     } else if (name === 'RightBlock') {
-      if (p.right_bg_color) el.style.backgroundColor = p.right_bg_color;
-      if (p.right_bg_image) {
-        el.style.backgroundImage = "url('" + normalizeDesignAsset(p.right_bg_image) + "')";
-        el.style.backgroundSize = 'cover';
-      }
+      setBg('right_bg_color', p.right_bg_color, el, 'RightBlock', false);
+      setBg('right_bg_image', p.right_bg_image, el, 'RightBlock', true);
     } else if (name === 'ButtonsBlock') {
-      if (p.buttons_bg_color) el.style.backgroundColor = p.buttons_bg_color;
-      if (p.buttons_bg_image) {
-        el.style.backgroundImage = "url('" + normalizeDesignAsset(p.buttons_bg_image) + "')";
-        el.style.backgroundSize = 'cover';
-      }
+      setBg('buttons_bg_color', p.buttons_bg_color, el, 'ButtonsBlock', false);
+      setBg('buttons_bg_image', p.buttons_bg_image, el, 'ButtonsBlock', true);
+    } else {
+      console.log(`[ModelFactory._applyDesignToPanel] panel "${name}" has no design mapping → skipped entirely`);
+      return;
     }
+
+    console.log(
+        `[ModelFactory._applyDesignToPanel] panel="${name}" ` +
+        `applied=[${applied.join('; ') || '—'}] ` +
+        `skippedNoValue=[${skippedNoValue.join(', ') || '—'}] ` +
+        `skippedNoElement=[${skippedNoElement.join(', ') || '—'}]`
+    );
   }
 
   _buildQuestionBody(bodyEl, data, onAnswer, ui, arInput) {
