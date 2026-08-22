@@ -17,6 +17,37 @@ function normalizeDesignAsset(name) {
   return DESIGN_RES + '/' + n + (/\.[a-z0-9]+$/i.test(n) ? '' : '.png');
 }
 
+// Кандидаты пути к JSON с "сырыми" группами дизайна.
+// Первый — подтверждённое реальное расположение файла в проекте.
+// Остальные — на случай других раскладок/опечаток в имени (как в questsim.js: "arprefabsdesign.json").
+const DESIGN_JSON_CANDIDATES = [
+  './assets/arprefabdesign.json',
+  './assets/arprefabsdesign.json',
+  './arprefabdesign.json',
+  './arprefabsdesign.json'
+];
+
+// Аналог QuestSim.tryFetchJson — не бросает исключение, просто возвращает null при неудаче.
+async function tryFetchDesignJson(path, ui = null) {
+  if (typeof window !== 'undefined' && window.location && window.location.protocol === 'file:') {
+    console.log('[ModelFactory] tryFetchDesignJson: protocol is file:, skipping fetch of', path);
+    return null;
+  }
+  console.log('[ModelFactory] tryFetchDesignJson: trying', path);
+  try {
+    const r = await fetch(path);
+    console.log('[ModelFactory] tryFetchDesignJson: response for', path, '→', r.status, r.statusText);
+    if (r.ok) {
+      const json = await r.json();
+      console.log('[ModelFactory] tryFetchDesignJson: OK, parsed JSON from', path, '— top-level keys:', Object.keys(json || {}));
+      return json;
+    }
+  } catch (e) {
+    console.log('[ModelFactory] tryFetchDesignJson: FAILED for', path, '—', e.message || e);
+  }
+  return null;
+}
+
 // Точная копия QuestSim.designGroupsToPrefab — не меняем логику получения полей,
 // чтобы дизайн-префаб, приходящий из тех же исходных "groups", давал идентичный результат.
 export function designGroupsToPrefab(groups) {
@@ -58,6 +89,7 @@ export class ModelFactory {
     this._prefabSource = null; // 'server' | 'fallback-code' | null (ещё не загружен)
     this._prefabSourceUrl = null;
     this._designPrefab = null; // текущий дизайн-префаб (см. setDesignPrefab)
+    this._designAutoLoadAttempted = false; // была ли уже попытка автозагрузки дизайн-JSON
   }
 
   /**
@@ -84,6 +116,47 @@ export class ModelFactory {
     return this._designPrefab;
   }
 
+  /**
+   * Пытается автоматически загрузить дизайн-JSON и применить его как design prefab,
+   * если он ещё не был явно установлен через setDesignPrefab(). Аналог логики
+   * QuestSim.handleBundleFiles (tryFetchJson по списку путей + designGroupsToPrefab),
+   * но без ручного выбора файла — сразу по известным путям в assets.
+   * Безопасно вызывать многократно: реальная попытка сети выполняется один раз.
+   */
+  async _autoLoadDesignIfNeeded(ui = null) {
+    if (this._designPrefab) {
+      console.log('[ModelFactory] _autoLoadDesignIfNeeded: design prefab already set explicitly → skipping autoload');
+      return;
+    }
+    if (this._designAutoLoadAttempted) {
+      console.log('[ModelFactory] _autoLoadDesignIfNeeded: autoload already attempted before → skipping');
+      return;
+    }
+    this._designAutoLoadAttempted = true;
+
+    console.log('[ModelFactory] _autoLoadDesignIfNeeded: trying candidates:', DESIGN_JSON_CANDIDATES);
+    if (ui) ui.log('[ModelFactory] Searching for design JSON...', 'info');
+
+    let groups = null;
+    let foundPath = null;
+    for (const path of DESIGN_JSON_CANDIDATES) {
+      groups = await tryFetchDesignJson(path, ui);
+      if (groups) { foundPath = path; break; }
+    }
+
+    if (!groups) {
+      console.log('[ModelFactory] _autoLoadDesignIfNeeded: no design JSON found at any candidate path → panels will use default styles');
+      if (ui) ui.log('[ModelFactory] No design JSON found → using default panel styles', 'warn');
+      return;
+    }
+
+    console.log('[ModelFactory] _autoLoadDesignIfNeeded: design JSON found at', foundPath, '→ converting via designGroupsToPrefab');
+    if (ui) ui.log(`[ModelFactory] Design JSON loaded from ${foundPath}`, 'ok');
+
+    const prefab = designGroupsToPrefab(groups);
+    this.setDesignPrefab(prefab);
+  }
+
   async createArTarget(targetData = '', options = {}) {
     const prefabUrl = options.prefabUrl || this.prefabUrl;
     const ui = options.ui || null;
@@ -96,6 +169,11 @@ export class ModelFactory {
         '(url:', this._prefabSourceUrl, ')'
     );
     if (ui) ui.log(`[ModelFactory] Prefab source: ${this._prefabSource}`, this._prefabSource === 'server' ? 'ok' : 'warn');
+
+    // Автозагрузка дизайн-JSON (если ещё не задан явно через setArTargetDesignPrefab).
+    // Не бросает исключений и не блокирует создание таргета при неудаче.
+    await this._autoLoadDesignIfNeeded(ui);
+
     return this.createArTargetSync(targetData, options);
   }
 
@@ -682,6 +760,26 @@ export async function preloadArTargetPrefab(url, ui = null) {
   console.log('[ModelFactory] preloadArTargetPrefab: done, source =', source);
   if (ui) ui.log(`[ModelFactory] Prefab preload done, source = ${source}`, source === 'server' ? 'ok' : 'warn');
   return source;
+}
+
+/**
+ * Дожидается загрузки дизайн-JSON (arprefabdesign.json и т.п.) один раз,
+ * до того как где-либо будет вызван синхронный createArTargetSync().
+ * Использует тот же defaultFactory (singleton), поэтому применённый дизайн
+ * переиспользуется во всех дальнейших вызовах createArTargetSync.
+ * Симметрична preloadArTargetPrefab — вызывать рядом с ней в точке инициализации AR.
+ * Ничего не делает, если дизайн уже был установлен явно через setArTargetDesignPrefab().
+ * @param {import('./ui.js').UI} [ui] — если передан, диагностика дублируется в ui.log
+ * @returns {Promise<object|null>} применённый дизайн-префаб или null, если не найден
+ */
+export async function preloadArTargetDesign(ui = null) {
+  console.log('[ModelFactory] preloadArTargetDesign: preloading design JSON');
+  if (ui) ui.log('[ModelFactory] Preloading AR target design JSON...', 'info');
+  await defaultFactory._autoLoadDesignIfNeeded(ui);
+  const prefab = defaultFactory.getDesignPrefab();
+  console.log('[ModelFactory] preloadArTargetDesign: done, design prefab =', prefab ? 'SET' : 'NOT SET');
+  if (ui) ui.log(`[ModelFactory] Design preload done: ${prefab ? 'design applied' : 'no design JSON found'}`, prefab ? 'ok' : 'warn');
+  return prefab;
 }
 
 export { ModelFactory as default };

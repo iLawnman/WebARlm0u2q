@@ -9,5 +9,7 @@ export {
   default,
   designGroupsToPrefab,
   setArTargetDesignPrefab,
-  getArTargetDesignPrefab
+  getArTargetDesignPrefab,
+  preloadArTargetPrefab,
+  preloadArTargetDesign
 } from './artarget.js';

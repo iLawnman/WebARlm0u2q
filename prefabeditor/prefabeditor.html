@@ -15,6 +15,7 @@
   <script src="./js/io.js"></script>
   <script src="./js/inspector.js"></script>
   <script src="./js/main.js"></script>
+  <script src="js/prefab3Ddesign.js"></script>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -110,6 +111,7 @@
     <button onclick="document.getElementById('file-input').click()">Открыть HTML...</button>
     <button class="btn-success" onclick="document.getElementById('json-input').click()">Загрузить JSON дизайн</button>
     <button onclick="window.__editor && window.__editor.exportHTML && window.__editor.exportHTML()">Сохранить HTML</button>
+    <button onclick="showPrefab3DDesign()">Показать префаб с дизайном в 3D</button>
     <input type="file" id="file-input" style="display:none" accept=".html,.template" onchange="window.__editor && window.__editor.handleFileSelect && window.__editor.handleFileSelect(event)">
     <input type="file" id="json-input" style="display:none" accept=".json" onchange="window.DesignPreview && window.DesignPreview.handleJsonFile(event)">
     <select id="json-row-selector" style="display:none; margin-top:6px;" onchange="window.DesignPreview && window.DesignPreview.handleRowChange(event)"></select>

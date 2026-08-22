@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createArTargetSync, preloadArTargetPrefab } from './artarget.js';
+import { createArTargetSync, preloadArTargetPrefab, preloadArTargetDesign } from './artarget.js';
 import { playSound } from './audio.js';
 import { QuestManager } from './quests.js';
 import { Policies } from './policies.js';
@@ -50,6 +50,12 @@ export class Recognition {
     const prefabSource = await preloadArTargetPrefab(undefined, this.ui);
     if (prefabSource !== 'server') {
       this.ui.log('AR target prefab NOT loaded from server → using built-in defaultPrefab from code', 'warn');
+    }
+
+    this.ui.log('Preloading AR target design...', 'info');
+    const designPrefab = await preloadArTargetDesign(this.ui);
+    if (!designPrefab) {
+      this.ui.log('AR target design JSON NOT found → panels will use default (undesigned) styles', 'warn');
     }
 
     this.ui.enableArButton();
@@ -126,8 +132,8 @@ export class Recognition {
   _parseRichText(text) {
     if (!text) return '';
     return text
-      .replace(/<size=\+?(\d+)>/gi, '<span style="font-size: calc(1em + $1px)">')
-      .replace(/<\/size>/gi, '</span>');
+        .replace(/<size=\+?(\d+)>/gi, '<span style="font-size: calc(1em + $1px)">')
+        .replace(/<\/size>/gi, '</span>');
   }
 
   _onSelect(ev) {
