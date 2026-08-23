@@ -14,7 +14,7 @@
 // domOverlay.root ничего не композитится поверх камеры.
 
 const DEFAULT_ASSET_FILES = [
-  './assets/artargetdesign.json',
+  './assets/arprefabsdesign.json',
   './assets/questtable.json',
   './assets/answers.json',
 ];
