@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>panel rotate fix WebXR AR — Куб на полу + DOM Overlay панель</title>
+<title>rotate fix WebXR AR — Куб на полу + DOM Overlay панель</title>
 <style>
   html, body {
     margin: 0;
@@ -585,15 +585,18 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// ---------- Project 3D anchors to screen space (no rotation) ----------
+// ---------- Project 3D anchors to screen space with 3D-like rotation ----------
 const projected = new THREE.Vector3();
 const camWorldPos = new THREE.Vector3();
+const directionToPanel = new THREE.Vector3();
+const cameraForward = new THREE.Vector3();
 
 function updateAnchoredPanels() {
   if (!placed) return;
   if (interacting) return;
 
   camera.getWorldPosition(camWorldPos);
+  camera.getWorldDirection(cameraForward);
   
   // Основная панель
   const distance = camWorldPos.distanceTo(panelAnchor);
@@ -611,10 +614,33 @@ function updateAnchoredPanels() {
     if (screenX < -margin || screenX > w + margin || screenY < -margin || screenY > h + margin) {
       anchorPanel.classList.remove('visible');
     } else {
-      // Только позиционирование и масштаб - БЕЗ ПОВОРОТА
+      // Вычисляем угол поворота в 3D-пространстве
+      directionToPanel.copy(panelAnchor).sub(camWorldPos);
+      directionToPanel.y = 0; // Игнорируем наклон по вертикали для горизонтального поворота
+      directionToPanel.normalize();
+      
+      // Угол между направлением камеры и направлением на панель
+      const cameraDirFlat = cameraForward.clone();
+      cameraDirFlat.y = 0;
+      cameraDirFlat.normalize();
+      
+      // Вычисляем угол поворота панели в горизонтальной плоскости
+      const angle = Math.atan2(directionToPanel.x, directionToPanel.z) - 
+                    Math.atan2(cameraDirFlat.x, cameraDirFlat.z);
+      
+      // Дополнительный наклон панели в зависимости от вертикального угла обзора
+      const verticalAngle = Math.asin(
+        (panelAnchor.y - camWorldPos.y) / distance
+      );
+      
       const scale = THREE.MathUtils.clamp(0.9 / distance, 0.35, 1.15);
+      
+      // Применяем трансформацию с поворотом и перспективным наклоном
       anchorPanel.style.transform =
-        `translate(${screenX}px, ${screenY}px) translate(-50%, -100%) scale(${scale})`;
+        `translate(${screenX}px, ${screenY}px) translate(-50%, -100%) ` +
+        `scale(${scale}) ` +
+        `rotateY(${-angle}rad) ` +
+        `rotateX(${-verticalAngle * 0.5}rad)`;
       anchorPanel.classList.add('visible');
     }
   }
@@ -641,10 +667,29 @@ function updateAnchoredPanels() {
     if (screenX < -margin || screenX > w + margin || screenY < -margin || screenY > h + margin) {
       data.element.classList.remove('visible');
     } else {
-      // Только позиционирование и масштаб - БЕЗ ПОВОРОТА
+      // Вычисляем угол поворота для дополнительной панели
+      directionToPanel.copy(anchorPos).sub(camWorldPos);
+      directionToPanel.y = 0;
+      directionToPanel.normalize();
+      
+      const cameraDirFlat = cameraForward.clone();
+      cameraDirFlat.y = 0;
+      cameraDirFlat.normalize();
+      
+      const angle = Math.atan2(directionToPanel.x, directionToPanel.z) - 
+                    Math.atan2(cameraDirFlat.x, cameraDirFlat.z);
+      
+      const verticalAngle = Math.asin(
+        (anchorPos.y - camWorldPos.y) / dist
+      );
+      
       const scale = THREE.MathUtils.clamp(0.9 / dist, 0.35, 1.15);
+      
       data.element.style.transform =
-        `translate(${screenX}px, ${screenY}px) translate(-50%, -100%) scale(${scale})`;
+        `translate(${screenX}px, ${screenY}px) translate(-50%, -100%) ` +
+        `scale(${scale}) ` +
+        `rotateY(${-angle}rad) ` +
+        `rotateX(${-verticalAngle * 0.5}rad)`;
       data.element.classList.add('visible');
     }
   }
