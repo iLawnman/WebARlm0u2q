@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>ds position WebXR AR — Куб на полу + DOM Overlay панель</title>
+<title>button fix WebXR AR — Куб на полу + DOM Overlay панель</title>
 <style>
   html, body {
     margin: 0;
@@ -51,9 +51,7 @@
 
   #unsupported h2 { color: #f8fafc; margin-bottom: 12px; }
 
-  /* ---------- WebXR DOM Overlay root ----------
-     Everything the browser composites on top of the AR camera feed during
-     the immersive session lives here. */
+  /* ---------- WebXR DOM Overlay root ---------- */
   #ar-overlay {
     position: fixed;
     inset: 0;
@@ -80,7 +78,7 @@
     position: absolute;
     top: 0;
     left: 0;
-    transform-origin: 50% 100%; /* bottom-center = 3D anchor point */
+    transform-origin: 50% 100%;
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
@@ -101,7 +99,6 @@
     pointer-events: auto;
   }
 
-  /* Scrollable window onto about.html */
   #anchor-panel {
     width: 460px;
   }
@@ -138,6 +135,7 @@
     color: #e0e7ff;
     font-size: 13px;
     font-weight: 600;
+    cursor: pointer;
   }
 
   #debug-btn:active {
@@ -204,7 +202,44 @@
   .convertor-row.ok { color: #86efac; }
   .convertor-row.missing { color: #fca5a5; }
 
-  /* ---------- Кнопка-триггер (плавает поверх всего) ---------- */
+  /* ---------- Кнопка AR (встроенный стиль ARButton) ---------- */
+  #ar-button-container {
+    position: absolute;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    pointer-events: auto;
+  }
+
+  #ar-button-container button {
+    padding: 14px 32px;
+    border-radius: 12px;
+    border: none;
+    background: #6366f1;
+    color: white;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 8px 30px rgba(99, 102, 241, 0.4);
+    transition: all 0.2s;
+  }
+
+  #ar-button-container button:hover {
+    background: #4f46e5;
+    transform: scale(1.02);
+  }
+
+  #ar-button-container button:active {
+    transform: scale(0.95);
+  }
+
+  #ar-button-container button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* ---------- Кнопка-триггер конвертора ---------- */
   .convertor-trigger {
     position: absolute;
     top: 16px;
@@ -238,11 +273,14 @@
   </div>
 </div>
 
-<!-- WebXR DOM Overlay root: passed to ARButton as domOverlay.root -->
+<!-- Кнопка запуска AR -->
+<div id="ar-button-container"></div>
+
+<!-- WebXR DOM Overlay root -->
 <div id="ar-overlay">
   <div id="place-hint">Коснитесь пола, чтобы поставить куб и панель</div>
   
-  <!-- Основная панель (привязана к кубу) -->
+  <!-- Основная панель -->
   <div id="anchor-panel" class="ar-anchored-panel">
     <div class="panel-frame">
       <iframe src="about.html" scrolling="yes"></iframe>
@@ -256,7 +294,7 @@
   <!-- Контейнер для динамических панелей конвертора -->
   <div id="convertor-panels-container"></div>
 
-  <!-- Кнопка-триггер (плавает) -->
+  <!-- Кнопка-триггер конвертора -->
   <button id="convertor-trigger-btn" type="button" class="convertor-trigger">📦 Проверить assets</button>
 </div>
 
@@ -272,13 +310,14 @@
 <script type="module">
 import * as THREE from 'three';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
-import { createConvertorPanels, checkAssetFiles } from './convertor.js';
+import { checkAssetFiles } from './convertor.js';
 
 const webglContainer = document.getElementById('webgl-container');
 const hint = document.getElementById('hint');
 const unsupportedEl = document.getElementById('unsupported');
 const arOverlay = document.getElementById('ar-overlay');
 const placeHint = document.getElementById('place-hint');
+const arButtonContainer = document.getElementById('ar-button-container');
 const convertorTriggerBtn = document.getElementById('convertor-trigger-btn');
 const convertorPanelsContainer = document.getElementById('convertor-panels-container');
 
@@ -303,29 +342,22 @@ debugBtn.addEventListener('click', () => {
 });
 
 // ---------- Хранилище всех панелей, привязанных к 3D-точкам ----------
-const anchoredPanels = new Map(); // key -> { element, anchorPosition, visible }
+const anchoredPanels = new Map();
 
 // ---------- Функция для добавления панели, привязанной к 3D-позиции ----------
-function addAnchoredPanel(panelElement, anchorPosition, options = {}) {
+function addAnchoredPanel(panelElement, anchorPosition) {
   const id = `panel-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
   
-  // Стилизуем панель
   panelElement.classList.add('ar-anchored-panel');
-  
-  // Добавляем в контейнер
   convertorPanelsContainer.appendChild(panelElement);
   
-  // Сохраняем информацию о панели
   const panelData = {
     element: panelElement,
     anchorPosition: anchorPosition.clone(),
-    visible: true,
-    options
+    visible: true
   };
   
   anchoredPanels.set(id, panelData);
-  
-  // Возвращаем ID для управления панелью
   return id;
 }
 
@@ -341,7 +373,6 @@ function removeAnchoredPanel(id) {
 // ---------- Freeze panel tracking while the user is actively touching it ----------
 let interacting = false;
 
-// Функция для добавления обработчиков взаимодействия на панель
 function setupPanelInteraction(panelElement) {
   panelElement.addEventListener('pointerdown', () => { interacting = true; });
   panelElement.addEventListener('touchstart', () => { interacting = true; }, { passive: true });
@@ -351,10 +382,8 @@ function setupPanelInteraction(panelElement) {
   panelElement.addEventListener('touchcancel', () => { interacting = false; }, { passive: true });
 }
 
-// Настраиваем основную панель
 setupPanelInteraction(anchorPanel);
 
-// Настраиваем взаимодействие с iframe
 const panelIframe = anchorPanel.querySelector('iframe');
 panelIframe.addEventListener('load', () => {
   try {
@@ -395,13 +424,14 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.xr.enabled = true;
 webglContainer.appendChild(renderer.domElement);
 
-// ---------- AR entry button: hit-test + DOM Overlay ----------
+// ---------- AR entry button ----------
+// Создаем кнопку ARButton и помещаем в контейнер
 const arButton = ARButton.createButton(renderer, {
   requiredFeatures: ['hit-test'],
   optionalFeatures: ['local-floor', 'dom-overlay'],
   domOverlay: { root: arOverlay }
 });
-document.body.appendChild(arButton);
+arButtonContainer.appendChild(arButton);
 
 // ---------- Lights ----------
 scene.add(new THREE.HemisphereLight(0xffffff, 0x333344, 1.2));
@@ -418,7 +448,7 @@ reticle.matrixAutoUpdate = false;
 reticle.visible = false;
 scene.add(reticle);
 
-// ---------- Cube (placed on the real floor) ----------
+// ---------- Cube ----------
 const cubeSize = 0.18;
 const cube = new THREE.Mesh(
   new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize),
@@ -440,9 +470,8 @@ const edges = new THREE.LineSegments(
 edges.visible = false;
 scene.add(edges);
 
-// World-space anchor the panel is locked to: fixed offset above the cube.
 const panelAnchor = new THREE.Vector3();
-const PANEL_HEIGHT_OFFSET = 0.28; // meters above the cube center
+const PANEL_HEIGHT_OFFSET = 0.28;
 
 // ---------- Hit-test state ----------
 let hitTestSource = null;
@@ -459,7 +488,6 @@ renderer.xr.addEventListener('sessionstart', () => {
   hitTestSource = null;
   placeHint.style.display = 'block';
   
-  // Удаляем все панели конвертора при новой сессии
   for (const [id, data] of anchoredPanels) {
     data.element.remove();
   }
@@ -473,7 +501,6 @@ renderer.xr.addEventListener('sessionend', () => {
 
 // ---------- Обработчик для кнопки конвертора ----------
 convertorTriggerBtn.addEventListener('click', async () => {
-  // Проверяем, что сессия активна и куб размещен
   if (!placed) {
     console.warn('Сначала разместите куб на полу');
     return;
@@ -486,11 +513,9 @@ convertorTriggerBtn.addEventListener('click', async () => {
   try {
     const { results, allExist } = await checkAssetFiles();
     
-    // Создаем панель с результатами
     const panel = document.createElement('div');
     panel.className = 'convertor-panel';
     
-    // Генерируем HTML для панели
     const rowsHtml = results.map(r => `
       <div class="convertor-row ${r.exists ? 'ok' : 'missing'}">
         <span>${r.exists ? '✅' : '❌'}</span>
@@ -514,18 +539,13 @@ convertorTriggerBtn.addEventListener('click', async () => {
       </div>
     `;
     
-    // Добавляем панель с привязкой к 3D-позиции
-    // Смещаем панель чуть в сторону от основной
     const offsetPosition = panelAnchor.clone();
-    offsetPosition.x += 0.25; // смещение вправо
+    offsetPosition.x += 0.25;
     offsetPosition.y += 0.1;
     
     const panelId = addAnchoredPanel(panel, offsetPosition);
-    
-    // Настраиваем обработчики взаимодействия
     setupPanelInteraction(panel);
     
-    // Обработчик закрытия
     panel.querySelector('.convertor-panel-close').addEventListener('click', () => {
       removeAnchoredPanel(panelId);
     });
@@ -538,7 +558,7 @@ convertorTriggerBtn.addEventListener('click', async () => {
   }
 });
 
-// Tap on screen (XR "select" event) -> place cube on the reticle, anchor panel above it
+// ---------- Tap on screen -> place cube ----------
 function onSelect() {
   if (!reticle.visible) return;
 
@@ -565,17 +585,17 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// ---------- Project 3D anchors to screen space and position panels ----------
+// ---------- Project 3D anchors to screen space ----------
 const projected = new THREE.Vector3();
 const camWorldPos = new THREE.Vector3();
 
 function updateAnchoredPanels() {
   if (!placed) return;
-  if (interacting) return; // don't fight the user's finger mid-scroll/tap
+  if (interacting) return;
 
   camera.getWorldPosition(camWorldPos);
   
-  // Обновляем основную панель
+  // Основная панель
   const distance = camWorldPos.distanceTo(panelAnchor);
   projected.copy(panelAnchor).project(camera);
 
@@ -598,7 +618,7 @@ function updateAnchoredPanels() {
     }
   }
   
-  // Обновляем все дополнительные панели
+  // Дополнительные панели
   for (const [id, data] of anchoredPanels) {
     if (!data.visible) continue;
     
@@ -628,7 +648,7 @@ function updateAnchoredPanels() {
   }
 }
 
-// ---------- Animation / render loop ----------
+// ---------- Animation loop ----------
 const clock = new THREE.Clock();
 
 renderer.setAnimationLoop((timestamp, frame) => {
