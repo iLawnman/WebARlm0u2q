@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>button fix WebXR AR — Куб на полу + DOM Overlay панель</title>
+<title>panel rotate fix WebXR AR — Куб на полу + DOM Overlay панель</title>
 <style>
   html, body {
     margin: 0;
@@ -202,7 +202,7 @@
   .convertor-row.ok { color: #86efac; }
   .convertor-row.missing { color: #fca5a5; }
 
-  /* ---------- Кнопка AR (встроенный стиль ARButton) ---------- */
+  /* ---------- Кнопка AR ---------- */
   #ar-button-container {
     position: absolute;
     bottom: 40px;
@@ -425,7 +425,6 @@ renderer.xr.enabled = true;
 webglContainer.appendChild(renderer.domElement);
 
 // ---------- AR entry button ----------
-// Создаем кнопку ARButton и помещаем в контейнер
 const arButton = ARButton.createButton(renderer, {
   requiredFeatures: ['hit-test'],
   optionalFeatures: ['local-floor', 'dom-overlay'],
@@ -539,9 +538,10 @@ convertorTriggerBtn.addEventListener('click', async () => {
       </div>
     `;
     
+    // Смещаем панель конвертора вправо от основной
     const offsetPosition = panelAnchor.clone();
-    offsetPosition.x += 0.25;
-    offsetPosition.y += 0.1;
+    offsetPosition.x += 0.30;
+    offsetPosition.y += 0.05;
     
     const panelId = addAnchoredPanel(panel, offsetPosition);
     setupPanelInteraction(panel);
@@ -585,7 +585,7 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// ---------- Project 3D anchors to screen space ----------
+// ---------- Project 3D anchors to screen space (no rotation) ----------
 const projected = new THREE.Vector3();
 const camWorldPos = new THREE.Vector3();
 
@@ -611,6 +611,7 @@ function updateAnchoredPanels() {
     if (screenX < -margin || screenX > w + margin || screenY < -margin || screenY > h + margin) {
       anchorPanel.classList.remove('visible');
     } else {
+      // Только позиционирование и масштаб - БЕЗ ПОВОРОТА
       const scale = THREE.MathUtils.clamp(0.9 / distance, 0.35, 1.15);
       anchorPanel.style.transform =
         `translate(${screenX}px, ${screenY}px) translate(-50%, -100%) scale(${scale})`;
@@ -640,6 +641,7 @@ function updateAnchoredPanels() {
     if (screenX < -margin || screenX > w + margin || screenY < -margin || screenY > h + margin) {
       data.element.classList.remove('visible');
     } else {
+      // Только позиционирование и масштаб - БЕЗ ПОВОРОТА
       const scale = THREE.MathUtils.clamp(0.9 / dist, 0.35, 1.15);
       data.element.style.transform =
         `translate(${screenX}px, ${screenY}px) translate(-50%, -100%) scale(${scale})`;
