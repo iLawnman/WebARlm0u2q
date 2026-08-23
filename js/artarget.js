@@ -216,83 +216,78 @@ export class ModelFactory {
       if (typeof onAnswer === 'function') onAnswer(value);
     };
 
-    const panelNodes = this._getPanelNodes(ui);
-    const panels = {};
+    // Единый экран (см. artargetPrefabNew.html: .screen > .content > .title-area + .panels + .buttons-area)
+    // вместо 4 отдельных CSS3D-объектов. Физический размер задаём явно (px), т.к. исходная
+    // разметка рассчитана на 100vw/100vh — для плавающей AR-панели это неприменимо.
+    const SCREEN_WIDTH_PX = 340;
+    const SCREEN_HEIGHT_PX = 480;
+    const SCREEN_SCALE = 0.0005; // 340px * 0.0005 ≈ 0.17м реальной ширины — тот же порядок, что был у MainBlock
 
-    console.log('[ModelFactory] Building panels from', panelNodes.length, 'nodes');
+    const screenSrc = this._getScreenRoot(ui);
+    const el = screenSrc.cloneNode(true);
+    console.log('[ModelFactory] Building single combined screen from prefab, source =', this._prefabSource);
 
-    for (const src of panelNodes) {
-      const name = src.dataset.name || 'panel';
-      const el = src.cloneNode(true);
+    el.classList.add('ar-target-screen');
+    el.style.width = `${SCREEN_WIDTH_PX}px`;
+    el.style.height = `${SCREEN_HEIGHT_PX}px`;
+    el.style.pointerEvents = 'auto';
+    el.style.touchAction = 'manipulation';
+    // Снимаем id у всего, что клонировано из статического префаба — при нескольких
+    // одновременно отслеживаемых таргетах одинаковые id (modal-0, note-content-0, ...)
+    // дали бы дубликаты в живом документе. Дальше работаем через прямые ссылки на узлы,
+    // а не через getElementById.
+    el.querySelectorAll('[id]').forEach((n) => n.removeAttribute('id'));
+    if (el.id) el.removeAttribute('id');
 
-      el.style.pointerEvents = 'auto';
-      el.style.touchAction = 'manipulation';
+    // Декоративные/текстовые слои не должны перехватывать клики — иначе интерактивные
+    // элементы (кнопки, инпут) под ними могут не получать события.
+    el.querySelectorAll(
+        '.title-text, .help, .help-body, .main-text, .decor-line, .panel-corner, ' +
+        '.mandala-icon, .bg, .bg-img, .right-panel-content'
+    ).forEach((n) => { n.style.pointerEvents = 'none'; });
 
-      // === ЖЁСТКИЙ ФИКС ДЛЯ MAINBLOCK ===
-      if (name === 'MainBlock') {
-        // Текстовые дети не должны перехватывать клики
-        el.querySelectorAll('.ar-panel-title, .ar-panel-question, .ar-panel-maintext, .ar-panel-help')
-            .forEach((child) => {
-              child.style.pointerEvents = 'none';
-            });
-      }
+    this._fillScreen(el, data, handleAnswer, ui, arInput);
+    this._applyDesignToScreen(el, this._designPrefab);
 
-      // === ЖЁСТКИЙ ФИКС ДЛЯ BUTTONSBLOCK ===
-      if (name === 'ButtonsBlock') {
-        el.style.border = '3px solid #ff00ff';          // яркий debug-бордер
-        el.style.background = 'rgba(80, 0, 80, 0.85)';
-        el.style.zIndex = '100';
-        el.style.minHeight = '90px';
-      }
+    // bindPanelEvents вызываем по тем же логическим зонам/именам, что и раньше
+    // (LeftHelpBlock/MainBlock/RightBlock/ButtonsBlock), просто теперь это не отдельные
+    // CSS3D-объекты, а под-элементы одного экрана — сохраняем сигнатуру вызова 1:1.
+    const zoneMainPanel = el.querySelector('.main-panel');
+    const zoneLeftPanel = el.querySelector('.panels > .side-panel');
+    const zoneRightPanel = el.querySelectorAll('.panels > .side-panel')[1] || null;
+    const zoneButtons = el.querySelector('.buttons-area');
+    if (zoneMainPanel) arInput.bindPanelEvents(zoneMainPanel, 'MainBlock');
+    if (zoneLeftPanel) arInput.bindPanelEvents(zoneLeftPanel, 'LeftHelpBlock');
+    if (zoneRightPanel) arInput.bindPanelEvents(zoneRightPanel, 'RightBlock');
+    if (zoneButtons) arInput.bindPanelEvents(zoneButtons, 'ButtonsBlock');
 
-      arInput.bindPanelEvents(el, name);
-      this._fillPanel(el, name, data, handleAnswer, ui, arInput);
-      this._applyDesignToPanel(name, el, this._designPrefab);
+    const cssObject = new CSS3DObject(el);
+    cssObject.name = 'Screen';
+    cssObject.scale.set(SCREEN_SCALE, SCREEN_SCALE, SCREEN_SCALE);
+    cssObject.position.set(0, 0.05, 0);
+    cssObject.rotation.set(-Math.PI / 2, 0, 0);
+    group.add(cssObject);
 
-      const pos = this._parseVec3(el.dataset.position, [0, 0, 0]);
-      const rotDeg = this._parseVec3(el.dataset.rotation, [-90, 0, 0]);
-      const rot = rotDeg.map((d) => (d * Math.PI) / 180);
-      let scale = parseFloat(el.dataset.scale) || 0.0005;
+    // Алиасы под старые имена — на случай, если что-то во внешнем коде читает
+    // group.userData.MainBlock / .LeftHelpBlock и т.п. напрямую (обратная совместимость).
+    const panels = { Screen: cssObject, MainBlock: cssObject, LeftHelpBlock: cssObject, RightBlock: cssObject, ButtonsBlock: cssObject };
 
-      // Увеличиваем ButtonsBlock
-      if (name === 'ButtonsBlock') {
-        scale = 0.0009;
-        pos[1] = -0.11;           // опускаем ниже
-      }
-
-      ['data-name', 'data-position', 'data-rotation', 'data-scale'].forEach((a) =>
-          el.removeAttribute(a)
-      );
-
-      const cssObject = new CSS3DObject(el);
-      cssObject.name = name;
-      cssObject.scale.set(scale, scale, scale);
-      cssObject.position.set(...pos);
-      cssObject.rotation.set(...rot);
-
-      group.add(cssObject);
-      panels[name] = cssObject;
-
-      // Debug: через небольшой таймаут смотрим реальный экранный rect
-      setTimeout(() => {
-        const rect = el.getBoundingClientRect();
-        console.log(`[Panel ${name}] screen rect:`, {
-          x: Math.round(rect.x),
-          y: Math.round(rect.y),
-          w: Math.round(rect.width),
-          h: Math.round(rect.height),
-          visible: rect.width > 0 && rect.height > 0
-        });
-      }, 300);
-    }
+    setTimeout(() => {
+      const rect = el.getBoundingClientRect();
+      console.log('[Screen] screen rect:', {
+        x: Math.round(rect.x), y: Math.round(rect.y),
+        w: Math.round(rect.width), h: Math.round(rect.height),
+        visible: rect.width > 0 && rect.height > 0
+      });
+    }, 300);
 
     group.userData = {
       targetInfo: data.raw,
       normalized: data,
       sphere,
       ...panels,
-      panelEl: panels.MainBlock?.element || null,
-      cssObject: panels.MainBlock || null,
+      panelEl: el,
+      cssObject,
       onAnswer,
       answerType: data.answerType,
       groupName: data.groupName
@@ -379,20 +374,26 @@ export class ModelFactory {
       console.log('[ModelFactory] _ensurePrefab: received', html.length, 'bytes of HTML from', url);
 
       const doc = new DOMParser().parseFromString(html, 'text/html');
-      const tpl = doc.querySelector('#ar-target') || doc.querySelector('template');
-      if (!tpl) throw new Error('No <template id="ar-target">');
+      // Новый формат префаба (подтверждён пользователем): единый полноэкранный
+      // "screen" (title-area + panels + buttons-area + опциональная modal-overlay),
+      // а не <template id="ar-target"> с 4 отдельными CSS3D-панелями.
+      const screenRoot = doc.querySelector('.screen') || doc.querySelector('body > div');
+      if (!screenRoot) {
+        throw new Error('Не найден корневой узел префаба (.screen или хотя бы body > div)');
+      }
 
       if (!document.getElementById('ar-target-prefab-styles')) {
         const styleEl = doc.querySelector('style');
         const s = document.createElement('style');
         s.id = 'ar-target-prefab-styles';
         s.textContent = (styleEl ? styleEl.textContent : '') + `
-          .ar-css3d-panel, .ar-css3d-panel * { pointer-events: auto !important; touch-action: manipulation !important; }
-          .ar-buttons-block { z-index: 100 !important; }
-          .ar-quest-btn, .ar-quest-submit-btn, .ar-slide-nav, .ar-quest-ok-btn {
+          .ar-target-screen, .ar-target-screen * { pointer-events: auto !important; touch-action: manipulation !important; }
+          .ar-target-screen .buttons-area { z-index: 100 !important; }
+          .ar-target-screen .nav-btn, .ar-target-screen .next-btn, .ar-target-screen .modal-close-btn,
+          .ar-target-screen .ar-quest-btn, .ar-target-screen .ar-quest-submit-btn, .ar-target-screen .ar-slide-nav, .ar-target-screen .ar-quest-ok-btn {
             pointer-events: auto !important;
-            min-width: 48px !important;
-            min-height: 40px !important;
+            min-width: 40px !important;
+            min-height: 36px !important;
             position: relative;
             z-index: 50;
           }
@@ -400,12 +401,12 @@ export class ModelFactory {
         document.head.appendChild(s);
       }
 
-      this._prefabCache = tpl.content || tpl;
+      this._prefabCache = screenRoot;
       this._prefabSource = 'server';
       this._prefabSourceUrl = url;
-      const nodeCount = this._prefabCache.querySelectorAll('[data-name]').length;
-      console.log('[ModelFactory] Prefab loaded OK from SERVER:', url, '— nodes found:', nodeCount);
-      if (ui) ui.log(`[ModelFactory] Prefab loaded from SERVER: ${url} (${nodeCount} nodes)`, 'ok');
+      const panelCount = this._prefabCache.querySelectorAll('.panel').length;
+      console.log('[ModelFactory] Prefab loaded OK from SERVER:', url, '— .panel elements found:', panelCount);
+      if (ui) ui.log(`[ModelFactory] Prefab loaded from SERVER: ${url} (${panelCount} panels)`, 'ok');
     } catch (e) {
       this._prefabSource = 'fallback-code';
       this._prefabSourceUrl = null;
@@ -418,100 +419,204 @@ export class ModelFactory {
     }
   }
 
-  _getPanelNodes(ui = null) {
+  _getScreenRoot(ui = null) {
     if (this._prefabCache) {
-      console.log('[ModelFactory] _getPanelNodes: using prefab, source =', this._prefabSource);
-      return Array.from(this._prefabCache.querySelectorAll('[data-name]'));
+      console.log('[ModelFactory] _getScreenRoot: using prefab, source =', this._prefabSource);
+      return this._prefabCache;
     }
     console.warn(
-        '[ModelFactory] _getPanelNodes: no prefab cached yet → building defaultPrefab from code ' +
+        '[ModelFactory] _getScreenRoot: no prefab cached yet → building defaultPrefab from code ' +
         '(server prefab was never fetched/awaited). This is the code-side fallback, not the server one.'
     );
-    if (ui) ui.log('[ModelFactory] _getPanelNodes: no cached prefab → building defaultPrefab from code', 'warn');
+    if (ui) ui.log('[ModelFactory] _getScreenRoot: no cached prefab → building defaultPrefab from code', 'warn');
     this._prefabSource = 'fallback-code';
     this._prefabSourceUrl = null;
     this._prefabCache = this._buildFallbackPrefab();
-    return Array.from(this._prefabCache.querySelectorAll('[data-name]'));
+    return this._prefabCache;
   }
 
+  /**
+   * Fallback-версия экрана, структурно повторяющая server-side формат
+   * (см. artargetPrefabNew.html: .screen > .content > .title-area + .panels(.side-panel x2 + .main-panel) + .buttons-area),
+   * включая уже готовые .panel-corner / .decor-line элементы — чтобы _applyDesignToScreen
+   * работал одинаково независимо от источника префаба.
+   */
   _buildFallbackPrefab() {
-    const root = document.createDocumentFragment();
-    const make = (name, cls, pos, rot, scale, html) => {
-      const div = document.createElement('div');
-      div.className = `ar-css3d-panel ${cls}`;
-      div.style.pointerEvents = 'auto';
-      div.dataset.name = name;
-      div.dataset.position = pos;
-      div.dataset.rotation = rot;
-      div.dataset.scale = scale;
-      div.innerHTML = html;
-      root.appendChild(div);
-    };
+    const corners = () => `
+      <div class="panel-corner tl" style="position:absolute; top:-2px; left:-2px; width:16px; height:16px; background-size:contain; background-repeat:no-repeat; pointer-events:none;"></div>
+      <div class="panel-corner tr" style="position:absolute; top:-2px; right:-2px; width:16px; height:16px; background-size:contain; background-repeat:no-repeat; transform:scaleX(-1); pointer-events:none;"></div>
+      <div class="panel-corner bl" style="position:absolute; bottom:-2px; left:-2px; width:16px; height:16px; background-size:contain; background-repeat:no-repeat; transform:scaleY(-1); pointer-events:none;"></div>
+      <div class="panel-corner br" style="position:absolute; bottom:-2px; right:-2px; width:16px; height:16px; background-size:contain; background-repeat:no-repeat; transform:scale(-1); pointer-events:none;"></div>`;
 
-    make('LeftHelpBlock', 'ar-left-help-block', '-0.115, 0.025, 0', '-90, 16, 0', '0.00048',
-        '<div class="ar-panel-help" data-field="help"></div>');
-    make('MainBlock', 'ar-main-block', '0, 0.045, 0', '-90, 0, 0', '0.0005',
-        `<div class="ar-panel-title" data-field="title"></div>
-       <div class="ar-panel-question" data-field="question"></div>
-       <div class="ar-panel-maintext" data-field="mainText"></div>`);
-    make('RightBlock', 'ar-right-block', '0.115, 0.025, 0', '-90, -16, 0', '0.00048',
-        `<img class="ar-panel-image" data-field="imageSrc" alt="" />
-       <div class="ar-panel-help" data-field="imageCaption"></div>`);
-    make('ButtonsBlock', 'ar-buttons-block', '0, 0.1, 0', '-90, 0, 0', '0.0009',
-        '<div class="ar-quest-body" data-field="buttons"></div>');
-
-    return root;
+    const div = document.createElement('div');
+    div.innerHTML = `
+      <div class="screen active" id="screen-fallback" style="position:relative; width:100%; height:100%; display:flex; flex-direction:column; box-sizing:border-box; overflow:hidden;">
+        <div class="bg" style="position:absolute; inset:0; background:#050505; z-index:0;"></div>
+        <div class="bg-img" style="position:absolute; inset:0; background-size:cover; background-position:center; z-index:1;"></div>
+        <div class="modal-overlay" style="display:none; position:absolute; inset:0; background:rgba(0,0,0,0.85); z-index:50; align-items:center; justify-content:center; padding:20px;">
+          <div class="modal-window" style="position:relative; width:90%; max-width:520px; background:#0a0a0c; border:2px solid #DAA520; border-radius:8px; padding:20px; box-sizing:border-box;">
+            <button class="modal-close-btn" type="button" style="position:absolute; top:10px; right:10px; background:#111; border:1px solid #DAA520; color:#DAA520; width:30px; height:30px; border-radius:4px; cursor:pointer;">✕</button>
+            <div class="modal-title" style="color:#FFD700; font-weight:bold; text-align:center; margin-bottom:14px; padding-right:25px;"></div>
+            <div class="modal-body" style="white-space:pre-line; color:#e2e8f0; font-size:0.8rem; line-height:1.45; max-height:60vh; overflow-y:auto;"></div>
+          </div>
+        </div>
+        <div class="content" style="position:relative; z-index:10; display:flex; flex-direction:column; height:100%; padding:10px; box-sizing:border-box; gap:8px;">
+          <div class="title-area" style="background:#070707EE; border:1px solid #DAA520; position:relative; padding:8px; border-radius:4px;">
+            <div class="title-text" style="color:#FFD700; text-align:center; font-weight:bold; font-size:0.95rem;"></div>
+          </div>
+          <div class="panels" style="display:flex; gap:8px; flex:1; min-height:0;">
+            <div class="panel side-panel" style="background:#070707EE; border:1px solid #DAA520; flex:1; display:flex; flex-direction:column; gap:8px; position:relative; padding:10px; border-radius:4px;">
+              ${corners()}
+              <div style="border:1px solid rgba(218,165,32,0.3); padding:6px; border-radius:4px; background:rgba(0,0,0,0.4);">
+                <div class="help" style="color:#FF69B4; font-weight:bold; font-size:0.75rem;">📍 ПОДСКАЗКА</div>
+                <div class="help-body" style="color:#cbd5e1; font-size:0.7rem; line-height:1.25; margin-top:4px;"></div>
+              </div>
+              <div style="border:1px solid rgba(218,165,32,0.3); padding:6px; border-radius:4px; background:rgba(0,0,0,0.4);">
+                <div class="help" style="color:#FF69B4; font-weight:bold; font-size:0.75rem;">📍 СОВЕТ</div>
+                <div class="help-body" style="color:#cbd5e1; font-size:0.7rem; line-height:1.25; margin-top:4px;"></div>
+              </div>
+            </div>
+            <div class="panel main-panel" style="background:#070707EE; border:1px solid #DAA520; flex:2; display:flex; flex-direction:column; justify-content:center; align-items:center; position:relative; padding:12px; border-radius:4px;">
+              ${corners()}
+              <div class="decor-line" style="width:80%; height:6px; margin-bottom:8px;"></div>
+              <div class="main-text" style="color:#FFD700; white-space:pre-line; text-align:center; font-weight:500; font-size:0.85rem; line-height:1.4;"></div>
+              <div class="decor-line" style="width:80%; height:6px; margin-top:8px;"></div>
+            </div>
+            <div class="panel side-panel" style="background:#070707EE; border:1px solid #DAA520; flex:1; position:relative; padding:10px; border-radius:4px; overflow-y:auto;">
+              ${corners()}
+              <div style="color:#FFD700; font-size:0.8rem; font-weight:bold; margin-bottom:6px;">📜 ЗАМЕТКА</div>
+              <div class="right-panel-content" style="color:#cbd5e1; font-size:0.7rem; line-height:1.3; white-space:pre-line;"></div>
+            </div>
+          </div>
+          <div class="buttons-area" style="background:#070707EE; border:1px solid #DAA520; padding:8px 12px; position:relative; border-radius:4px;">
+            <div class="buttons-row" style="display:flex; align-items:center; justify-content:center; gap:10px;"></div>
+            <div style="text-align:center; margin-top:6px;">
+              <button class="next-btn" type="button" style="display:none;">Дальше</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    return div.firstElementChild;
   }
 
-  _fillPanel(el, name, data, onAnswer, ui, arInput) {
+  /**
+   * Заполняет единый "screen"-префаб данными таргета. Селекторы — по классам
+   * (title-text, main-text, help-body, right-panel-content, buttons-row), т.к.
+   * новый формат префаба не использует data-field.
+   */
+  _fillScreen(el, data, onAnswer, ui, arInput) {
     const setText = (sel, val) => {
       const n = el.querySelector(sel);
       if (n) n.textContent = val || '';
+      return n;
     };
 
-    if (name === 'LeftHelpBlock') {
-      setText('[data-field="help"]', data.help);
-      if (!data.help) el.classList.add('ar-panel-empty');
-    }
-    if (name === 'MainBlock') {
-      setText('[data-field="title"]', data.title);
-      setText('[data-field="question"]', data.question);
-      setText('[data-field="mainText"]', data.mainText);
-      if (!data.title && !data.question && !data.mainText) el.classList.add('ar-panel-empty');
-    }
-    if (name === 'RightBlock') {
-      const img = el.querySelector('[data-field="imageSrc"]');
-      if (img) {
-        if (data.imageSrc) {
-          img.src = data.imageSrc;
-          img.alt = data.imageCaption || data.title || '';
-        } else {
-          img.removeAttribute('src');
+    // Заголовок — дублируется в шапке (title-area) и в модалке (если она есть).
+    setText('.title-area .title-text', data.title);
+    setText('.modal-title', data.title);
+
+    // Левая панель — 2 слота помощи (helpUp/helpDown), как в questsim (sim-help-up/down).
+    // Если раздельных полей нет, используем объединённое data.help одним куском в первый слот.
+    const helpBodies = el.querySelectorAll('.panels > .side-panel:first-child .help-body');
+    if (helpBodies[0]) helpBodies[0].textContent = data.helpUp || data.help || '';
+    if (helpBodies[1]) helpBodies[1].textContent = data.helpDown || '';
+    console.log(
+        '[ModelFactory._fillScreen] left help slots filled:', helpBodies.length,
+        'helpUp=', !!data.helpUp, 'helpDown=', !!data.helpDown, 'fallback help=', !!data.help
+    );
+
+    // Главная панель — вопрос + основной текст одним блоком (в новом префабе один слот
+    // .main-text вместо раздельных title/question/mainText, как было у CSS3D MainBlock).
+    setText('.main-panel .main-text', [data.question, data.mainText].filter(Boolean).join('\n\n'));
+
+    // Модалка (если есть в разметке) — длинный вступительный текст. Явного поля "story"
+    // в текущей модели данных нет (см. recognition.js: title/question/mainText/options/imageSrc),
+    // поэтому берём с fallback-цепочкой и логируем, что реально использовано —
+    // стоит проверить, нет ли отдельного поля story/legend/intro в quests.js.
+    const storySrc = data.raw?.story || data.raw?.legend || data.raw?.intro || data.mainText || data.question || '';
+    const storyField = data.raw?.story ? 'raw.story' : data.raw?.legend ? 'raw.legend' : data.raw?.intro ? 'raw.intro' : data.mainText ? 'mainText' : 'question';
+    console.log('[ModelFactory._fillScreen] modal-body source field:', storyField);
+    setText('.modal-body', storySrc);
+
+    // Правая панель — заметка (imageCaption) + опционально картинка распознанного маркера,
+    // которой в новой разметке нет как <img> — добавляем динамически, если imageSrc есть.
+    const rightPanel = el.querySelectorAll('.panels > .side-panel')[1];
+    if (rightPanel) {
+      const noteEl = rightPanel.querySelector('.right-panel-content');
+      if (noteEl) noteEl.textContent = data.imageCaption || '';
+      let img = rightPanel.querySelector('img.ar-target-image');
+      if (data.imageSrc) {
+        if (!img) {
+          img = document.createElement('img');
+          img.className = 'ar-target-image';
+          img.style.cssText = 'display:block; width:100%; height:auto; max-height:120px; object-fit:contain; border-radius:6px; margin-bottom:6px; background:rgba(0,0,0,0.3);';
+          rightPanel.insertBefore(img, rightPanel.firstChild);
         }
+        img.src = data.imageSrc;
+        img.alt = data.imageCaption || data.title || '';
+      } else if (img) {
+        img.remove();
       }
-      setText('[data-field="imageCaption"]', data.imageCaption);
-      if (!data.imageSrc && !data.imageCaption) el.classList.add('ar-panel-empty');
+    } else {
+      console.warn('[ModelFactory._fillScreen] правая side-panel не найдена — imageCaption/imageSrc не применены');
     }
-    if (name === 'ButtonsBlock') {
-      const body = el.querySelector('[data-field="buttons"]') || el;
-      this._buildQuestionBody(body, data, onAnswer, ui, arInput);
+
+    // Кнопки/ответ — та же логика построения UI (_buildQuestionBody), что и раньше,
+    // просто монтируется в .buttons-row вместо data-field="buttons".
+    const buttonsRow = el.querySelector('.buttons-area .buttons-row');
+    if (buttonsRow) {
+      this._buildQuestionBody(buttonsRow, data, onAnswer, ui, arInput);
+    } else {
+      console.warn('[ModelFactory._fillScreen] .buttons-row не найден — ответ построить некуда');
+    }
+    // "Дальше" — из старого 2D-флоу (переход к следующему экрану квеста), в AR такого шага
+    // нет: ответ отправляется сразу через onAnswer(...) из _buildQuestionBody. Прячем кнопку,
+    // а не оставляем нерабочей.
+    const nextBtn = el.querySelector('.next-btn');
+    if (nextBtn) nextBtn.style.display = 'none';
+
+    // Модалка: если есть — навешиваем закрытие через addEventListener (не inline onclick,
+    // т.к. id внутри неуникальны при нескольких одновременных таргетах — см. очистку id выше).
+    // При закрытии, если правая заметка ещё пустая, переносим туда текст модалки —
+    // тот же UX-паттерн, что был в исходном экспорте редактора.
+    const modalOverlay = el.querySelector('.modal-overlay');
+    const modalCloseBtn = el.querySelector('.modal-close-btn');
+    if (modalOverlay && modalCloseBtn) {
+      modalCloseBtn.removeAttribute('onclick');
+      const closeModal = () => {
+        // Читаем текст модалки ДО удаления из DOM — иначе querySelector('.modal-body')
+        // после .remove() ничего не найдёт (узел уже отсоединён от дерева).
+        const modalBody = el.querySelector('.modal-body');
+        const modalBodyText = modalBody ? modalBody.textContent : '';
+        modalOverlay.style.display = 'none';
+        modalOverlay.remove();
+        const noteEl = el.querySelector('.panels > .side-panel:last-child .right-panel-content');
+        if (noteEl && !noteEl.textContent.trim() && modalBodyText) {
+          noteEl.textContent = modalBodyText;
+        }
+      };
+      if (typeof arInput.bindInteractiveEvent === 'function') {
+        arInput.bindInteractiveEvent(modalCloseBtn, 'ModalCloseButton', closeModal);
+      } else {
+        modalCloseBtn.addEventListener('click', closeModal);
+      }
     }
   }
 
   /**
-   * Применяет дизайн-префаб к CSS3D-панели (аналог QuestSim.applyDesign,
-   * но вместо фиксированных id элементов оверлея — по имени панели/data-field).
+   * Применяет дизайн-префаб к единому screen-узлу (аналог QuestSim.applyDesign),
+   * по CSS-классам вместо data-field/data-name. В отличие от старой CSS3D-версии,
+   * этот формат префаба УЖЕ содержит .panel-corner и .decor-line элементы в разметке —
+   * поэтому просто переставляем им background-image, а не создаём новые узлы.
    * Ничего не делает, если префаб не задан (никакой регрессии для случая без дизайна).
    */
-  _applyDesignToPanel(name, el, p) {
+  _applyDesignToScreen(el, p) {
     if (!p) return;
 
     const applied = [];
     const skippedNoValue = [];
     const skippedNoElement = [];
 
-    // field: имя поля в префабе; value: значение; target: DOM-узел, к которому применяем (или null, если не найден)
-    // targetLabel: человекочитаемое имя узла для лога
     const setBg = (field, value, target, targetLabel, isImage) => {
       if (!target) { skippedNoElement.push(`${field} (нет узла "${targetLabel}")`); return; }
       if (value === undefined || value === null || value === '') { skippedNoValue.push(field); return; }
@@ -525,112 +630,81 @@ export class ModelFactory {
         applied.push(`${field}=${value}`);
       }
     };
-
     const setColor = (field, value, target, targetLabel) => {
       if (!target) { skippedNoElement.push(`${field} (нет узла "${targetLabel}")`); return; }
       if (value === undefined || value === null || value === '') { skippedNoValue.push(field); return; }
       target.style.color = value;
       applied.push(`${field}=${value}`);
     };
+    // Обновляет background-image УЖЕ существующим .panel-corner / .decor-line узлам
+    // (они есть в разметке этого формата префаба), вместо создания новых.
+    const setExistingBgAll = (field, value, targets, targetsLabel) => {
+      if (!targets || !targets.length) { skippedNoElement.push(`${field} (нет узлов "${targetsLabel}")`); return; }
+      if (!value) { skippedNoValue.push(field); return; }
+      const url = normalizeDesignAsset(value);
+      targets.forEach((t) => {
+        t.style.backgroundImage = `url('${url}')`;
+        t.style.backgroundSize = 'contain';
+        t.style.backgroundRepeat = 'no-repeat';
+      });
+      applied.push(`${field}=${value} → ${url} (${targets.length} узлов)`);
+    };
 
-    if (name === 'MainBlock') {
-      setBg('main_bg_color', p.main_bg_color, el, 'MainBlock', false);
-      setBg('main_bg_image', p.main_bg_image, el, 'MainBlock', true);
-      const titleEl = el.querySelector('[data-field="title"]');
-      if (!titleEl) {
-        skippedNoElement.push('title_color/title_bg_color/title_bg_image (нет узла [data-field="title"])');
+    const sidePanels = el.querySelectorAll('.panels > .side-panel');
+    const leftPanel = sidePanels[0] || null;
+    const rightPanel = sidePanels[1] || null;
+    const mainPanel = el.querySelector('.main-panel');
+    const titleArea = el.querySelector('.title-area');
+    const titleText = el.querySelector('.title-area .title-text');
+    const buttonsArea = el.querySelector('.buttons-area');
+    const bgImgEl = el.querySelector('.bg-img');
+
+    // Фон всего экрана — раньше это поле (back_image) было "сиротой": в CSS3D-формате
+    // не было под него DOM-узла. В этом формате есть .bg-img — наконец применяем.
+    setBg('back_image', p.back_image, bgImgEl, '.bg-img', true);
+
+    setBg('title_bg_color', p.title_bg_color, titleArea, '.title-area', false);
+    setBg('title_bg_image', p.title_bg_image, titleArea, '.title-area', true);
+    setColor('title_color', p.title_color, titleText, '.title-area .title-text');
+
+    setBg('main_bg_color', p.main_bg_color, mainPanel, '.main-panel', false);
+    setBg('main_bg_image', p.main_bg_image, mainPanel, '.main-panel', true);
+    // Отдельного поля цвета main-text в дизайн-префабе нет — по конвенции из
+    // реального экспорта редактора main-text красится тем же золотым, что и title.
+    setColor('title_color', p.title_color, mainPanel?.querySelector('.main-text'), '.main-panel .main-text');
+    setExistingBgAll('main_corner', p.main_corner, mainPanel ? Array.from(mainPanel.querySelectorAll('.panel-corner')) : [], '.main-panel .panel-corner');
+    setExistingBgAll('main_decor1+main_decor2', p.main_decor1 || p.main_decor2, mainPanel ? Array.from(mainPanel.querySelectorAll('.decor-line')) : [], '.main-panel .decor-line');
+
+    setBg('left_bg_color', p.left_bg_color, leftPanel, '.panels > .side-panel[0]', false);
+    setBg('left_bg_image', p.left_bg_image, leftPanel, '.panels > .side-panel[0]', true);
+    if (leftPanel) {
+      const helpLabels = leftPanel.querySelectorAll('.help');
+      if (p.left_help_color && helpLabels.length) {
+        helpLabels.forEach((h) => { h.style.color = p.left_help_color; });
+        applied.push(`left_help_color=${p.left_help_color} (${helpLabels.length} меток)`);
+      } else if (!p.left_help_color) {
+        skippedNoValue.push('left_help_color');
       } else {
-        setColor('title_color', p.title_color, titleEl, 'MainBlock > [data-field="title"]');
-        setBg('title_bg_color', p.title_bg_color, titleEl, 'MainBlock > [data-field="title"]', false);
-        setBg('title_bg_image', p.title_bg_image, titleEl, 'MainBlock > [data-field="title"]', true);
+        skippedNoElement.push('left_help_color (нет узлов .help)');
       }
-      this._applyCorners('main_corner', p.main_corner, el, applied, skippedNoValue);
-      this._applyMainDecorLines(p, el, applied, skippedNoValue);
-    } else if (name === 'LeftHelpBlock') {
-      setBg('left_bg_color', p.left_bg_color, el, 'LeftHelpBlock', false);
-      setBg('left_bg_image', p.left_bg_image, el, 'LeftHelpBlock', true);
-      const helpEl = el.querySelector('[data-field="help"]') || el;
-      setColor('left_help_color', p.left_help_color, helpEl, 'LeftHelpBlock > [data-field="help"] (или сам блок)');
-      this._applyCorners('left_corner', p.left_corner, el, applied, skippedNoValue);
-    } else if (name === 'RightBlock') {
-      setBg('right_bg_color', p.right_bg_color, el, 'RightBlock', false);
-      setBg('right_bg_image', p.right_bg_image, el, 'RightBlock', true);
-      this._applyCorners('right_corner', p.right_corner, el, applied, skippedNoValue);
-    } else if (name === 'ButtonsBlock') {
-      setBg('buttons_bg_color', p.buttons_bg_color, el, 'ButtonsBlock', false);
-      setBg('buttons_bg_image', p.buttons_bg_image, el, 'ButtonsBlock', true);
     } else {
-      console.log(`[ModelFactory._applyDesignToPanel] panel "${name}" has no design mapping → skipped entirely`);
-      return;
+      skippedNoElement.push('left_bg_color/left_bg_image/left_help_color (нет левой .side-panel)');
     }
+    setExistingBgAll('left_corner', p.left_corner, leftPanel ? Array.from(leftPanel.querySelectorAll('.panel-corner')) : [], 'левая .side-panel .panel-corner');
+
+    setBg('right_bg_color', p.right_bg_color, rightPanel, '.panels > .side-panel[1]', false);
+    setBg('right_bg_image', p.right_bg_image, rightPanel, '.panels > .side-panel[1]', true);
+    setExistingBgAll('right_corner', p.right_corner, rightPanel ? Array.from(rightPanel.querySelectorAll('.panel-corner')) : [], 'правая .side-panel .panel-corner');
+
+    setBg('buttons_bg_color', p.buttons_bg_color, buttonsArea, '.buttons-area', false);
+    setBg('buttons_bg_image', p.buttons_bg_image, buttonsArea, '.buttons-area', true);
 
     console.log(
-        `[ModelFactory._applyDesignToPanel] panel="${name}" ` +
+        '[ModelFactory._applyDesignToScreen] ' +
         `applied=[${applied.join('; ') || '—'}] ` +
         `skippedNoValue=[${skippedNoValue.join(', ') || '—'}] ` +
         `skippedNoElement=[${skippedNoElement.join(', ') || '—'}]`
     );
-  }
-
-  /**
-   * Создаёт 4 угловых декора (аналог panel-corner из редакторского HTML-экспорта:
-   * RusStyleElement.png с отражениями по углам). В отличие от редакторской 2D-разметки,
-   * где корни позиционируются с отрицательным офсетом (top:-2px; left:-2px), панели
-   * в artargetPrefabNew.html имеют `overflow: hidden`, поэтому такой офсет обрежется —
-   * ставим декор строго по внутренним краям (0/0), без нахлёста на border.
-   * Динамическая вставка (а не разметка в HTML-префабе) — чтобы не требовать правок
-   * в самом server-side prefab-файле.
-   */
-  _applyCorners(field, imageName, el, applied, skippedNoValue) {
-    if (!imageName) { skippedNoValue.push(field); return; }
-    const url = normalizeDesignAsset(imageName);
-    const corners = [
-      { pos: 'top:0; left:0;', transform: '' },
-      { pos: 'top:0; right:0;', transform: 'scaleX(-1)' },
-      { pos: 'bottom:0; left:0;', transform: 'scaleY(-1)' },
-      { pos: 'bottom:0; right:0;', transform: 'scale(-1)' }
-    ];
-    for (const c of corners) {
-      const d = document.createElement('div');
-      d.className = 'ar-panel-corner';
-      d.style.cssText =
-          `position:absolute; ${c.pos} width:14px; height:14px; ` +
-          `background-image:url('${url}'); background-size:contain; background-repeat:no-repeat; ` +
-          `pointer-events:none; transform:${c.transform};`;
-      el.appendChild(d);
-    }
-    applied.push(`${field}=${imageName} → ${url} (4 угла, offset 0/0 из-за overflow:hidden)`);
-  }
-
-  /**
-   * Декор-линии над/под содержимым MainBlock (аналог MainText_Decor_2lines_line1/line2
-   * из редакторского экспорта). Ставятся первым/последним ребёнком панели (обрамление
-   * всего блока сверху/снизу), а не между title/question/mainText — у AR-панели все три
-   * поля идут одним потоком, и точное позиционирование "вокруг main-text как в редакторе"
-   * потребовало бы менять сам HTML-префаб; это сознательное упрощение.
-   */
-  _applyMainDecorLines(p, el, applied, skippedNoValue) {
-    const mkLine = (imageName) => {
-      const url = normalizeDesignAsset(imageName);
-      const d = document.createElement('div');
-      d.className = 'ar-panel-decor-line';
-      d.style.cssText =
-          `width:80%; height:5px; margin:4px auto; align-self:center; ` +
-          `background-image:url('${url}'); background-size:contain; background-repeat:no-repeat; background-position:center;`;
-      return d;
-    };
-    if (p.main_decor1) {
-      el.insertBefore(mkLine(p.main_decor1), el.firstChild);
-      applied.push(`main_decor1=${p.main_decor1} (сверху)`);
-    } else {
-      skippedNoValue.push('main_decor1');
-    }
-    if (p.main_decor2) {
-      el.appendChild(mkLine(p.main_decor2));
-      applied.push(`main_decor2=${p.main_decor2} (снизу)`);
-    } else {
-      skippedNoValue.push('main_decor2');
-    }
   }
 
   _buildQuestionBody(bodyEl, data, onAnswer, ui, arInput) {
