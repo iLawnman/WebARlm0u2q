@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>WebXR AR — Куб на полу</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #05070d;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  #webgl-container {
+    position: absolute;
+    inset: 0;
+  }
+
+  #hint {
+    position: absolute;
+    z-index: 3;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #e2e8f0;
+    font-size: 13px;
+    background: rgba(11, 17, 32, 0.65);
+    padding: 8px 16px;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    pointer-events: none;
+    text-align: center;
+    max-width: 90%;
+  }
+
+  #unsupported {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #94a3b8;
+    padding: 32px;
+  }
+
+  #unsupported h2 { color: #f8fafc; margin-bottom: 12px; }
+
+  /* --- DOM Overlay UI (only actually shown while an AR session is active) --- */
+  #ar-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    display: none;
+  }
+
+  #info-toggle {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: auto;
+    padding: 12px 24px;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    background: rgba(17, 24, 39, 0.85);
+    color: #f8fafc;
+    font-size: 14px;
+    font-weight: 600;
+    backdrop-filter: blur(6px);
+  }
+
+  #info-panel {
+    position: absolute;
+    left: 50%;
+    bottom: 76px;
+    transform: translateX(-50%) translateY(20px);
+    width: min(92vw, 420px);
+    height: min(65vh, 640px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+    background: #0b1120;
+  }
+
+  #info-panel.open {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    pointer-events: auto;
+  }
+
+  #info-panel iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+  }
+
+  #place-hint {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: none;
+    color: #f8fafc;
+    background: rgba(11, 17, 32, 0.65);
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 13px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+  }
+</style>
+</head>
+<body>
+
+<div id="webgl-container"></div>
+<div id="hint">Наведите камеру на пол — появится маркер. Коснитесь экрана, чтобы поставить куб.</div>
+
+<div id="unsupported">
+  <div>
+    <h2>WebXR AR недоступен</h2>
+    <p>Откройте страницу на Android-устройстве в Chrome (ARCore) по HTTPS,<br>
+       или на устройстве с поддержкой WebXR immersive-ar.</p>
+  </div>
+</div>
+
+<!-- DOM Overlay: рендерится браузером поверх камеры прямо во время AR-сессии -->
+<div id="ar-overlay">
+  <div id="place-hint">Коснитесь пола, чтобы поставить куб</div>
+  <button id="info-toggle">ℹ️ О платформе</button>
+  <div id="info-panel">
+    <iframe src="about.html"></iframe>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { ARButton } from 'three/addons/webxr/ARButton.js';
+
+const webglContainer = document.getElementById('webgl-container');
+const hint = document.getElementById('hint');
+const unsupportedEl = document.getElementById('unsupported');
+const arOverlay = document.getElementById('ar-overlay');
+const infoToggle = document.getElementById('info-toggle');
+const infoPanel = document.getElementById('info-panel');
+const placeHint = document.getElementById('place-hint');
+
+// ---------- Basic WebXR support check ----------
+if (!('xr' in navigator)) {
+  unsupportedEl.style.display = 'flex';
+} else {
+  navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+    if (!supported) unsupportedEl.style.display = 'flex';
+  }).catch(() => { unsupportedEl.style.display = 'flex'; });
+}
+
+// ---------- Scene / Camera ----------
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(
+  70,
+  window.innerWidth / window.innerHeight,
+  0.01,
+  20
+);
+
+// ---------- Renderer ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.xr.enabled = true;
+webglContainer.appendChild(renderer.domElement);
+
+// ---------- AR entry button (camera passthrough + floor hit-test + DOM overlay) ----------
+const arButton = ARButton.createButton(renderer, {
+  requiredFeatures: ['hit-test'],
+  optionalFeatures: ['local-floor', 'dom-overlay'],
+  domOverlay: { root: document.getElementById('ar-overlay') }
+});
+document.body.appendChild(arButton);
+
+// ---------- Lights ----------
+scene.add(new THREE.HemisphereLight(0xffffff, 0x333344, 1.2));
+
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+dirLight.position.set(2, 4, 2);
+scene.add(dirLight);
+
+// ---------- Reticle (floor marker) ----------
+const reticleGeometry = new THREE.RingGeometry(0.08, 0.1, 32).rotateX(-Math.PI / 2);
+const reticleMaterial = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
+const reticle = new THREE.Mesh(reticleGeometry, reticleMaterial);
+reticle.matrixAutoUpdate = false;
+reticle.visible = false;
+scene.add(reticle);
+
+// ---------- Cube (placed on the real floor) ----------
+const cubeSize = 0.18;
+const cube = new THREE.Mesh(
+  new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize),
+  new THREE.MeshStandardMaterial({
+    color: 0x6366f1,
+    metalness: 0.3,
+    roughness: 0.35,
+    emissive: 0x1e1b4b,
+    emissiveIntensity: 0.4,
+  })
+);
+cube.visible = false;
+scene.add(cube);
+
+const edges = new THREE.LineSegments(
+  new THREE.EdgesGeometry(cube.geometry),
+  new THREE.LineBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.7 })
+);
+edges.visible = false;
+scene.add(edges);
+
+// ---------- Hit-test state ----------
+let hitTestSource = null;
+let hitTestSourceRequested = false;
+let placed = false;
+
+renderer.xr.addEventListener('sessionstart', () => {
+  placed = false;
+  cube.visible = false;
+  edges.visible = false;
+  reticle.visible = false;
+  hitTestSourceRequested = false;
+  hitTestSource = null;
+  placeHint.style.display = 'block';
+});
+
+renderer.xr.addEventListener('sessionend', () => {
+  hitTestSource = null;
+  hitTestSourceRequested = false;
+});
+
+// Tap on screen (XR "select" event) -> place / move cube to reticle position
+function onSelect() {
+  if (!reticle.visible) return;
+  cube.position.setFromMatrixPosition(reticle.matrix);
+  cube.position.y += cubeSize / 2;
+  edges.position.copy(cube.position);
+  cube.visible = true;
+  edges.visible = true;
+  placed = true;
+  placeHint.style.display = 'none';
+}
+
+const controller = renderer.xr.getController(0);
+controller.addEventListener('select', onSelect);
+scene.add(controller);
+
+// ---------- Info panel toggle (DOM overlay UI) ----------
+infoToggle.addEventListener('click', () => {
+  infoPanel.classList.toggle('open');
+});
+
+// ---------- Resize ----------
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ---------- Animation / render loop ----------
+const clock = new THREE.Clock();
+
+renderer.setAnimationLoop((timestamp, frame) => {
+  if (frame) {
+    const session = renderer.xr.getSession();
+    const referenceSpace = renderer.xr.getReferenceSpace();
+
+    hint.style.display = 'none';
+    arOverlay.style.display = 'block';
+
+    if (!hitTestSourceRequested) {
+      session.requestReferenceSpace('viewer').then((viewerSpace) => {
+        session.requestHitTestSource({ space: viewerSpace }).then((source) => {
+          hitTestSource = source;
+        });
+      });
+      session.addEventListener('end', () => {
+        hitTestSourceRequested = false;
+        hitTestSource = null;
+      });
+      hitTestSourceRequested = true;
+    }
+
+    if (hitTestSource) {
+      const hitTestResults = frame.getHitTestResults(hitTestSource);
+      if (hitTestResults.length > 0 && !placed) {
+        const hit = hitTestResults[0];
+        const pose = hit.getPose(referenceSpace);
+        reticle.visible = true;
+        reticle.matrix.fromArray(pose.transform.matrix);
+      } else if (!placed) {
+        reticle.visible = false;
+      } else {
+        reticle.visible = false;
+      }
+    }
+  } else {
+    arOverlay.style.display = 'none';
+  }
+
+  if (placed) {
+    const t = clock.getElapsedTime();
+    cube.rotation.y = t * 0.6;
+    edges.rotation.copy(cube.rotation);
+  }
+
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>
