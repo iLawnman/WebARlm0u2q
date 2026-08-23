@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>fix 1 Troika 3D UI — WebXR AR Panel</title>
+<title>import fix Troika 3D UI — WebXR AR Panel</title>
 <style>
   html, body {
     margin: 0;
@@ -93,17 +93,15 @@
 </div>
 
 <script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
-    "troika-three-utils": "https://unpkg.com/troika-three-utils@0.50.0/dist/troika-three-utils.esm.js",
-    "troika-worker-utils": "https://unpkg.com/troika-worker-utils@0.50.0/dist/troika-worker-utils.esm.js",
-    "troika-three-text": "https://unpkg.com/troika-three-text@0.50.0/dist/troika-three-text.esm.js",
-    "troika-3d": "https://unpkg.com/troika-3d@0.50.0/dist/troika-3d.esm.js",
-    "troika-3d-ui": "https://unpkg.com/troika-3d-ui@0.50.0/dist/troika-3d-ui.esm.js"
-  }
-}
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+        "troika-3d-ui": "https://esm.sh/troika-3d-ui@0.50.0?external=three",
+        "troika-3d": "https://esm.sh/troika-3d@0.50.0?external=three",
+        "troika-three-text": "https://esm.sh/troika-three-text@0.50.0?external=three"
+      }
+    }
 </script>
 
 <script type="module">
