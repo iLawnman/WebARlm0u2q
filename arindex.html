@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>WebXR AR — Куб на полу + DOM Overlay панель</title>
+<title>dom but fix — Куб на полу + DOM Overlay панель</title>
 <style>
   html, body {
     margin: 0;
@@ -229,6 +229,39 @@ debugBtn.addEventListener('click', () => {
   logToOverlay('Клик по кнопке в WebXR DOM Overlay сработал ✅');
 });
 
+// ---------- Freeze panel tracking while the user is actively touching it ----------
+// The panel's screen position is recalculated every XR frame to follow the
+// 3D anchor. That's fine while idle, but if we keep rewriting
+// anchorPanel.style.transform WHILE a finger is down (scrolling the iframe,
+// or tapping the debug button), the target keeps moving under the touch and
+// both native scroll and click/tap synthesis break. So: freeze position
+// updates for the duration of any touch/pointer interaction on the panel.
+let interacting = false;
+
+anchorPanel.addEventListener('pointerdown', () => { interacting = true; });
+anchorPanel.addEventListener('touchstart', () => { interacting = true; }, { passive: true });
+window.addEventListener('pointerup', () => { interacting = false; });
+window.addEventListener('pointercancel', () => { interacting = false; });
+window.addEventListener('touchend', () => { interacting = false; }, { passive: true });
+window.addEventListener('touchcancel', () => { interacting = false; }, { passive: true });
+
+// Touches inside the <iframe> happen in a separate document and never bubble
+// out to the parent page, so the listeners above alone won't see them.
+// about.html is same-origin, so we can reach into its document directly.
+const panelIframe = anchorPanel.querySelector('iframe');
+panelIframe.addEventListener('load', () => {
+  try {
+    const doc = panelIframe.contentDocument;
+    doc.addEventListener('touchstart', () => { interacting = true; }, { passive: true });
+    doc.addEventListener('touchend', () => { interacting = false; }, { passive: true });
+    doc.addEventListener('touchcancel', () => { interacting = false; }, { passive: true });
+    doc.addEventListener('pointerdown', () => { interacting = true; });
+    doc.addEventListener('pointerup', () => { interacting = false; });
+  } catch (err) {
+    console.warn('Could not attach listeners inside iframe (cross-origin?)', err);
+  }
+});
+
 // ---------- Basic WebXR support check ----------
 if (!('xr' in navigator)) {
   unsupportedEl.style.display = 'flex';
@@ -358,6 +391,7 @@ const camWorldPos = new THREE.Vector3();
 
 function updateAnchoredPanel() {
   if (!placed) return;
+  if (interacting) return; // don't fight the user's finger mid-scroll/tap
 
   camera.getWorldPosition(camWorldPos);
   const distance = camWorldPos.distanceTo(panelAnchor);
