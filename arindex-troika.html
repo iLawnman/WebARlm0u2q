@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Troika 3D UI — WebXR AR Panel</title>
+<title>fix 1 Troika 3D UI — WebXR AR Panel</title>
 <style>
   html, body {
     margin: 0;
@@ -18,11 +18,12 @@
   #webgl-container {
     position: absolute;
     inset: 0;
+    z-index: 1;
   }
 
   #hint {
     position: absolute;
-    z-index: 3;
+    z-index: 10;
     top: 16px;
     left: 50%;
     transform: translateX(-50%);
@@ -34,21 +35,48 @@
     border: 1px solid rgba(148, 163, 184, 0.25);
     pointer-events: none;
     text-align: center;
+    max-width: 90%;
   }
 
   #unsupported {
     position: absolute;
     inset: 0;
-    z-index: 5;
+    z-index: 20;
     display: none;
     align-items: center;
     justify-content: center;
     text-align: center;
     color: #94a3b8;
     padding: 32px;
+    background: #05070d;
   }
 
   #unsupported h2 { color: #f8fafc; margin-bottom: 12px; }
+
+  /* Стилизация и принудительное отображение кнопки ARButton из Three.js */
+  #ARButton {
+    position: absolute !important;
+    bottom: 30px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    z-index: 9999 !important;
+    padding: 12px 24px !important;
+    border: 1px solid rgba(99, 102, 241, 0.5) !important;
+    border-radius: 999px !important;
+    background: rgba(15, 23, 42, 0.85) !important;
+    color: #f8fafc !important;
+    font-family: inherit !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
+    backdrop-filter: blur(8px) !important;
+    transition: all 0.2s ease !important;
+  }
+
+  #ARButton:active {
+    transform: translateX(-50%) scale(0.96) !important;
+  }
 </style>
 </head>
 <body>
@@ -88,15 +116,6 @@ const webglContainer = document.getElementById('webgl-container');
 const hint = document.getElementById('hint');
 const unsupportedEl = document.getElementById('unsupported');
 
-// Check XR support
-if (!('xr' in navigator)) {
-  unsupportedEl.style.display = 'flex';
-} else {
-  navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-    if (!supported) unsupportedEl.style.display = 'flex';
-  }).catch(() => { unsupportedEl.style.display = 'flex'; });
-}
-
 // ---------- Scene Setup ----------
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
@@ -107,16 +126,25 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.xr.enabled = true;
 webglContainer.appendChild(renderer.domElement);
 
-// Инициализация менеджера событий кликов/поинтеров Troika в 3D
-const raycaster = new THREE.Raycaster();
+// Инициализация взаимодействия Troika
 const raycastController = initInteraction(renderer, camera, scene);
 
-// ---------- AR Setup ----------
+// ---------- AR Button Restoration ----------
 const arButton = ARButton.createButton(renderer, {
   requiredFeatures: ['hit-test'],
   optionalFeatures: ['local-floor']
 });
+arButton.id = 'ARButton';
 document.body.appendChild(arButton);
+
+// Проверка поддержки WebXR AR
+if (!('xr' in navigator)) {
+  unsupportedEl.style.display = 'flex';
+} else {
+  navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+    if (!supported) unsupportedEl.style.display = 'flex';
+  }).catch(() => { unsupportedEl.style.display = 'flex'; });
+}
 
 // ---------- Lights ----------
 scene.add(new THREE.HemisphereLight(0xffffff, 0x333344, 1.2));
@@ -157,10 +185,9 @@ scene.add(edges);
 // ---------- Troika 3D UI Panel ----------
 let debugClickCount = 0;
 
-// Корневой 3D UI контейнер Troika
 const uiPanel = new Block({
   width: 0.6,
-  height: 0.7,
+  height: 0.65,
   padding: 0.03,
   flexDirection: 'column',
   justifyContent: 'space-between',
@@ -174,15 +201,13 @@ const uiPanel = new Block({
   visible: false
 });
 
-// Заголовок панели
 const titleText = new Text({
   text: 'Troika 3D UI Panel',
-  fontSize: 0.045,
+  fontSize: 0.04,
   color: 0x67e8f9,
   marginBottom: 0.02
 });
 
-// Контентный блок (вместо iframe)
 const contentBlock = new Block({
   width: '100%',
   flex: 1,
@@ -193,18 +218,17 @@ const contentBlock = new Block({
 });
 
 const bodyText = new Text({
-  text: 'Это нативная 3D UI Панель, созданная с использованием Troika-3D-UI.\n\nОна живет прямо в 3D пространстве WebXR, не требует DOM-проекций и поддерживает raycast-клики.',
-  fontSize: 0.025,
+  text: 'Панель отрендерена внутри 3D-сцены с помощью Troika UI.\n\nПоддерживает нативный Raycasting и клики через XR-контроллер.',
+  fontSize: 0.024,
   color: 0x94a3b8,
   maxWidth: 0.5
 });
 
 contentBlock.add(bodyText);
 
-// Debug Кнопка и Логи
 const debugLogText = new Text({
-  text: 'Лог кликов: лог пуст…',
-  fontSize: 0.022,
+  text: 'Лог кликов: ожидает клика…',
+  fontSize: 0.02,
   color: 0x67e8f9,
   marginTop: 0.01
 });
@@ -219,7 +243,7 @@ const testButton = new Button({
   onClick: (evt) => {
     debugClickCount++;
     const time = new Date().toLocaleTimeString('ru-RU', { hour12: false });
-    const logMsg = `[${time}] #${debugClickCount} Клик по 3D кнопке Troika!`;
+    const logMsg = `[${time}] #${debugClickCount} Клик по 3D кнопке ✅`;
     debugLogText.text = logMsg;
     debugLogText.sync();
     console.log('[Troika 3D UI]', logMsg);
@@ -228,12 +252,11 @@ const testButton = new Button({
 
 const buttonText = new Text({
   text: '🧪 Тест клика (Troika Event)',
-  fontSize: 0.025,
+  fontSize: 0.024,
   color: 0xffffff
 });
 testButton.add(buttonText);
 
-// Сборка UI
 uiPanel.add(titleText);
 uiPanel.add(contentBlock);
 uiPanel.add(testButton);
@@ -259,29 +282,22 @@ renderer.xr.addEventListener('sessionstart', () => {
 function onSelect() {
   if (!reticle.visible || placed) return;
 
-  // Размещение куба
   cube.position.setFromMatrixPosition(reticle.matrix);
   cube.position.y += cubeSize / 2;
   edges.position.copy(cube.position);
   cube.visible = true;
   edges.visible = true;
 
-  // Размещение Troika UI панели ровно над кубом
-  uiPanel.position.set(cube.position.x, cube.position.y + 0.5, cube.position.z);
-  
-  // Панель всегда смотрит на камеру (Billboarding)
+  uiPanel.position.set(cube.position.x, cube.position.y + 0.45, cube.position.z);
   uiPanel.quaternion.copy(camera.quaternion);
   uiPanel.visible = true;
-  
-  // Принудительная синхронизация лэйаута Troika UI
   uiPanel.afterUpdateMatrixWorld();
 
   placed = true;
 }
 
 const controller = renderer.xr.getController(0);
-controller.addEventListener('select', (evt) => {
-  // Если не кликнули по 3D UI, ставим куб
+controller.addEventListener('select', () => {
   if (!placed) {
     onSelect();
   }
@@ -336,7 +352,7 @@ renderer.setAnimationLoop((timestamp, frame) => {
     cube.rotation.y = t * 0.6;
     edges.rotation.copy(cube.rotation);
 
-    // Разворачиваем панель к камере (Billboarding)
+    // Панель всегда смотрит на камеру
     uiPanel.quaternion.copy(camera.quaternion);
   }
 
