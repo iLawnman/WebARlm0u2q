@@ -2,10 +2,10 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>WebXR Multiple Anchors placement</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Х WebXR Android Touch Fix</title>
     <style>
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; touch-action: none; }
         body {
             margin: 0;
             padding: 0;
@@ -16,6 +16,7 @@
         #canvas-container {
             width: 100vw;
             height: 100vh;
+            touch-action: none;
         }
         #hint {
             position: absolute;
@@ -23,7 +24,7 @@
             left: 50%;
             transform: translateX(-50%);
             color: #ffffff;
-            background: rgba(0, 0, 0, 0.6);
+            background: rgba(0, 0, 0, 0.65);
             padding: 10px 20px;
             border-radius: 20px;
             font-size: 14px;
@@ -42,7 +43,7 @@
     </script>
 </head>
 <body>
-    <div id="hint">Нажимайте на пол, чтобы ставить новые объекты</div>
+    <div id="hint">Коснитесь пола, чтобы поставить объект</div>
     <div id="canvas-container"></div>
 
     <script type="module">
@@ -83,7 +84,7 @@
         scene.add(floorGrid);
 
         const floorPlane = new THREE.Mesh(
-            new THREE.PlaneGeometry(20, 20),
+            new THREE.PlaneGeometry(30, 30),
             new THREE.MeshBasicMaterial({ visible: false })
         );
         floorPlane.rotation.x = -Math.PI / 2;
@@ -91,7 +92,7 @@
 
         const placedObjects = [];
 
-        // 5. Текстура UI Панели
+        // 5. Текстура UI
         function createUIPanelCanvas() {
             const canvas = document.createElement('canvas');
             canvas.width = 1024;
@@ -194,15 +195,15 @@
             document.getElementById('hint').innerText = `Создано объектов: ${placedObjects.length}`;
         }
 
-        // 6. Фикс: слушаем клик строго на 3D Canvas элемент (а не window/body)
+        // 6. Фикс сенсорного ввода на Android (Обычный 3D-режим)
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
 
-        renderer.domElement.addEventListener('pointerdown', (event) => {
+        function handleTouchOrClick(clientX, clientY) {
             if (renderer.xr.isPresenting) return;
 
-            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            mouse.x = (clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(clientY / window.innerHeight) * 2 + 1;
 
             raycaster.setFromCamera(mouse, camera);
             const intersects = raycaster.intersectObject(floorPlane);
@@ -211,6 +212,32 @@
                 const pt = intersects[0].point;
                 createNewAnchorInstance(pt.x, pt.y, pt.z);
             }
+        }
+
+        // Используем touchend / click с отслеживанием смещения пальца
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        renderer.domElement.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            }
+        }, { passive: true });
+
+        renderer.domElement.addEventListener('touchend', (e) => {
+            if (e.changedTouches.length === 1) {
+                const deltaX = Math.abs(e.changedTouches[0].clientX - touchStartX);
+                const deltaY = Math.abs(e.changedTouches[0].clientY - touchStartY);
+                // Проверяем, что это тап, а не свайп кадра (OrbitControls)
+                if (deltaX < 10 && deltaY < 10) {
+                    handleTouchOrClick(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+                }
+            }
+        });
+
+        renderer.domElement.addEventListener('click', (e) => {
+            handleTouchOrClick(e.clientX, e.clientY);
         });
 
         // 7. AR сессия (WebXR)
