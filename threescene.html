@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>WebXR Placement & UI Anchor</title>
+    <title>WebXR Multiple Anchors placement</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -42,7 +42,7 @@
     </script>
 </head>
 <body>
-    <div id="hint">Нажмите на пол, чтобы установить объект</div>
+    <div id="hint">Нажимайте на пол, чтобы ставить новые объекты</div>
     <div id="canvas-container"></div>
 
     <script type="module">
@@ -55,16 +55,16 @@
         scene.background = new THREE.Color(0x0e0f14);
 
         const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 100);
-        camera.position.set(0, 1.2, 2.5);
+        camera.position.set(0, 1.8, 3.5);
 
-        // 2. Рендерер с настройкой Hit-Test для WebXR
+        // 2. Рендерер
+        const container = document.getElementById('canvas-container');
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.xr.enabled = true;
-        document.getElementById('canvas-container').appendChild(renderer.domElement);
+        container.appendChild(renderer.domElement);
 
-        // AR Кнопка с запросом функции поиска поверхностей (hit-test)
         document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
 
         const controls = new OrbitControls(camera, renderer.domElement);
@@ -78,36 +78,20 @@
         dirLight.position.set(5, 10, 7);
         scene.add(dirLight);
 
-        // 4. Плоскость пола (для кликов в обычном 3D-режиме)
+        // 4. Пол
         const floorGrid = new THREE.GridHelper(10, 20, 0x444444, 0x222222);
-        floorGrid.position.y = 0;
         scene.add(floorGrid);
 
         const floorPlane = new THREE.Mesh(
-            new THREE.PlaneGeometry(10, 10),
+            new THREE.PlaneGeometry(20, 20),
             new THREE.MeshBasicMaterial({ visible: false })
         );
         floorPlane.rotation.x = -Math.PI / 2;
         scene.add(floorPlane);
 
-        // 5. Контейнер Якоря (Якорь объекта)
-        const anchorGroup = new THREE.Group();
-        anchorGroup.visible = false; // Скрыт до клика
-        scene.add(anchorGroup);
+        const placedObjects = [];
 
-        // Куб (Нижней гранью стоит на пол)
-        const cubeSize = 0.55;
-        const cubeGeometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
-        const cubeMaterial = new THREE.MeshStandardMaterial({
-            color: 0x338266,
-            roughness: 0.3,
-            metalness: 0.1
-        });
-        const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-        cube.position.set(0, cubeSize / 2, 0); // Центрируем относительно пола
-        anchorGroup.add(cube);
-
-        // Генерация Canvas-текстуры UI
+        // 5. Текстура UI Панели
         function createUIPanelCanvas() {
             const canvas = document.createElement('canvas');
             canvas.width = 1024;
@@ -180,34 +164,42 @@
             return canvas;
         }
 
-        // Привязка UI-панели к якорю
-        const uiCanvas = createUIPanelCanvas();
-        const uiTexture = new THREE.CanvasTexture(uiCanvas);
-        uiTexture.minFilter = THREE.LinearFilter;
-        uiTexture.magFilter = THREE.LinearFilter;
+        const sharedCanvas = createUIPanelCanvas();
+        const sharedUiTexture = new THREE.CanvasTexture(sharedCanvas);
+        sharedUiTexture.minFilter = THREE.LinearFilter;
+        sharedUiTexture.magFilter = THREE.LinearFilter;
 
-        const uiGeometry = new THREE.PlaneGeometry(1.3, 1.015);
-        const uiMaterial = new THREE.MeshBasicMaterial({
-            map: uiTexture,
-            transparent: true,
-            side: THREE.DoubleSide
-        });
+        const cubeSize = 0.55;
+        const cubeGeo = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
+        const cubeMat = new THREE.MeshStandardMaterial({ color: 0x338266, roughness: 0.3, metalness: 0.1 });
 
-        const uiMesh = new THREE.Mesh(uiGeometry, uiMaterial);
-        // Позиция панели жестко зафиксирована над кубом в системе координат Якоря
-        uiMesh.position.set(0, cubeSize + 0.6, 0);
-        anchorGroup.add(uiMesh);
+        const uiGeo = new THREE.PlaneGeometry(1.3, 1.015);
+        const uiMat = new THREE.MeshBasicMaterial({ map: sharedUiTexture, transparent: true, side: THREE.DoubleSide });
 
-        // 6. Логика установки объекта (Raycasting и WebXR Hit-Test)
+        function createNewAnchorInstance(x, y, z) {
+            const group = new THREE.Group();
+
+            const cube = new THREE.Mesh(cubeGeo, cubeMat);
+            cube.position.set(0, cubeSize / 2, 0);
+            group.add(cube);
+
+            const uiMesh = new THREE.Mesh(uiGeo, uiMat);
+            uiMesh.position.set(0, cubeSize + 0.6, 0);
+            group.add(uiMesh);
+
+            group.position.set(x, y, z);
+            scene.add(group);
+
+            placedObjects.push({ group, cube });
+            document.getElementById('hint').innerText = `Создано объектов: ${placedObjects.length}`;
+        }
+
+        // 6. Фикс: слушаем клик строго на 3D Canvas элемент (а не window/body)
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
 
-        let xrHitTestSource = null;
-        let xrHitTestLocalSpace = null;
-
-        // Поле ввода для касаний/кликов
-        window.addEventListener('pointerdown', (event) => {
-            if (renderer.xr.isPresenting) return; // В AR режиме клик обрабатывается через selectEvent
+        renderer.domElement.addEventListener('pointerdown', (event) => {
+            if (renderer.xr.isPresenting) return;
 
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -216,28 +208,21 @@
             const intersects = raycaster.intersectObject(floorPlane);
 
             if (intersects.length > 0) {
-                const point = intersects[0].point;
-                placeAnchor(point.x, point.y, point.z);
+                const pt = intersects[0].point;
+                createNewAnchorInstance(pt.x, pt.y, pt.z);
             }
         });
 
-        // Функция фиксации якоря в точке
-        function placeAnchor(x, y, z) {
-            anchorGroup.position.set(x, y, z);
-            anchorGroup.visible = true;
-            document.getElementById('hint').innerText = 'Объект и панель привязаны к пол';
-        }
-
-        // WebXR Контроллер для AR на Android
+        // 7. AR сессия (WebXR)
+        let xrHitTestSource = null;
         const controller = renderer.xr.getController(0);
         controller.addEventListener('select', () => {
             if (reticle.visible) {
-                placeAnchor(reticle.position.x, reticle.position.y, reticle.position.z);
+                createNewAnchorInstance(reticle.position.x, reticle.position.y, reticle.position.z);
             }
         });
         scene.add(controller);
 
-        // AR Маркер (Reticle) при сканировании пола
         const reticle = new THREE.Mesh(
             new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2),
             new THREE.MeshBasicMaterial({ color: 0x40e0d0 })
@@ -246,13 +231,12 @@
         reticle.visible = false;
         scene.add(reticle);
 
-        // 7. Основной цикл рендеринга
+        // 8. Цикл рендеринга
         renderer.setAnimationLoop((timestamp, frame) => {
-            if (anchorGroup.visible) {
-                cube.rotation.y += 0.005; // Вращение куба внутри родительской группы
-            }
+            placedObjects.forEach(item => {
+                item.cube.rotation.y += 0.005;
+            });
 
-            // WebXR Hit-Test логика для Android AR
             if (frame && renderer.xr.isPresenting) {
                 const referenceSpace = renderer.xr.getReferenceSpace();
                 const session = renderer.xr.getSession();
