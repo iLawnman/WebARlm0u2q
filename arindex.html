@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>DOM Overlays WebXR AR — Куб и панель на полу</title>
+<title>WebXR AR — Куб на полу + DOM Overlay панель</title>
 <style>
   html, body {
     margin: 0;
@@ -51,9 +51,13 @@
 
   #unsupported h2 { color: #f8fafc; margin-bottom: 12px; }
 
-  /* Minimal DOM overlay: just a short instruction while the AR session
-     is running. The about.html content itself now lives IN the 3D scene
-     (baked onto a textured plane), not in this overlay. */
+  /* ---------- WebXR DOM Overlay root ----------
+     Everything the browser composites on top of the AR camera feed during
+     the immersive session lives here. #anchor-panel is NOT centered by
+     CSS — its position/scale are recalculated every frame in JS by
+     projecting a 3D world point (above the cube) into screen space, so it
+     visually tracks the object as the camera moves, while still being a
+     real, clickable/scrollable DOM element (unlike a baked 3D texture). */
   #ar-overlay {
     position: fixed;
     inset: 0;
@@ -75,18 +79,38 @@
     border: 1px solid rgba(148, 163, 184, 0.25);
   }
 
-  #loading-badge {
+  #anchor-panel {
     position: absolute;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%);
+    top: 0;
+    left: 0;
+    width: 340px;
+    height: 240px;
+    transform-origin: 50% 100%; /* bottom-center = the 3D anchor point */
+    opacity: 0;
+    visibility: hidden;
     pointer-events: none;
-    color: #94a3b8;
-    background: rgba(11, 17, 32, 0.65);
-    padding: 6px 14px;
-    border-radius: 999px;
-    font-size: 12px;
-    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+    background: #0b1120;
+    transition: opacity 0.15s linear;
+    will-change: transform, opacity;
+  }
+
+  #anchor-panel.visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  #anchor-panel iframe {
+    width: 320px;   /* fixed logical size, CSS transform below handles scaling */
+    height: 620px;
+    border: 0;
+    display: block;
+    transform: scale(1.0625); /* 340/320 to fill panel width */
+    transform-origin: top left;
   }
 </style>
 </head>
@@ -103,8 +127,12 @@
   </div>
 </div>
 
+<!-- WebXR DOM Overlay root: passed to ARButton as domOverlay.root -->
 <div id="ar-overlay">
   <div id="place-hint">Коснитесь пола, чтобы поставить куб и панель</div>
+  <div id="anchor-panel">
+    <iframe src="about.html" scrolling="yes"></iframe>
+  </div>
 </div>
 
 <script type="importmap">
@@ -119,13 +147,13 @@
 <script type="module">
 import * as THREE from 'three';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
-import html2canvas from 'https://esm.sh/html2canvas@1.4.1';
 
 const webglContainer = document.getElementById('webgl-container');
 const hint = document.getElementById('hint');
 const unsupportedEl = document.getElementById('unsupported');
 const arOverlay = document.getElementById('ar-overlay');
 const placeHint = document.getElementById('place-hint');
+const anchorPanel = document.getElementById('anchor-panel');
 
 // ---------- Basic WebXR support check ----------
 if (!('xr' in navigator)) {
@@ -153,11 +181,11 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.xr.enabled = true;
 webglContainer.appendChild(renderer.domElement);
 
-// ---------- AR entry button (camera passthrough + floor hit-test) ----------
+// ---------- AR entry button: hit-test + DOM Overlay ----------
 const arButton = ARButton.createButton(renderer, {
   requiredFeatures: ['hit-test'],
   optionalFeatures: ['local-floor', 'dom-overlay'],
-  domOverlay: { root: document.getElementById('ar-overlay') }
+  domOverlay: { root: arOverlay }
 });
 document.body.appendChild(arButton);
 
@@ -198,71 +226,9 @@ const edges = new THREE.LineSegments(
 edges.visible = false;
 scene.add(edges);
 
-// ---------- about.html baked into a 3D panel (textured plane, part of the scene) ----------
-let panelMesh = null;
-let panelSize = { width: 0.55, height: 0.4 };
-let panelReady = false;
-const loadingBadge = document.createElement('div');
-loadingBadge.id = 'loading-badge';
-loadingBadge.textContent = 'Готовим 3D-панель…';
-document.body.appendChild(loadingBadge);
-
-const hiddenFrame = document.createElement('iframe');
-hiddenFrame.src = 'about.html';
-hiddenFrame.style.position = 'fixed';
-hiddenFrame.style.left = '-99999px';
-hiddenFrame.style.top = '0';
-hiddenFrame.style.width = '900px';
-hiddenFrame.style.height = '600px';
-hiddenFrame.style.border = '0';
-document.body.appendChild(hiddenFrame);
-
-hiddenFrame.addEventListener('load', async () => {
-  try {
-    await new Promise((r) => setTimeout(r, 400)); // let webfonts/images settle
-    const doc = hiddenFrame.contentDocument;
-    const fullHeight = Math.min(doc.documentElement.scrollHeight, 6000);
-    hiddenFrame.style.height = fullHeight + 'px';
-    await new Promise((r) => setTimeout(r, 150));
-
-    const canvas = await html2canvas(doc.body, {
-      width: 900,
-      height: fullHeight,
-      windowWidth: 900,
-      windowHeight: fullHeight,
-      backgroundColor: '#0b1120',
-      scale: 1.5,
-      useCORS: true,
-    });
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.needsUpdate = true;
-
-    const aspect = canvas.width / canvas.height;
-    const panelWidth = 0.6; // meters, real-world scale in AR
-    const panelHeight = panelWidth / aspect;
-    panelSize = { width: panelWidth, height: panelHeight };
-
-    const geometry = new THREE.PlaneGeometry(panelWidth, panelHeight);
-    const material = new THREE.MeshBasicMaterial({
-      map: texture,
-      side: THREE.DoubleSide,
-      toneMapped: false,
-    });
-    panelMesh = new THREE.Mesh(geometry, material);
-    panelMesh.visible = false;
-    scene.add(panelMesh);
-
-    panelReady = true;
-    loadingBadge.remove();
-  } catch (err) {
-    loadingBadge.textContent = 'Не удалось отрисовать панель';
-    console.error(err);
-  } finally {
-    hiddenFrame.remove();
-  }
-});
+// World-space anchor the panel is locked to: fixed offset above the cube.
+const panelAnchor = new THREE.Vector3();
+const PANEL_HEIGHT_OFFSET = 0.28; // meters above the cube center
 
 // ---------- Hit-test state ----------
 let hitTestSource = null;
@@ -273,7 +239,7 @@ renderer.xr.addEventListener('sessionstart', () => {
   placed = false;
   cube.visible = false;
   edges.visible = false;
-  if (panelMesh) panelMesh.visible = false;
+  anchorPanel.classList.remove('visible');
   reticle.visible = false;
   hitTestSourceRequested = false;
   hitTestSource = null;
@@ -285,7 +251,7 @@ renderer.xr.addEventListener('sessionend', () => {
   hitTestSourceRequested = false;
 });
 
-// Tap on screen (XR "select" event) -> place cube + panel at reticle position
+// Tap on screen (XR "select" event) -> place cube on the reticle, anchor panel above it
 function onSelect() {
   if (!reticle.visible) return;
 
@@ -295,14 +261,7 @@ function onSelect() {
   cube.visible = true;
   edges.visible = true;
 
-  if (panelMesh && panelReady) {
-    panelMesh.position.set(
-      cube.position.x,
-      cube.position.y + cubeSize / 2 + panelSize.height / 2 + 0.1,
-      cube.position.z
-    );
-    panelMesh.visible = true;
-  }
+  panelAnchor.set(cube.position.x, cube.position.y + PANEL_HEIGHT_OFFSET, cube.position.z);
 
   placed = true;
   placeHint.style.display = 'none';
@@ -319,9 +278,46 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
+// ---------- Project the 3D anchor to screen space and position the DOM overlay panel ----------
+const projected = new THREE.Vector3();
+const camWorldPos = new THREE.Vector3();
+
+function updateAnchoredPanel() {
+  if (!placed) return;
+
+  camera.getWorldPosition(camWorldPos);
+  const distance = camWorldPos.distanceTo(panelAnchor);
+
+  projected.copy(panelAnchor).project(camera);
+
+  // Behind the camera or far outside view: hide instead of drawing garbage.
+  if (projected.z > 1 || distance > 8) {
+    anchorPanel.classList.remove('visible');
+    return;
+  }
+
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const screenX = (projected.x * 0.5 + 0.5) * w;
+  const screenY = (1 - (projected.y * 0.5 + 0.5)) * h;
+
+  // Off-screen margin check so we don't render a clickable panel the user can't see.
+  const margin = 40;
+  if (screenX < -margin || screenX > w + margin || screenY < -margin || screenY > h + margin) {
+    anchorPanel.classList.remove('visible');
+    return;
+  }
+
+  // Pseudo-3D depth: scale down as the anchor gets farther away.
+  const scale = THREE.MathUtils.clamp(0.9 / distance, 0.35, 1.15);
+
+  anchorPanel.style.transform =
+    `translate(${screenX}px, ${screenY}px) translate(-50%, -100%) scale(${scale})`;
+  anchorPanel.classList.add('visible');
+}
+
 // ---------- Animation / render loop ----------
 const clock = new THREE.Clock();
-const billboardTarget = new THREE.Vector3();
 
 renderer.setAnimationLoop((timestamp, frame) => {
   if (frame) {
@@ -365,14 +361,7 @@ renderer.setAnimationLoop((timestamp, frame) => {
     const t = clock.getElapsedTime();
     cube.rotation.y = t * 0.6;
     edges.rotation.copy(cube.rotation);
-
-    // Panel stays upright and turns to face the viewer (Y-axis billboard),
-    // like a real sign standing on the floor.
-    if (panelMesh && panelMesh.visible) {
-      billboardTarget.copy(camera.position);
-      billboardTarget.y = panelMesh.position.y;
-      panelMesh.lookAt(billboardTarget);
-    }
+    updateAnchoredPanel();
   }
 
   renderer.render(scene, camera);
