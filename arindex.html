@@ -83,13 +83,14 @@
     position: absolute;
     top: 0;
     left: 0;
-    width: 340px;
-    height: 240px;
+    width: 460px;
     transform-origin: 50% 100%; /* bottom-center = the 3D anchor point */
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    border-radius: 16px;
     overflow: hidden;
     border: 1px solid rgba(148, 163, 184, 0.3);
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
@@ -104,14 +105,63 @@
     pointer-events: auto;
   }
 
+  /* Scrollable window onto about.html — sized big enough that the bottom
+     CTA button is reachable with a short scroll instead of being cut off. */
+  #anchor-panel .panel-frame {
+    width: 100%;
+    height: 560px;
+    background: #0b1120;
+  }
+
   #anchor-panel iframe {
-    width: 320px;   /* fixed logical size, CSS transform below handles scaling */
-    height: 620px;
+    width: 100%;
+    height: 100%;
     border: 0;
     display: block;
-    transform: scale(1.0625); /* 340/320 to fill panel width */
-    transform-origin: top left;
   }
+
+  /* Debug row: real page DOM (not inside the iframe), sits right under the
+     about.html panel, part of the same anchored element. Used to verify
+     that taps on the WebXR DOM Overlay are actually reaching the page. */
+  #anchor-panel .panel-debug {
+    flex-shrink: 0;
+    padding: 10px 12px;
+    background: #0f172a;
+    border-top: 1px solid rgba(148, 163, 184, 0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  #debug-btn {
+    pointer-events: auto;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(129, 140, 248, 0.4);
+    background: rgba(99, 102, 241, 0.18);
+    color: #e0e7ff;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  #debug-btn:active {
+    background: rgba(99, 102, 241, 0.35);
+  }
+
+  #debug-log {
+    max-height: 96px;
+    overflow-y: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #94a3b8;
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 8px;
+    padding: 6px 8px;
+  }
+
+  #debug-log .log-empty { color: #475569; }
+  #debug-log .log-line { color: #67e8f9; }
 </style>
 </head>
 <body>
@@ -131,7 +181,13 @@
 <div id="ar-overlay">
   <div id="place-hint">Коснитесь пола, чтобы поставить куб и панель</div>
   <div id="anchor-panel">
-    <iframe src="about.html" scrolling="yes"></iframe>
+    <div class="panel-frame">
+      <iframe src="about.html" scrolling="yes"></iframe>
+    </div>
+    <div class="panel-debug">
+      <button id="debug-btn" type="button">🧪 Тест клика — вывести в лог</button>
+      <div id="debug-log"><span class="log-empty">лог пуст…</span></div>
+    </div>
   </div>
 </div>
 
@@ -154,6 +210,24 @@ const unsupportedEl = document.getElementById('unsupported');
 const arOverlay = document.getElementById('ar-overlay');
 const placeHint = document.getElementById('place-hint');
 const anchorPanel = document.getElementById('anchor-panel');
+const debugBtn = document.getElementById('debug-btn');
+const debugLog = document.getElementById('debug-log');
+
+let debugClickCount = 0;
+function logToOverlay(message) {
+  debugClickCount += 1;
+  const time = new Date().toLocaleTimeString('ru-RU', { hour12: false });
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.textContent = `[${time}] #${debugClickCount} ${message}`;
+  if (debugLog.querySelector('.log-empty')) debugLog.innerHTML = '';
+  debugLog.prepend(line);
+  console.log('[AR DOM Overlay]', message);
+}
+
+debugBtn.addEventListener('click', () => {
+  logToOverlay('Клик по кнопке в WebXR DOM Overlay сработал ✅');
+});
 
 // ---------- Basic WebXR support check ----------
 if (!('xr' in navigator)) {
