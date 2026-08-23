@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>WebXR 3D UI Scene</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #0e0f14;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+        }
+    </style>
+    <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { ARButton } from 'three/addons/webxr/ARButton.js';
+
+        // 1. Сцена и Камера
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0e0f14);
+
+        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 0.2, 3.2);
+
+        // 2. Рендерер с поддержкой WebXR
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.xr.enabled = true;
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        // Кнопка AR для Android (WebXR)
+        document.body.appendChild(ARButton.createButton(renderer));
+
+        // Интерактивное вращение пальцем/мышью
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+
+        // 3. Освобождение и Свет
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        dirLight.position.set(5, 10, 7);
+        scene.add(dirLight);
+
+        // 4. Зеленый куб снизу панели
+        const cubeGeometry = new THREE.BoxGeometry(1.1, 1.1, 1.1);
+        const cubeMaterial = new THREE.MeshStandardMaterial({
+            color: 0x338266,
+            roughness: 0.3,
+            metalness: 0.1
+        });
+        const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+        cube.position.set(0, -0.7, 0);
+        scene.add(cube);
+
+        // 5. Генератор UI-текстуры высокое разрешение (2D Canvas -> 3D Mesh)
+        function createUIPanelCanvas() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024;
+            canvas.height = 800;
+            const ctx = canvas.getContext('2d');
+
+            // Основная плашка (Карточка)
+            ctx.fillStyle = '#4c5878';
+            ctx.beginPath();
+            ctx.roundRect(0, 0, 1024, 800, 24);
+            ctx.fill();
+
+            // Верхний Badge
+            ctx.strokeStyle = '#8596bd';
+            ctx.lineWidth = 3;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+            ctx.beginPath();
+            ctx.roundRect(40, 40, 360, 52, 26);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = '#c5d3f0';
+            ctx.font = '600 22px system-ui';
+            ctx.fillText('WebAR & WebGL Платформа', 65, 74);
+
+            // Главный заголовок
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 44px system-ui';
+            ctx.fillText('Интерактивные AR-квесты в', 40, 160);
+            ctx.fillText('браузере', 40, 215);
+
+            // Подзаголовок
+            ctx.fillStyle = '#40e0d0';
+            ctx.font = '500 24px system-ui';
+            ctx.fillText('Запуск дополненной реальности без установки сторонних', 40, 275);
+            ctx.fillText('приложений', 40, 310);
+
+            // Теги / Кнопки
+            const tags = ['WebGL', 'Three.js', 'WebAR', 'VFX', 'Анимации'];
+            let tagX = 40;
+            ctx.font = '500 20px system-ui';
+
+            tags.forEach(tag => {
+                const textWidth = ctx.measureText(tag).width;
+                const pillWidth = textWidth + 36;
+
+                ctx.strokeStyle = '#6b7a9e';
+                ctx.lineWidth = 2;
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+                ctx.beginPath();
+                ctx.roundRect(tagX, 360, pillWidth, 44, 22);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.fillStyle = '#40e0d0';
+                ctx.fillText(tag, tagX + 18, 389);
+
+                tagX += pillWidth + 14;
+            });
+
+            // Нижнее превью-окно
+            ctx.strokeStyle = '#627297';
+            ctx.lineWidth = 2;
+            ctx.fillStyle = '#232b38';
+            ctx.beginPath();
+            ctx.roundRect(40, 440, 944, 320, 20);
+            ctx.fill();
+            ctx.stroke();
+
+            // Имитация контента превью
+            const grad = ctx.createLinearGradient(40, 440, 984, 760);
+            grad.addColorStop(0, '#2d5a3f');
+            grad.addColorStop(1, '#1b3b28');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.roundRect(48, 448, 928, 304, 16);
+            ctx.fill();
+
+            return canvas;
+        }
+
+        // 6. Создание UI Plane Mesh в 3D сцене
+        const uiCanvas = createUIPanelCanvas();
+        const uiTexture = new THREE.CanvasTexture(uiCanvas);
+        uiTexture.minFilter = THREE.LinearFilter;
+        uiTexture.magFilter = THREE.LinearFilter;
+
+        const uiGeometry = new THREE.PlaneGeometry(2.6, 2.03);
+        const uiMaterial = new THREE.MeshBasicMaterial({
+            map: uiTexture,
+            transparent: true,
+            side: THREE.DoubleSide
+        });
+
+        const uiMesh = new THREE.Mesh(uiGeometry, uiMaterial);
+        // Жесткая фиксация позиции панели в миром пространстве (над кубом)
+        uiMesh.position.set(0, 0.95, -0.1);
+        scene.add(uiMesh);
+
+        // Адаптив под экраны смартфонов
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Loop рендеринга (подходит и для WebGL, и для WebXR)
+        renderer.setAnimationLoop(() => {
+            cube.rotation.y += 0.005;
+            controls.update();
+            renderer.render(scene, camera);
+        });
+    </script>
+</body>
+</html>
