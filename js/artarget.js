@@ -195,8 +195,8 @@ export class ModelFactory {
       if (typeof onAnswer === 'function') onAnswer(value);
     };
 
-    const SCREEN_WIDTH_PX = 340;
-    const SCREEN_HEIGHT_PX = 480;
+    const SCREEN_WIDTH_PX = 500;
+    const SCREEN_HEIGHT_PX = 600;
     const SCREEN_SCALE = 0.0005;
 
     const screenSrc = this._getScreenRoot(ui);
@@ -343,19 +343,21 @@ export class ModelFactory {
       }
 
       if (!document.getElementById('ar-target-prefab-styles')) {
-        const styleEl = doc.querySelector('style');
         const s = document.createElement('style');
         s.id = 'ar-target-prefab-styles';
-        s.textContent = (styleEl ? styleEl.textContent : '') + `
-          .ar-target-screen, .ar-target-screen * { pointer-events: auto !important; touch-action: manipulation !important; }
-          .ar-target-screen .buttons-area { z-index: 100 !important; }
-          .ar-target-screen .nav-btn, .ar-target-screen .next-btn, .ar-target-screen .modal-close-btn,
-          .ar-target-screen .ar-quest-btn, .ar-target-screen .ar-quest-submit-btn, .ar-target-screen .ar-slide-nav, .ar-target-screen .ar-quest-ok-btn {
+        s.textContent = `
+          .ar-target-screen, .ar-target-screen * { 
+            pointer-events: auto !important; 
+            touch-action: manipulation !important; 
+          }
+          .ar-target-screen .modal-close-btn {
             pointer-events: auto !important;
-            min-width: 40px !important;
-            min-height: 36px !important;
-            position: relative;
-            z-index: 50;
+            z-index: 99999 !important;
+            position: relative !important;
+            cursor: pointer !important;
+          }
+          .ar-target-screen .modal-overlay {
+            pointer-events: auto !important;
           }
         `;
         document.head.appendChild(s);
@@ -396,55 +398,58 @@ export class ModelFactory {
   }
 
   _buildFallbackPrefab() {
-    const corners = () => `
-      <div class="panel-corner tl" style="position:absolute; top:-2px; left:-2px; width:16px; height:16px; background-size:contain; background-repeat:no-repeat; pointer-events:none;"></div>
-      <div class="panel-corner tr" style="position:absolute; top:-2px; right:-2px; width:16px; height:16px; background-size:contain; background-repeat:no-repeat; transform:scaleX(-1); pointer-events:none;"></div>
-      <div class="panel-corner bl" style="position:absolute; bottom:-2px; left:-2px; width:16px; height:16px; background-size:contain; background-repeat:no-repeat; transform:scaleY(-1); pointer-events:none;"></div>
-      <div class="panel-corner br" style="position:absolute; bottom:-2px; right:-2px; width:16px; height:16px; background-size:contain; background-repeat:no-repeat; transform:scale(-1); pointer-events:none;"></div>`;
-
     const div = document.createElement('div');
     div.innerHTML = `
-      <div class="screen active" id="screen-fallback" style="position:relative; width:100%; height:100%; display:flex; flex-direction:column; box-sizing:border-box; overflow:hidden;">
-        <div class="bg" style="position:absolute; inset:0; background:#050505; z-index:0;"></div>
-        <div class="bg-img" style="position:absolute; inset:0; background-size:cover; background-position:center; z-index:1;"></div>
-        <div class="modal-overlay" style="display:none; position:absolute; inset:0; background:rgba(0,0,0,0.85); z-index:50; align-items:center; justify-content:center; padding:20px;">
-          <div class="modal-window" style="position:relative; width:90%; max-width:520px; background:#0a0a0c; border:2px solid #DAA520; border-radius:8px; padding:20px; box-sizing:border-box;">
-            <button class="modal-close-btn" type="button" style="position:absolute; top:10px; right:10px; background:#111; border:1px solid #DAA520; color:#DAA520; width:30px; height:30px; border-radius:4px; cursor:pointer;">✕</button>
-            <div class="modal-title" style="color:#FFD700; font-weight:bold; text-align:center; margin-bottom:14px; padding-right:25px;"></div>
-            <div class="modal-body" style="white-space:pre-line; color:#e2e8f0; font-size:0.8rem; line-height:1.45; max-height:60vh; overflow-y:auto;"></div>
+      <div class="screen active" id="screen-fallback">
+        <div class="bg"></div>
+        <div class="bg-img"></div>
+        <div class="modal-overlay" style="display:flex;">
+          <div class="modal-window">
+            <button class="modal-close-btn" type="button">✕</button>
+            <div class="modal-title"></div>
+            <div class="modal-body"></div>
           </div>
         </div>
-        <div class="content" style="position:relative; z-index:10; display:flex; flex-direction:column; height:100%; padding:10px; box-sizing:border-box; gap:8px;">
-          <div class="title-area" style="background:#070707EE; border:1px solid #DAA520; position:relative; padding:8px; border-radius:4px;">
-            <div class="title-text" style="color:#FFD700; text-align:center; font-weight:bold; font-size:0.95rem;"></div>
+        <div class="content">
+          <div class="title-area">
+            <div class="title-text"></div>
           </div>
-          <div class="panels" style="display:flex; gap:8px; flex:1; min-height:0;">
-            <div class="panel side-panel" style="background:#070707EE; border:1px solid #DAA520; flex:1; display:flex; flex-direction:column; gap:8px; position:relative; padding:10px; border-radius:4px;">
-              ${corners()}
-              <div style="border:1px solid rgba(218,165,32,0.3); padding:6px; border-radius:4px; background:rgba(0,0,0,0.4);">
-                <div class="help" style="color:#FF69B4; font-weight:bold; font-size:0.75rem;">📍 ПОДСКАЗКА</div>
-                <div class="help-body" style="color:#cbd5e1; font-size:0.7rem; line-height:1.25; margin-top:4px;"></div>
+          <div class="panels">
+            <div class="panel side-panel">
+              <div class="panel-corner tl"></div>
+              <div class="panel-corner tr"></div>
+              <div class="panel-corner bl"></div>
+              <div class="panel-corner br"></div>
+              <div class="help-slot">
+                <div class="help">📍 ПОДСКАЗКА</div>
+                <div class="help-body"></div>
               </div>
-              <div style="border:1px solid rgba(218,165,32,0.3); padding:6px; border-radius:4px; background:rgba(0,0,0,0.4);">
-                <div class="help" style="color:#FF69B4; font-weight:bold; font-size:0.75rem;">📍 СОВЕТ</div>
-                <div class="help-body" style="color:#cbd5e1; font-size:0.7rem; line-height:1.25; margin-top:4px;"></div>
+              <div class="help-slot">
+                <div class="help">📍 СОВЕТ</div>
+                <div class="help-body"></div>
               </div>
             </div>
-            <div class="panel main-panel" style="background:#070707EE; border:1px solid #DAA520; flex:2; display:flex; flex-direction:column; justify-content:center; align-items:center; position:relative; padding:12px; border-radius:4px;">
-              ${corners()}
-              <div class="decor-line" style="width:80%; height:6px; margin-bottom:8px;"></div>
-              <div class="main-text" style="color:#FFD700; white-space:pre-line; text-align:center; font-weight:500; font-size:0.85rem; line-height:1.4;"></div>
-              <div class="decor-line" style="width:80%; height:6px; margin-top:8px;"></div>
+            <div class="panel main-panel">
+              <div class="panel-corner tl"></div>
+              <div class="panel-corner tr"></div>
+              <div class="panel-corner bl"></div>
+              <div class="panel-corner br"></div>
+              <div class="decor-line"></div>
+              <div class="main-text"></div>
+              <div class="decor-line"></div>
             </div>
-            <div class="panel side-panel" style="background:#070707EE; border:1px solid #DAA520; flex:1; position:relative; padding:10px; border-radius:4px; overflow-y:auto;">
-              ${corners()}
-              <div style="color:#FFD700; font-size:0.8rem; font-weight:bold; margin-bottom:6px;">📜 ЗАМЕТКА</div>
-              <div class="right-panel-content" style="color:#cbd5e1; font-size:0.7rem; line-height:1.3; white-space:pre-line;"></div>
+            <div class="panel side-panel">
+              <div class="panel-corner tl"></div>
+              <div class="panel-corner tr"></div>
+              <div class="panel-corner bl"></div>
+              <div class="panel-corner br"></div>
+              <div class="right-label">📜 ЗАМЕТКА</div>
+              <div class="right-panel-content"></div>
             </div>
           </div>
-          <div class="buttons-area" style="background:#070707EE; border:1px solid #DAA520; padding:8px 12px; position:relative; border-radius:4px;">
-            <div class="buttons-row" style="display:flex; align-items:center; justify-content:center; gap:10px;"></div>
-            <div style="text-align:center; margin-top:6px;">
+          <div class="buttons-area">
+            <div class="buttons-row"></div>
+            <div class="next-btn-wrap">
               <button class="next-btn" type="button" style="display:none;">Дальше</button>
             </div>
           </div>
@@ -466,16 +471,10 @@ export class ModelFactory {
     const helpBodies = el.querySelectorAll('.panels > .side-panel:first-child .help-body');
     if (helpBodies[0]) helpBodies[0].textContent = data.helpUp || data.help || '';
     if (helpBodies[1]) helpBodies[1].textContent = data.helpDown || '';
-    console.log(
-        '[ModelFactory._fillScreen] left help slots filled:', helpBodies.length,
-        'helpUp=', !!data.helpUp, 'helpDown=', !!data.helpDown, 'fallback help=', !!data.help
-    );
 
     setText('.main-panel .main-text', [data.question, data.mainText].filter(Boolean).join('\n\n'));
 
     const storySrc = data.raw?.story || data.raw?.legend || data.raw?.intro || data.mainText || data.question || '';
-    const storyField = data.raw?.story ? 'raw.story' : data.raw?.legend ? 'raw.legend' : data.raw?.intro ? 'raw.intro' : data.mainText ? 'mainText' : 'question';
-    console.log('[ModelFactory._fillScreen] modal-body source field:', storyField);
     setText('.modal-body', storySrc);
 
     const rightPanel = el.querySelectorAll('.panels > .side-panel')[1];
@@ -487,7 +486,6 @@ export class ModelFactory {
         if (!img) {
           img = document.createElement('img');
           img.className = 'ar-target-image';
-          img.style.cssText = 'display:block; width:100%; height:auto; max-height:120px; object-fit:contain; border-radius:6px; margin-bottom:6px; background:rgba(0,0,0,0.3);';
           rightPanel.insertBefore(img, rightPanel.firstChild);
         }
         img.src = data.imageSrc;
@@ -495,86 +493,147 @@ export class ModelFactory {
       } else if (img) {
         img.remove();
       }
-    } else {
-      console.warn('[ModelFactory._fillScreen] правая side-panel не найдена — imageCaption/imageSrc не применены');
     }
 
     const buttonsRow = el.querySelector('.buttons-area .buttons-row');
     if (buttonsRow) {
       this._buildQuestionBody(buttonsRow, data, onAnswer, ui, arInput);
-    } else {
-      console.warn('[ModelFactory._fillScreen] .buttons-row не найден — ответ построить некуда');
     }
 
     const nextBtn = el.querySelector('.next-btn');
     if (nextBtn) nextBtn.style.display = 'none';
 
+    // ============================================================
+    // МОДАЛКА - ИСПРАВЛЕННАЯ ОБРАБОТКА
+    // ============================================================
     const modalOverlay = el.querySelector('.modal-overlay');
     const modalCloseBtn = el.querySelector('.modal-close-btn');
+    
     if (modalOverlay && modalCloseBtn) {
-      modalCloseBtn.removeAttribute('onclick');
+      console.log('[Modal] Found modal overlay and close button');
+      if (ui) ui.log('[Modal] Found modal overlay and close button', 'info');
       
-      modalCloseBtn.style.cssText += `
-        pointer-events: auto !important;
-        touch-action: manipulation !important;
-        cursor: pointer !important;
-        z-index: 9999 !important;
-        position: relative !important;
-      `;
+      // Убеждаемся, что модалка видима
+      modalOverlay.style.display = 'flex';
+      modalOverlay.style.pointerEvents = 'auto';
+      modalOverlay.style.touchAction = 'manipulation';
+      
+      // Убеждаемся, что кнопка видима и кликабельна
+      modalCloseBtn.style.display = 'block';
+      modalCloseBtn.style.pointerEvents = 'auto';
+      modalCloseBtn.style.touchAction = 'manipulation';
+      modalCloseBtn.style.cursor = 'pointer';
+      modalCloseBtn.style.zIndex = '99999';
+      modalCloseBtn.style.position = 'relative';
+      modalCloseBtn.style.minWidth = '40px';
+      modalCloseBtn.style.minHeight = '40px';
+      modalCloseBtn.style.padding = '8px';
+      modalCloseBtn.style.fontSize = '20px';
+      modalCloseBtn.style.lineHeight = '1';
+      
+      // Сохраняем ссылки для обработчика
+      const modalOverlayRef = modalOverlay;
+      const modalCloseBtnRef = modalCloseBtn;
+      const elRef = el;
       
       const closeModal = (e) => {
-        if (ui) ui.log('[Modal] Close button clicked, closing modal...', 'ok');
-        console.log('[Modal] Close button clicked');
+        console.log('[Modal] closeModal called!', e ? e.type : 'no event');
+        if (ui) ui.log('[Modal] closeModal called!', 'ok');
         
-        const modalBody = el.querySelector('.modal-body');
-        const modalBodyText = modalBody ? modalBody.textContent : '';
-        
-        modalOverlay.style.display = 'none';
-        modalOverlay.remove();
-        
-        const noteEl = el.querySelector('.panels > .side-panel:last-child .right-panel-content');
-        if (noteEl && !noteEl.textContent.trim() && modalBodyText) {
-          noteEl.textContent = modalBodyText;
-          if (ui) ui.log('[Modal] Text moved to right panel', 'info');
+        try {
+          // Читаем текст модалки до удаления
+          const modalBody = elRef.querySelector('.modal-body');
+          const modalBodyText = modalBody ? modalBody.textContent : '';
+          console.log('[Modal] modal body text length:', modalBodyText ? modalBodyText.length : 0);
+          
+          // Скрываем и удаляем модалку
+          modalOverlayRef.style.display = 'none';
+          modalOverlayRef.remove();
+          console.log('[Modal] modal overlay removed');
+          
+          // Переносим текст в правую панель
+          const noteEl = elRef.querySelector('.panels > .side-panel:last-child .right-panel-content');
+          if (noteEl && !noteEl.textContent.trim() && modalBodyText) {
+            noteEl.textContent = modalBodyText;
+            console.log('[Modal] text moved to right panel');
+            if (ui) ui.log('[Modal] Text moved to right panel', 'info');
+          }
+          
+          console.log('[Modal] Closed successfully');
+          if (ui) ui.log('[Modal] Closed successfully', 'ok');
+        } catch (err) {
+          console.error('[Modal] Error in closeModal:', err);
+          if (ui) ui.log('[Modal] Error: ' + err.message, 'error');
         }
-        
-        if (ui) ui.log('[Modal] Closed successfully', 'ok');
       };
       
+      // ===== НАВЕШИВАЕМ ОБРАБОТЧИКИ ВСЕМИ ВОЗМОЖНЫМИ СПОСОБАМИ =====
+      
+      // 1. Через ARInput
       if (typeof arInput.bindInteractiveEvent === 'function') {
-        arInput.bindInteractiveEvent(modalCloseBtn, 'ModalCloseButton', closeModal);
+        arInput.bindInteractiveEvent(modalCloseBtnRef, 'ModalCloseButton', closeModal);
+        console.log('[Modal] Bound via arInput.bindInteractiveEvent');
         if (ui) ui.log('[Modal] Bound via arInput.bindInteractiveEvent', 'info');
-      } else {
-        modalCloseBtn.addEventListener('click', closeModal);
-        modalCloseBtn.addEventListener('pointerup', closeModal);
-        if (ui) ui.log('[Modal] Bound via direct addEventListener', 'info');
       }
       
-      modalCloseBtn.addEventListener('click', (e) => {
+      // 2. Прямой обработчик click (capture phase)
+      modalCloseBtnRef.addEventListener('click', function(e) {
+        console.log('[Modal] Direct click handler (capture)');
         e.stopPropagation();
         e.stopImmediatePropagation();
-        if (ui) ui.log('[Modal] Direct click handler triggered', 'info');
+        if (e.cancelable) e.preventDefault();
         closeModal(e);
       }, true);
       
-      modalCloseBtn.addEventListener('pointerup', (e) => {
+      // 3. Прямой обработчик click (bubble phase)
+      modalCloseBtnRef.addEventListener('click', function(e) {
+        console.log('[Modal] Direct click handler (bubble)');
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        if (e.cancelable) e.preventDefault();
+        closeModal(e);
+      }, false);
+      
+      // 4. Pointerup (capture)
+      modalCloseBtnRef.addEventListener('pointerup', function(e) {
         if (e.button === 0) {
+          console.log('[Modal] Direct pointerup handler (capture)');
           e.stopPropagation();
           e.stopImmediatePropagation();
-          if (ui) ui.log('[Modal] Direct pointerup handler triggered', 'info');
+          if (e.cancelable) e.preventDefault();
           closeModal(e);
         }
       }, true);
       
-      modalOverlay.style.pointerEvents = 'auto';
-      modalOverlay.style.touchAction = 'manipulation';
+      // 5. Touch events для мобильных
+      modalCloseBtnRef.addEventListener('touchstart', function(e) {
+        console.log('[Modal] Touchstart handler');
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        if (e.cancelable) e.preventDefault();
+      }, true);
       
-      modalOverlay.addEventListener('click', (e) => {
-        if (e.target === modalOverlay) {
+      modalCloseBtnRef.addEventListener('touchend', function(e) {
+        console.log('[Modal] Touchend handler');
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        if (e.cancelable) e.preventDefault();
+        closeModal(e);
+      }, true);
+      
+      // 6. Клик по оверлею - НЕ закрываем модалку
+      modalOverlayRef.addEventListener('click', function(e) {
+        if (e.target === modalOverlayRef) {
+          console.log('[Modal] Click on overlay - ignoring');
           if (ui) ui.log('[Modal] Click on overlay - ignoring', 'info');
         }
       });
+      
+      console.log('[Modal] All handlers attached');
+      if (ui) ui.log('[Modal] All handlers attached', 'ok');
+      
     } else {
+      console.warn('[Modal] Modal overlay or close button not found');
       if (ui) ui.log('[Modal] Modal overlay or close button not found', 'warn');
     }
   }
@@ -818,7 +877,7 @@ export class ModelFactory {
   }
 }
 
-// ===== ВАЖНО: Экспорты функций =====
+// ===== ЭКСПОРТЫ =====
 const defaultFactory = new ModelFactory();
 
 export function createArTargetSync(targetData, options = {}) {

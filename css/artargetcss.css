@@ -1,0 +1,449 @@
+/* ============================================================
+   artargetcss.css - Стили для AR Target панелей
+   ============================================================ */
+
+/* --- Базовые стили для экрана AR Target --- */
+.ar-target-screen,
+.ar-target-screen * {
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+    box-sizing: border-box;
+}
+
+.ar-target-screen .buttons-area {
+    z-index: 100 !important;
+}
+
+/* --- Интерактивные элементы --- */
+.ar-target-screen .nav-btn,
+.ar-target-screen .next-btn,
+.ar-target-screen .modal-close-btn,
+.ar-target-screen .ar-quest-btn,
+.ar-target-screen .ar-quest-submit-btn,
+.ar-target-screen .ar-slide-nav,
+.ar-target-screen .ar-quest-ok-btn {
+    pointer-events: auto !important;
+    min-width: 40px !important;
+    min-height: 36px !important;
+    position: relative;
+    z-index: 50;
+}
+
+/* --- Модальное окно --- */
+.ar-target-screen .modal-overlay {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 50;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    pointer-events: auto;
+    touch-action: manipulation;
+}
+
+.ar-target-screen .modal-window {
+    position: relative;
+    width: 90%;
+    max-width: 520px;
+    background: #0a0a0c;
+    border: 2px solid #DAA520;
+    border-radius: 8px;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.ar-target-screen .modal-close-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #111;
+    border: 1px solid #DAA520;
+    color: #DAA520;
+    width: 30px;
+    height: 30px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+    padding: 8px;
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+    z-index: 9999 !important;
+    position: relative !important;
+}
+
+.ar-target-screen .modal-title {
+    color: #FFD700;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 14px;
+    padding-right: 25px;
+}
+
+.ar-target-screen .modal-body {
+    white-space: pre-line;
+    color: #e2e8f0;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+/* --- Контентная область --- */
+.ar-target-screen .content {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 10px;
+    box-sizing: border-box;
+    gap: 8px;
+}
+
+/* --- Заголовок --- */
+.ar-target-screen .title-area {
+    background: #070707EE;
+    border: 1px solid #DAA520;
+    position: relative;
+    padding: 8px;
+    border-radius: 4px;
+}
+
+.ar-target-screen .title-text {
+    color: #FFD700;
+    text-align: center;
+    font-weight: bold;
+    font-size: 0.95rem;
+    pointer-events: none;
+}
+
+/* --- Панели --- */
+.ar-target-screen .panels {
+    display: flex;
+    gap: 8px;
+    flex: 1;
+    min-height: 0;
+}
+
+.ar-target-screen .panel {
+    border-radius: 4px;
+    position: relative;
+}
+
+.ar-target-screen .side-panel {
+    background: #070707EE;
+    border: 1px solid #DAA520;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    overflow-y: auto;
+}
+
+.ar-target-screen .main-panel {
+    background: #070707EE;
+    border: 1px solid #DAA520;
+    flex: 2;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 12px;
+}
+
+/* --- Уголки панелей --- */
+.ar-target-screen .panel-corner {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    background-size: contain;
+    background-repeat: no-repeat;
+    pointer-events: none;
+}
+
+.ar-target-screen .panel-corner.tl {
+    top: -2px;
+    left: -2px;
+}
+
+.ar-target-screen .panel-corner.tr {
+    top: -2px;
+    right: -2px;
+    transform: scaleX(-1);
+}
+
+.ar-target-screen .panel-corner.bl {
+    bottom: -2px;
+    left: -2px;
+    transform: scaleY(-1);
+}
+
+.ar-target-screen .panel-corner.br {
+    bottom: -2px;
+    right: -2px;
+    transform: scale(-1);
+}
+
+/* --- Декоративные линии --- */
+.ar-target-screen .decor-line {
+    width: 80%;
+    height: 6px;
+    pointer-events: none;
+}
+
+.ar-target-screen .decor-line:first-child {
+    margin-bottom: 8px;
+}
+
+.ar-target-screen .decor-line:last-child {
+    margin-top: 8px;
+}
+
+/* --- Текст в панелях --- */
+.ar-target-screen .help {
+    color: #FF69B4;
+    font-weight: bold;
+    font-size: 0.75rem;
+    pointer-events: none;
+}
+
+.ar-target-screen .help-body {
+    color: #cbd5e1;
+    font-size: 0.7rem;
+    line-height: 1.25;
+    margin-top: 4px;
+    pointer-events: none;
+}
+
+.ar-target-screen .main-text {
+    color: #FFD700;
+    white-space: pre-line;
+    text-align: center;
+    font-weight: 500;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    pointer-events: none;
+}
+
+.ar-target-screen .right-panel-content {
+    color: #cbd5e1;
+    font-size: 0.7rem;
+    line-height: 1.3;
+    white-space: pre-line;
+    pointer-events: none;
+}
+
+/* --- Кнопки ответов --- */
+.ar-target-screen .buttons-area {
+    background: #070707EE;
+    border: 1px solid #DAA520;
+    padding: 8px 12px;
+    position: relative;
+    border-radius: 4px;
+}
+
+.ar-target-screen .buttons-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.ar-target-screen .next-btn {
+    display: none;
+}
+
+/* --- Стили для кнопок квеста --- */
+.ar-target-screen .ar-quest-options-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+}
+
+.ar-target-screen .ar-quest-btn {
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+    cursor: pointer !important;
+    min-width: 48px;
+    min-height: 40px;
+    position: relative;
+    z-index: 50;
+    padding: 6px 14px;
+    background: #1a1a2e;
+    border: 1px solid #DAA520;
+    border-radius: 4px;
+    color: #FFD700;
+    font-size: 0.75rem;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.ar-target-screen .ar-quest-btn:hover {
+    background: #2a2a4e;
+}
+
+.ar-target-screen .ar-quest-btn:active {
+    background: #3a3a6e;
+}
+
+/* --- Поле ввода --- */
+.ar-target-screen .ar-quest-input-block {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+.ar-target-screen .ar-quest-input {
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+    flex: 1;
+    min-width: 100px;
+    padding: 6px 10px;
+    background: #111;
+    border: 1px solid #DAA520;
+    border-radius: 4px;
+    color: #e2e8f0;
+    font-size: 0.8rem;
+    outline: none;
+}
+
+.ar-target-screen .ar-quest-input:focus {
+    border-color: #FFD700;
+    box-shadow: 0 0 8px rgba(218, 165, 32, 0.3);
+}
+
+.ar-target-screen .ar-quest-submit-btn {
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+    cursor: pointer !important;
+    min-width: 48px;
+    min-height: 40px;
+    position: relative;
+    z-index: 50;
+    padding: 6px 14px;
+    background: #DAA520;
+    border: none;
+    border-radius: 4px;
+    color: #111;
+    font-weight: bold;
+    font-size: 0.8rem;
+    transition: background 0.2s;
+}
+
+.ar-target-screen .ar-quest-submit-btn:hover {
+    background: #c8941a;
+}
+
+.ar-target-screen .ar-quest-submit-btn:active {
+    background: #b07e16;
+}
+
+/* --- Слайдер --- */
+.ar-target-screen .ar-quest-slider {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    justify-content: center;
+}
+
+.ar-target-screen .ar-slide-nav {
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+    cursor: pointer !important;
+    min-width: 36px;
+    min-height: 36px;
+    position: relative;
+    z-index: 50;
+    background: #1a1a2e;
+    border: 1px solid #DAA520;
+    border-radius: 4px;
+    color: #FFD700;
+    font-size: 1rem;
+    padding: 4px 10px;
+    transition: background 0.2s;
+}
+
+.ar-target-screen .ar-slide-nav:hover {
+    background: #2a2a4e;
+}
+
+.ar-target-screen .ar-slide-nav:active {
+    background: #3a3a6e;
+}
+
+.ar-target-screen .ar-slide-content {
+    flex: 1;
+    text-align: center;
+    color: #e2e8f0;
+    font-size: 0.8rem;
+    padding: 4px 8px;
+    min-height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ar-target-screen .ar-quest-ok-btn {
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+    cursor: pointer !important;
+    min-width: 48px;
+    min-height: 40px;
+    position: relative;
+    z-index: 50;
+    padding: 6px 18px;
+    background: #DAA520;
+    border: none;
+    border-radius: 4px;
+    color: #111;
+    font-weight: bold;
+    font-size: 0.8rem;
+    transition: background 0.2s;
+}
+
+.ar-target-screen .ar-quest-ok-btn:hover {
+    background: #c8941a;
+}
+
+.ar-target-screen .ar-quest-ok-btn:active {
+    background: #b07e16;
+}
+
+/* --- Картинка в правой панели --- */
+.ar-target-screen .ar-target-image {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 120px;
+    object-fit: contain;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+/* --- Фон --- */
+.ar-target-screen .bg {
+    position: absolute;
+    inset: 0;
+    background: #050505;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.ar-target-screen .bg-img {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    z-index: 1;
+    pointer-events: none;
+}

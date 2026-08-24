@@ -8,8 +8,7 @@ export class ARInput {
   }
 
   /**
-   * Панель: stopPropagation только если клик НЕ по интерактивному потомку.
-   * Используем capture фазу для раннего перехвата
+   * Панель: полностью пропускаем интерактивные элементы
    */
   bindPanelEvents(element, panelName) {
     element.style.pointerEvents = 'auto';
@@ -29,13 +28,12 @@ export class ARInput {
       '.modal-close-btn'
     ].join(',');
 
-    // Обработчик для capture фазы — проверяем, является ли цель интерактивной
+    // Обработчик для capture фазы
     const captureHandler = (e) => {
       const target = e.target;
       const isInteractive = !!target.closest(interactiveSelector);
       
-      // Если клик по интерактивному элементу — НЕ останавливаем распространение
-      // и НЕ предотвращаем дефолтное поведение, чтобы событие дошло до кнопки
+      // Если клик по интерактивному элементу — полностью пропускаем
       if (isInteractive) {
         if (this.ui) {
           this.ui.log(
@@ -43,8 +41,7 @@ export class ARInput {
             'info'
           );
         }
-        // Не вызываем stopPropagation, не вызываем preventDefault
-        return;
+        return; // Не вызываем stopPropagation
       }
 
       // Если клик по не-интерактивной области панели — останавливаем
@@ -58,32 +55,12 @@ export class ARInput {
       if (e.cancelable) e.preventDefault();
     };
 
-    // Навешиваем на capture фазу (true), чтобы перехватить ДО всплытия
+    // Навешиваем на capture фазу
     element.addEventListener('pointerdown', captureHandler, true);
     element.addEventListener('pointerup', captureHandler, true);
     element.addEventListener('click', captureHandler, true);
     element.addEventListener('touchstart', captureHandler, { passive: false, capture: true });
     element.addEventListener('touchend', captureHandler, { passive: false, capture: true });
-
-    // Также сохраняем обработчик для bubble фазы (для не-интерактивных кликов,
-    // которые не были остановлены в capture)
-    const bubbleHandler = (e) => {
-      const target = e.target;
-      const isInteractive = !!target.closest(interactiveSelector);
-      
-      if (isInteractive) {
-        return; // Пропускаем интерактивные
-      }
-      
-      // Для не-интерактивных — останавливаем, если еще не остановлено
-      if (!e.defaultPrevented) {
-        e.stopPropagation();
-        if (e.cancelable) e.preventDefault();
-      }
-    };
-
-    element.addEventListener('click', bubbleHandler);
-    element.addEventListener('pointerup', bubbleHandler);
   }
 
   /**
@@ -99,7 +76,7 @@ export class ARInput {
     element.style.minWidth = '48px';
     element.style.minHeight = '40px';
     element.style.position = 'relative';
-    element.style.zIndex = '9999 !important';
+    element.style.zIndex = '99999 !important';
     
     // Для кнопок с textContent пустым (как крестик) добавляем padding
     if (!element.textContent.trim() || element.textContent === '✕') {
@@ -124,7 +101,7 @@ export class ARInput {
       callback(e);
     };
 
-    // Навешиваем на capture фазе, чтобы перехватить ДО панели
+    // Навешиваем на capture фазе
     element.addEventListener('click', fire, true);
     element.addEventListener('pointerup', (e) => {
       if (e.button === 0) fire(e);
