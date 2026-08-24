@@ -110,15 +110,18 @@ export class ModelFactory {
   }
 
   createArTargetSync(targetData = '', options = {}) {
-    const { onAnswer = null, ui = null } = options;
+    const { onAnswer = null, ui = null, arInput = null } = options;
     const data = this.parser.normalizeTargetData(targetData);
     
     console.log('[ModelFactory] createArTargetSync: creating target:', data.groupName);
 
-    // Создаем ARInput с рендерером, сценой и камерой
-    const arInput = new ARInput(ui, this.panelCreator.renderer, this.panelCreator.scene, this.panelCreator.camera);
-    this._arInputInstances.push(arInput);
-    arInput.init();
+    // Берем рабочий переданный arInput или создаем фоллбэк при необходимости
+    let activeArInput = arInput;
+    if (!activeArInput) {
+      activeArInput = new ARInput(ui, this.panelCreator.renderer, this.panelCreator.scene, this.panelCreator.camera);
+      activeArInput.init();
+      this._arInputInstances.push(activeArInput);
+    }
     
     const group = new THREE.Group();
     group.name = `arTarget_${data.groupName}`;
@@ -135,7 +138,7 @@ export class ModelFactory {
     };
 
     // Создаем CSS экран
-    const { el, cssObject } = this.panelCreator.createCSSScreen(data, handleAnswer, ui, arInput);
+    const { el, cssObject } = this.panelCreator.createCSSScreen(data, handleAnswer, ui, activeArInput);
     group.add(cssObject);
 
     // Привязываем панели к ARInput
@@ -144,21 +147,13 @@ export class ModelFactory {
     const zoneRightPanel = el.querySelectorAll('.panels > .side-panel')[1] || null;
     const zoneButtons = el.querySelector('.buttons-area');
     
-    if (zoneMainPanel) arInput.bindPanelEvents(zoneMainPanel, 'MainBlock');
-    if (zoneLeftPanel) arInput.bindPanelEvents(zoneLeftPanel, 'LeftHelpBlock');
-    if (zoneRightPanel) arInput.bindPanelEvents(zoneRightPanel, 'RightBlock');
-    if (zoneButtons) arInput.bindPanelEvents(zoneButtons, 'ButtonsBlock');
+    if (zoneMainPanel) activeArInput.bindPanelEvents(zoneMainPanel, 'MainBlock');
+    if (zoneLeftPanel) activeArInput.bindPanelEvents(zoneLeftPanel, 'LeftHelpBlock');
+    if (zoneRightPanel) activeArInput.bindPanelEvents(zoneRightPanel, 'RightBlock');
+    if (zoneButtons) activeArInput.bindPanelEvents(zoneButtons, 'ButtonsBlock');
 
     // Добавляем CSS объект в ARInput
-    arInput.addCSSObject(cssObject);
-
-    // Инициализируем ARInput
-    // if (this.panelCreator.scene) {
-    //   arInput.addSceneGroup(group);
-    //   arInput.init();
-    // } else {
-    //   arInput.init();
-    // }
+    activeArInput.addCSSObject(cssObject);
 
     const panels = { 
       Screen: cssObject, 
@@ -178,7 +173,7 @@ export class ModelFactory {
       onAnswer: handleAnswer,
       answerType: data.answerType,
       groupName: data.groupName,
-      arInput: arInput
+      arInput: activeArInput
     };
 
     this._ensureDebugSaveButton(group, ui);

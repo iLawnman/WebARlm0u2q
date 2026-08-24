@@ -15,7 +15,15 @@ export class App {
     this.recognition = null;
     this.arScene = new ARScene(this.ui);
 
-    this.arInput = new ARInput(this.ui);
+    // Передаем зависимости WebGL/CSS сцены в ARInput
+    this.arInput = new ARInput(
+      this.ui,
+      this.arScene.renderer,
+      this.arScene.scene,
+      this.arScene.camera
+    );
+    this.arInput.init();
+
     this.uiInput = new UIInput(this.ui);
 
     this.xrSession = null;

@@ -113,7 +113,7 @@ export class ARPanelCreator {
           }
           .ar-target-screen .modal-close-btn {
             pointer-events: auto !important;
-            z-index: 99999 !important;
+            z-index: 999999 !important;
             position: relative !important;
             cursor: pointer !important;
           }
@@ -121,7 +121,7 @@ export class ARPanelCreator {
             pointer-events: auto !important;
           }
           .modal-overlay {
-            display: none !important;
+            display: none;
           }
           .modal-overlay.active {
             display: flex !important;
@@ -232,7 +232,7 @@ export class ARPanelCreator {
     const nextBtn = el.querySelector('.next-btn');
     if (nextBtn) nextBtn.style.display = 'none';
 
-    // Модалка
+    // Инициализация модального окна
     this.modalManager.setupModal(el, data, ui);
   }
 

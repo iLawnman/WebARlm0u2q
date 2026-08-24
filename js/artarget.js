@@ -4,28 +4,13 @@ import { ARModalManager } from './armodal.js';
 
 // Singleton instance for convenience functions
 const defaultFactory = new ModelFactory();
-const modalManager = new ARModalManager();
 
 export function createArTargetSync(targetData, options = {}) {
-  const target = defaultFactory.createArTargetSync(targetData, options);
-  
-  // Если переданы данные для модального окна — инициализируем при старте
-  if (targetData && (targetData.story || targetData.legend || targetData.intro || targetData.title)) {
-    modalManager.setupModal(document.body, targetData, options.ui);
-  }
-  
-  return target;
+  return defaultFactory.createArTargetSync(targetData, options);
 }
 
 export async function createArTarget(targetData, options = {}) {
-  const target = await defaultFactory.createArTarget(targetData, options);
-  
-  // Инициализация модального окна при вызове асинхронной сборки
-  if (targetData && (targetData.story || targetData.legend || targetData.intro || targetData.title)) {
-    modalManager.setupModal(document.body, targetData, options.ui);
-  }
-
-  return target;
+  return await defaultFactory.createArTarget(targetData, options);
 }
 
 export function setArTargetDesignPrefab(prefab) {
