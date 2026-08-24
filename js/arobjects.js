@@ -118,7 +118,8 @@ export class ModelFactory {
     // Создаем ARInput с рендерером, сценой и камерой
     const arInput = new ARInput(ui, this.panelCreator.renderer, this.panelCreator.scene, this.panelCreator.camera);
     this._arInputInstances.push(arInput);
-
+    arInput.init();
+    
     const group = new THREE.Group();
     group.name = `arTarget_${data.groupName}`;
 
@@ -152,12 +153,12 @@ export class ModelFactory {
     arInput.addCSSObject(cssObject);
 
     // Инициализируем ARInput
-    if (this.panelCreator.scene) {
-      arInput.addSceneGroup(group);
-      arInput.init();
-    } else {
-      arInput.init();
-    }
+    // if (this.panelCreator.scene) {
+    //   arInput.addSceneGroup(group);
+    //   arInput.init();
+    // } else {
+    //   arInput.init();
+    // }
 
     const panels = { 
       Screen: cssObject, 
