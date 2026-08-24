@@ -6,10 +6,12 @@ export {
   ModelFactory,
   createArTarget,
   createArTargetSync,
-  default,
   designGroupsToPrefab,
   setArTargetDesignPrefab,
   getArTargetDesignPrefab,
   preloadArTargetPrefab,
   preloadArTargetDesign
 } from './artarget.js';
+
+// Экспорт по умолчанию для обратной совместимости
+export { ModelFactory as default } from './artarget.js';

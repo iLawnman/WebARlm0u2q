@@ -21,7 +21,7 @@ export class UIInput {
         const target = document.elementFromPoint(touch.clientX, touch.clientY);
         const tag = target ? `${target.tagName}.${target.className}` : 'null';
         if (this.ui) {
-          this.ui.log(`[UIInput TouchStart] (${Math.round(touch.clientX)},${Math.round(touch.clientY)}) -> ${tag}`, 'info');
+          // this.ui.log(`[UIInput TouchStart] (${Math.round(touch.clientX)},${Math.round(touch.clientY)}) -> ${tag}`, 'info');
         }
       }
     };
@@ -32,7 +32,7 @@ export class UIInput {
       const isButton = e.target.closest('button, input, .ar-css3d-panel');
       if (!isButton) {
         if (this.ui) {
-          this.ui.log(`[UIInput Global Miss] Click at (${e.clientX}, ${e.clientY}) on tag: ${e.target.tagName}`, 'warn');
+          // this.ui.log(`[UIInput Global Miss] Click at (${e.clientX}, ${e.clientY}) on tag: ${e.target.tagName}`, 'warn');
         }
         playSound('miss');
       }

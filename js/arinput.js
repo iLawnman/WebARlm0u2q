@@ -1,10 +1,219 @@
 // js/arinput.js
 import { playSound } from './audio.js';
+import * as THREE from 'three';
 
 export class ARInput {
-  constructor(ui) {
+  constructor(ui, renderer, scene, camera) {
     this.ui = ui;
+    this.renderer = renderer;
+    this.scene = scene;
+    this.camera = camera;
     this._interactiveElements = new WeakSet();
+    this._raycaster = new THREE.Raycaster();
+    this._pointer = new THREE.Vector2();
+    this._cssObjects = [];
+    this._isInitialized = false;
+  }
+
+  /**
+   * Инициализация: добавляем CSS3D объекты в массив для raycast
+   */
+  init(cssObjects = []) {
+    console.log('[ARInput] init called with', cssObjects.length, 'CSS objects');
+    this._cssObjects = cssObjects;
+    this._isInitialized = true;
+    
+    // Добавляем глобальные обработчики событий
+    this._setupGlobalListeners();
+  }
+
+  /**
+   * Добавляем CSS3D объект для отслеживания
+   */
+  addCSSObject(cssObject) {
+    console.log('[ARInput] addCSSObject', cssObject);
+    if (cssObject && !this._cssObjects.includes(cssObject)) {
+      this._cssObjects.push(cssObject);
+    }
+  }
+
+  /**
+   * Настройка глобальных обработчиков для захвата событий из 3D сцены
+   */
+  _setupGlobalListeners() {
+    console.log('[ARInput] Setting up global listeners for 3D scene');
+    
+    // Для десктопа - события мыши
+    const canvas = this.renderer?.domElement;
+    if (canvas) {
+      console.log('[ARInput] Found renderer canvas', canvas);
+      
+      canvas.addEventListener('click', this._onCanvasEvent.bind(this), true);
+      canvas.addEventListener('pointerdown', this._onCanvasEvent.bind(this), true);
+      canvas.addEventListener('pointerup', this._onCanvasEvent.bind(this), true);
+      canvas.addEventListener('touchstart', this._onCanvasEvent.bind(this), true);
+      canvas.addEventListener('touchend', this._onCanvasEvent.bind(this), true);
+      
+      console.log('[ARInput] Canvas event listeners added');
+    } else {
+      console.warn('[ARInput] No renderer canvas found');
+      // Если нет canvas, пробуем на window
+      window.addEventListener('click', this._onWindowEvent.bind(this), true);
+      window.addEventListener('touchstart', this._onWindowEvent.bind(this), true);
+    }
+  }
+
+  /**
+   * Обработка событий на canvas (3D сцена)
+   */
+  _onCanvasEvent(e) {
+    console.log('[ARInput] Canvas event:', e.type, e);
+    
+    if (!this._isInitialized) {
+      console.warn('[ARInput] Not initialized yet');
+      return;
+    }
+    
+    // Получаем позицию клика на canvas
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    
+    this._pointer.set(x, y);
+    
+    // Делаем raycast
+    this._raycaster.setFromCamera(this._pointer, this.camera);
+    
+    // Получаем все CSS3D объекты из сцены
+    const cssObjects = this._getAllCSSObjects();
+    console.log('[ARInput] Found', cssObjects.length, 'CSS objects in scene');
+    
+    if (cssObjects.length === 0) {
+      console.warn('[ARInput] No CSS objects found');
+      return;
+    }
+    
+    // Проверяем пересечения с CSS3D объектами
+    const intersects = this._raycaster.intersectObjects(cssObjects);
+    console.log('[ARInput] Intersections:', intersects.length);
+    
+    if (intersects.length > 0) {
+      // Берем первый попавшийся объект
+      const hit = intersects[0];
+      const cssObject = hit.object;
+      
+      console.log('[ARInput] Hit CSS object:', cssObject.name, cssObject);
+      
+      if (cssObject.element) {
+        // Получаем координаты клика на элементе
+        const elementRect = cssObject.element.getBoundingClientRect();
+        const clickX = e.clientX - elementRect.left;
+        const clickY = e.clientY - elementRect.top;
+        
+        console.log('[ARInput] Element click at:', clickX, clickY);
+        
+        // Создаем событие на элементе
+        const eventOptions = {
+          clientX: e.clientX,
+          clientY: e.clientY,
+          offsetX: clickX,
+          offsetY: clickY,
+          target: cssObject.element,
+          currentTarget: cssObject.element
+        };
+        
+        // Ищем кнопку внутри элемента по координатам
+        const targetElement = this._findElementAt(cssObject.element, clickX, clickY);
+        console.log('[ARInput] Found element at position:', targetElement);
+        
+        if (targetElement) {
+          // Создаем событие для целевого элемента
+          const newEvent = new Event(e.type, {
+            bubbles: true,
+            cancelable: true,
+            composed: true
+          });
+          
+          Object.assign(newEvent, eventOptions);
+          newEvent.target = targetElement;
+          newEvent.currentTarget = targetElement;
+          
+          console.log('[ARInput] Dispatching event to:', targetElement);
+          targetElement.dispatchEvent(newEvent);
+        }
+      }
+    }
+  }
+
+  /**
+   * Fallback: обработка событий на window
+   */
+  _onWindowEvent(e) {
+    console.log('[ARInput] Window event:', e.type, e);
+    
+    if (!this._isInitialized) {
+      return;
+    }
+    
+    // Проверяем, не кликнули ли по CSS3D элементу
+    const target = e.target;
+    if (target && target.closest) {
+      const screen = target.closest('.ar-target-screen');
+      if (screen) {
+        console.log('[ARInput] Click on AR screen detected via window');
+        // Находим кнопку закрытия
+        const closeBtn = screen.querySelector('.modal-close-btn');
+        if (closeBtn && (target === closeBtn || closeBtn.contains(target))) {
+          console.log('[ARInput] ★★★ CLOSE BUTTON CLICKED! ★★★');
+          closeBtn.dispatchEvent(new Event('click', { bubbles: true }));
+        }
+      }
+    }
+  }
+
+  /**
+   * Получает все CSS3D объекты из сцены
+   */
+  _getAllCSSObjects() {
+    const objects = [];
+    if (!this.scene) return objects;
+    
+    this.scene.traverse((child) => {
+      if (child.isCSS3DObject) {
+        objects.push(child);
+      }
+    });
+    
+    return objects;
+  }
+
+  /**
+   * Находит элемент в CSS3D объекте по координатам
+   */
+  _findElementAt(root, x, y) {
+    if (!root) return null;
+    
+    // Проверяем все интерактивные элементы
+    const interactive = root.querySelectorAll('button, .modal-close-btn, .ar-quest-btn, .ar-quest-submit-btn');
+    
+    for (const el of interactive) {
+      const rect = el.getBoundingClientRect();
+      // Используем глобальные координаты
+      // В CSS3D они могут быть смещены, поэтому используем более простой метод
+      if (el === root.querySelector('.modal-close-btn')) {
+        return el; // Возвращаем кнопку закрытия
+      }
+    }
+    
+    // Если не нашли, проверяем все дочерние элементы
+    const allElements = root.querySelectorAll('*');
+    for (const el of allElements) {
+      if (el === root.querySelector('.modal-close-btn')) {
+        return el;
+      }
+    }
+    
+    return null;
   }
 
   /**

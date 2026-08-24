@@ -83,6 +83,25 @@ export class ModelFactory {
     this._prefabSourceUrl = null;
     this._designPrefab = null;
     this._designAutoLoadAttempted = false;
+    this._renderer = null;
+    this._scene = null;
+    this._camera = null;
+    this._arInputInstances = [];
+  }
+
+  setRenderer(renderer) {
+    console.log('[ModelFactory] setRenderer called');
+    this._renderer = renderer;
+  }
+
+  setScene(scene) {
+    console.log('[ModelFactory] setScene called');
+    this._scene = scene;
+  }
+
+  setCamera(camera) {
+    console.log('[ModelFactory] setCamera called');
+    this._camera = camera;
   }
 
   setDesignPrefab(prefab) {
@@ -159,7 +178,16 @@ export class ModelFactory {
   createArTargetSync(targetData = '', options = {}) {
     const { onAnswer = null, ui = null } = options;
     const data = this._normalizeTargetData(targetData);
-    const arInput = new ARInput(ui);
+    
+    console.log('[ModelFactory] createArTargetSync: checking renderer/scene/camera');
+    console.log('[ModelFactory] renderer:', !!this._renderer);
+    console.log('[ModelFactory] scene:', !!this._scene);
+    console.log('[ModelFactory] camera:', !!this._camera);
+    
+    // Создаем ARInput с рендерером, сценой и камерой
+    const arInput = new ARInput(ui, this._renderer, this._scene, this._camera);
+    this._arInputInstances.push(arInput);
+    console.log('[ModelFactory] ARInput created with renderer, scene, camera');
 
     if (!this._prefabCache) {
       console.warn(
@@ -208,6 +236,8 @@ export class ModelFactory {
     el.style.height = `${SCREEN_HEIGHT_PX}px`;
     el.style.pointerEvents = 'auto';
     el.style.touchAction = 'manipulation';
+    el.style.position = 'relative';
+    el.style.background = 'transparent';
     el.querySelectorAll('[id]').forEach((n) => n.removeAttribute('id'));
     if (el.id) el.removeAttribute('id');
 
@@ -235,6 +265,22 @@ export class ModelFactory {
     cssObject.rotation.set(-Math.PI / 2, 0, 0);
     group.add(cssObject);
 
+    // Добавляем CSS объект в ARInput для raycast
+    arInput.addCSSObject(cssObject);
+    console.log('[ModelFactory] CSS object added to ARInput:', cssObject.name);
+
+    // Инициализируем ARInput с объектами из сцены
+    if (this._scene) {
+      // Добавляем группу в сцену для raycast
+      arInput.addSceneGroup(group);
+      arInput.init();
+      console.log('[ModelFactory] ARInput initialized with scene');
+    } else {
+      console.warn('[ModelFactory] No scene available for ARInput initialization');
+      // Пробуем инициализировать без сцены
+      arInput.init();
+    }
+
     const panels = { Screen: cssObject, MainBlock: cssObject, LeftHelpBlock: cssObject, RightBlock: cssObject, ButtonsBlock: cssObject };
 
     setTimeout(() => {
@@ -255,7 +301,8 @@ export class ModelFactory {
       cssObject,
       onAnswer,
       answerType: data.answerType,
-      groupName: data.groupName
+      groupName: data.groupName,
+      arInput: arInput
     };
 
     this._ensureDebugSaveButton(group, ui);
@@ -359,6 +406,12 @@ export class ModelFactory {
           .ar-target-screen .modal-overlay {
             pointer-events: auto !important;
           }
+          .modal-overlay {
+            display: none !important;
+          }
+          .modal-overlay.active {
+            display: flex !important;
+          }
         `;
         document.head.appendChild(s);
       }
@@ -403,11 +456,11 @@ export class ModelFactory {
       <div class="screen active" id="screen-fallback">
         <div class="bg"></div>
         <div class="bg-img"></div>
-        <div class="modal-overlay" style="display:none;">
-          <div class="modal-window">
-            <button class="modal-close-btn" type="button">✕</button>
-            <div class="modal-title"></div>
-            <div class="modal-body"></div>
+        <div class="modal-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:99999;background:rgba(0,0,0,0.8);align-items:center;justify-content:center;pointer-events:none;">
+          <div class="modal-window" style="background:#1a1a2e;padding:30px;border-radius:15px;max-width:80%;max-height:80%;overflow:auto;color:white;position:relative;pointer-events:auto;box-shadow:0 10px 40px rgba(0,0,0,0.5);">
+            <button class="modal-close-btn" type="button" style="position:absolute;top:10px;right:15px;font-size:28px;font-weight:bold;background:none;border:none;color:#ff6b6b;cursor:pointer;z-index:999999;pointer-events:auto;padding:10px 15px;min-width:48px;min-height:48px;">✕</button>
+            <div class="modal-title" style="font-size:20px;font-weight:bold;margin-bottom:15px;color:#ffd700;"></div>
+            <div class="modal-body" style="font-size:16px;line-height:1.6;color:#e0e0e0;"></div>
           </div>
         </div>
         <div class="content">
@@ -504,180 +557,161 @@ export class ModelFactory {
     if (nextBtn) nextBtn.style.display = 'none';
 
     // ============================================================
-    // МОДАЛКА - ПОЛНОСТЬЮ ПЕРЕРАБОТАННЫЙ БЛОК С ЛОГИРОВАНИЕМ
+    // МОДАЛКА - УЛУЧШЕННАЯ ВЕРСИЯ
     // ============================================================
     const modalOverlay = el.querySelector('.modal-overlay');
     const modalCloseBtn = el.querySelector('.modal-close-btn');
     
-    console.log('[Modal] === START MODAL SETUP ===');
+    console.log('[Modal] === MODAL SETUP START ===');
     console.log('[Modal] modalOverlay found:', !!modalOverlay);
     console.log('[Modal] modalCloseBtn found:', !!modalCloseBtn);
     
     if (modalOverlay && modalCloseBtn) {
       console.log('[Modal] Found modal overlay and close button');
-      console.log('[Modal] modalOverlay:', modalOverlay);
-      console.log('[Modal] modalCloseBtn:', modalCloseBtn);
       
-      if (ui) ui.log('[Modal] Found modal overlay and close button', 'info');
-
-      // ВАЖНО: модалка изначально скрыта
+      // Настраиваем модалку
       modalOverlay.style.display = 'none';
-      modalOverlay.style.pointerEvents = 'auto';
-      modalOverlay.style.touchAction = 'manipulation';
+      modalOverlay.style.position = 'fixed';
+      modalOverlay.style.top = '0';
+      modalOverlay.style.left = '0';
+      modalOverlay.style.width = '100%';
+      modalOverlay.style.height = '100%';
+      modalOverlay.style.zIndex = '99999';
+      modalOverlay.style.background = 'rgba(0,0,0,0.8)';
+      modalOverlay.style.alignItems = 'center';
+      modalOverlay.style.justifyContent = 'center';
+      modalOverlay.style.pointerEvents = 'none';
       
-      // Убеждаемся, что кнопка видима и кликабельна
+      // Настраиваем окно модалки
+      const modalWindow = modalOverlay.querySelector('.modal-window');
+      if (modalWindow) {
+        modalWindow.style.pointerEvents = 'auto';
+        modalWindow.style.position = 'relative';
+        modalWindow.style.background = '#1a1a2e';
+        modalWindow.style.padding = '30px';
+        modalWindow.style.borderRadius = '15px';
+        modalWindow.style.maxWidth = '80%';
+        modalWindow.style.maxHeight = '80%';
+        modalWindow.style.overflow = 'auto';
+        modalWindow.style.color = 'white';
+        modalWindow.style.boxShadow = '0 10px 40px rgba(0,0,0,0.5)';
+        modalWindow.style.border = '1px solid rgba(255,215,0,0.3)';
+      }
+      
+      // Настраиваем кнопку закрытия
       modalCloseBtn.style.display = 'block';
-      modalCloseBtn.style.pointerEvents = 'auto !important';
-      modalCloseBtn.style.touchAction = 'manipulation !important';
-      modalCloseBtn.style.cursor = 'pointer !important';
-      modalCloseBtn.style.zIndex = '99999 !important';
-      modalCloseBtn.style.position = 'relative';
-      modalCloseBtn.style.minWidth = '40px';
-      modalCloseBtn.style.minHeight = '40px';
-      modalCloseBtn.style.padding = '8px';
-      modalCloseBtn.style.fontSize = '20px';
-      modalCloseBtn.style.lineHeight = '1';
-      modalCloseBtn.style.background = 'rgba(255,255,255,0.2)';
-      modalCloseBtn.style.border = '2px solid #ff4444';
-      modalCloseBtn.style.borderRadius = '50%';
-      modalCloseBtn.style.color = '#ff4444';
+      modalCloseBtn.style.position = 'absolute';
+      modalCloseBtn.style.top = '10px';
+      modalCloseBtn.style.right = '15px';
+      modalCloseBtn.style.fontSize = '28px';
       modalCloseBtn.style.fontWeight = 'bold';
+      modalCloseBtn.style.background = 'none';
+      modalCloseBtn.style.border = 'none';
+      modalCloseBtn.style.color = '#ff6b6b';
+      modalCloseBtn.style.cursor = 'pointer';
+      modalCloseBtn.style.zIndex = '999999';
+      modalCloseBtn.style.pointerEvents = 'auto';
+      modalCloseBtn.style.padding = '10px 15px';
+      modalCloseBtn.style.minWidth = '48px';
+      modalCloseBtn.style.minHeight = '48px';
+      modalCloseBtn.style.transition = 'transform 0.2s';
       
-      // ДОБАВЛЯЕМ: логгируем HTML структуру модалки
-      console.log('[Modal] Modal HTML structure:', modalOverlay.outerHTML);
-      
-      // ДОБАВЛЯЕМ: проверяем, что кнопка находится внутри модалки
-      console.log('[Modal] Is close button inside modal?', modalOverlay.contains(modalCloseBtn));
-      
-      // ДОБАВЛЯЕМ: проверяем z-index и позиционирование
-      console.log('[Modal] Close button z-index:', window.getComputedStyle(modalCloseBtn).zIndex);
-      console.log('[Modal] Close button position:', window.getComputedStyle(modalCloseBtn).position);
+      // Hover эффект для кнопки
+      modalCloseBtn.onmouseover = function() {
+        this.style.transform = 'scale(1.2)';
+      };
+      modalCloseBtn.onmouseout = function() {
+        this.style.transform = 'scale(1)';
+      };
       
       const modalOverlayRef = modalOverlay;
       const modalCloseBtnRef = modalCloseBtn;
-      const elRef = el;
-
+      
+      // Функция закрытия
       const closeModal = (e) => {
-        console.log('[Modal] === closeModal called! ===');
-        console.log('[Modal] Event:', e);
-        console.log('[Modal] Event type:', e ? e.type : 'no event');
-        console.log('[Modal] Event target:', e ? e.target : 'no target');
-        console.log('[Modal] Event currentTarget:', e ? e.currentTarget : 'no currentTarget');
-        console.log('[Modal] Event phase:', e ? e.eventPhase : 'no phase');
+        console.log('[Modal] ★★★ closeModal called ★★★');
+        if (e) {
+          console.log('[Modal] Event type:', e.type);
+          console.log('[Modal] Event target:', e.target);
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          if (e.cancelable) e.preventDefault();
+        }
         
-        if (ui) ui.log('[Modal] closeModal called!', 'ok');
-
         try {
-          const modalBody = elRef.querySelector('.modal-body');
-          const modalBodyText = modalBody ? modalBody.textContent : '';
-          
           modalOverlayRef.style.display = 'none';
-          modalOverlayRef.remove();
-          
-          const noteEl = elRef.querySelector('.panels > .side-panel:last-child .right-panel-content');
-          if (noteEl && !noteEl.textContent.trim() && modalBodyText) {
-            noteEl.textContent = modalBodyText;
-          }
-          
-          console.log('[Modal] Closed successfully');
+          console.log('[Modal] Modal closed successfully');
           if (ui) ui.log('[Modal] Closed successfully', 'ok');
         } catch (err) {
           console.error('[Modal] Error in closeModal:', err);
-          if (ui) ui.log('[Modal] Error: ' + err.message, 'error');
         }
       };
-
-      // ДОБАВЛЯЕМ: функция для логирования всех событий
-      const logEvent = (eventName) => (e) => {
-        console.log(`[Modal] EVENT: ${eventName} on close button`);
-        console.log(`[Modal] Event details:`, {
-          type: e.type,
-          target: e.target,
-          currentTarget: e.currentTarget,
-          bubbles: e.bubbles,
-          cancelable: e.cancelable,
-          defaultPrevented: e.defaultPrevented,
-          eventPhase: e.eventPhase,
-          composed: e.composed
-        });
-        if (e.type === 'touchstart' || e.type === 'touchend') {
-          console.log('[Modal] Touch details:', {
-            touches: e.touches?.length,
-            changedTouches: e.changedTouches?.length,
-            targetTouches: e.targetTouches?.length
-          });
+      
+      // Функция показа модалки
+      const showModal = (data) => {
+        console.log('[Modal] showModal called with data:', data);
+        modalOverlayRef.style.display = 'flex';
+        modalOverlayRef.style.pointerEvents = 'auto';
+        
+        // Обновляем содержимое если передано
+        if (data) {
+          const titleEl = modalOverlayRef.querySelector('.modal-title');
+          const bodyEl = modalOverlayRef.querySelector('.modal-body');
+          if (titleEl && data.title) titleEl.textContent = data.title;
+          if (bodyEl && data.body) bodyEl.textContent = data.body;
         }
-        if (e.type === 'click' || e.type === 'pointerup') {
-          console.log('[Modal] Click position:', {
-            clientX: e.clientX,
-            clientY: e.clientY,
-            screenX: e.screenX,
-            screenY: e.screenY
+        
+        console.log('[Modal] Modal should be visible now');
+        if (ui) ui.log('[Modal] Modal shown', 'info');
+        
+        // Логируем для отладки
+        setTimeout(() => {
+          const rect = modalOverlayRef.getBoundingClientRect();
+          console.log('[Modal] Modal rect:', {
+            x: rect.x, y: rect.y,
+            w: rect.width, h: rect.height,
+            display: modalOverlayRef.style.display
           });
-        }
+        }, 100);
       };
-
-      // ВАРИАНТ 1: Через arInput.bindInteractiveEvent
-      if (typeof arInput.bindInteractiveEvent === 'function') {
+      
+      // Сохраняем функции в глобальный доступ для отладки
+      window._modalShow = showModal;
+      window._modalClose = closeModal;
+      window._modalOverlay = modalOverlayRef;
+      
+      // 1. Обработчик через ARInput (если доступен)
+      if (arInput && typeof arInput.bindInteractiveEvent === 'function') {
         console.log('[Modal] Binding via arInput.bindInteractiveEvent');
-        arInput.bindInteractiveEvent(modalCloseBtnRef, 'ModalCloseButton', (e) => {
-          console.log('[Modal] arInput.bindInteractiveEvent callback triggered!', e);
+        arInput.bindInteractiveEvent(modalCloseBtnRef, 'ModalCloseButton', function(e) {
+          console.log('[Modal] ★★★ ARInput callback triggered! ★★★');
           closeModal(e);
         });
-        console.log('[Modal] Bound via arInput.bindInteractiveEvent');
-        if (ui) ui.log('[Modal] Bound via arInput.bindInteractiveEvent', 'info');
       } else {
-        console.warn('[Modal] arInput.bindInteractiveEvent is not a function!');
+        console.warn('[Modal] ARInput not available or bindInteractiveEvent not a function');
       }
-
-      // ВАРИАНТ 2: Прямые обработчики на кнопке
-      console.log('[Modal] Adding direct event handlers...');
       
-      // click
+      // 2. Прямой обработчик onclick (самый надежный)
+      modalCloseBtnRef.onclick = function(e) {
+        console.log('[Modal] ★★★ ONCLICK FIRED! ★★★');
+        console.log('[Modal] Event:', e);
+        closeModal(e);
+        return false;
+      };
+      
+      // 3. Обработчик через addEventListener (capture phase)
       modalCloseBtnRef.addEventListener('click', function(e) {
-        console.log('[Modal] DIRECT click handler on close button');
-        console.log('[Modal] Click event details:', {
-          type: e.type,
-          target: e.target,
-          currentTarget: e.currentTarget,
-          button: e.button,
-          clientX: e.clientX,
-          clientY: e.clientY
-        });
+        console.log('[Modal] ★★★ addEventListener CLICK (capture) FIRED! ★★★');
         e.stopPropagation();
         e.stopImmediatePropagation();
         if (e.cancelable) e.preventDefault();
         closeModal(e);
       }, true);
       
-      // pointerdown
-      modalCloseBtnRef.addEventListener('pointerdown', function(e) {
-        console.log('[Modal] DIRECT pointerdown handler on close button');
-        console.log('[Modal] Pointer event details:', {
-          type: e.type,
-          pointerId: e.pointerId,
-          button: e.button,
-          clientX: e.clientX,
-          clientY: e.clientY,
-          isPrimary: e.isPrimary
-        });
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        if (e.cancelable) e.preventDefault();
-      }, true);
-      
-      // pointerup
+      // 4. Обработчик pointerup
       modalCloseBtnRef.addEventListener('pointerup', function(e) {
-        console.log('[Modal] DIRECT pointerup handler on close button');
-        console.log('[Modal] Pointerup details:', {
-          type: e.type,
-          pointerId: e.pointerId,
-          button: e.button,
-          clientX: e.clientX,
-          clientY: e.clientY
-        });
         if (e.button === 0) {
-          console.log('[Modal] Left click detected on close button');
+          console.log('[Modal] ★★★ pointerup FIRED! ★★★');
           e.stopPropagation();
           e.stopImmediatePropagation();
           if (e.cancelable) e.preventDefault();
@@ -685,98 +719,72 @@ export class ModelFactory {
         }
       }, true);
       
-      // touchstart
+      // 5. Обработчик touchstart/touchend для мобильных
       modalCloseBtnRef.addEventListener('touchstart', function(e) {
-        console.log('[Modal] DIRECT touchstart handler on close button');
-        console.log('[Modal] Touch event details:', {
-          touches: e.touches?.length,
-          changedTouches: e.changedTouches?.length,
-          target: e.target
-        });
+        console.log('[Modal] ★★★ touchstart FIRED! ★★★');
         e.stopPropagation();
         e.stopImmediatePropagation();
         if (e.cancelable) e.preventDefault();
       }, { passive: false, capture: true });
       
-      // touchend
       modalCloseBtnRef.addEventListener('touchend', function(e) {
-        console.log('[Modal] DIRECT touchend handler on close button');
-        console.log('[Modal] Touch end details:', {
-          changedTouches: e.changedTouches?.length,
-          target: e.target
-        });
+        console.log('[Modal] ★★★ touchend FIRED! ★★★');
         e.stopPropagation();
         e.stopImmediatePropagation();
         if (e.cancelable) e.preventDefault();
         closeModal(e);
       }, { passive: false, capture: true });
-
-      // ВАРИАНТ 3: mousedown/mouseup для десктопа
-      modalCloseBtnRef.addEventListener('mousedown', function(e) {
-        console.log('[Modal] DIRECT mousedown on close button', e.button);
-      }, true);
       
-      modalCloseBtnRef.addEventListener('mouseup', function(e) {
-        console.log('[Modal] DIRECT mouseup on close button', e.button);
-      }, true);
-
-      // ДОБАВЛЯЕМ: проверка, что кнопка получает события
-      const computedStyles = window.getComputedStyle(modalCloseBtnRef);
-      console.log('[Modal] Close button computed styles:', {
-        pointerEvents: computedStyles.pointerEvents,
-        touchAction: computedStyles.touchAction,
-        display: computedStyles.display,
-        zIndex: computedStyles.zIndex,
-        position: computedStyles.position,
-        width: computedStyles.width,
-        height: computedStyles.height,
-        visibility: computedStyles.visibility
-      });
-
-      // ДОБАВЛЯЕМ: слушаем события на документе для отладки
-      const docHandler = (e) => {
-        if (e.target === modalCloseBtnRef || modalCloseBtnRef.contains(e.target)) {
-          console.log(`[Modal] Document event: ${e.type} on close button or child`);
-          console.log('[Modal] Event path:', e.composedPath ? e.composedPath() : 'not available');
+      // 6. Глобальный обработчик для отладки
+      const globalHandler = function(e) {
+        const target = e.target;
+        if (target === modalCloseBtnRef || modalCloseBtnRef.contains(target)) {
+          console.log('[Modal] ★★★ GLOBAL HANDLER: Close button clicked! ★★★');
+          console.log('[Modal] Event details:', {
+            type: e.type,
+            target: target.tagName,
+            className: target.className
+          });
         }
       };
       
-      document.addEventListener('click', docHandler, true);
-      document.addEventListener('pointerdown', docHandler, true);
-      document.addEventListener('pointerup', docHandler, true);
-      document.addEventListener('touchstart', docHandler, true);
-      document.addEventListener('touchend', docHandler, true);
+      // Добавляем глобальные обработчики на capture phase
+      document.addEventListener('click', globalHandler, true);
+      document.addEventListener('pointerdown', globalHandler, true);
+      document.addEventListener('touchstart', globalHandler, true);
       
-      // Сохраняем обработчики для очистки
-      modalCloseBtnRef._docHandlers = docHandler;
+      // Сохраняем для очистки
+      modalCloseBtnRef._globalHandler = globalHandler;
       
-      console.log('[Modal] All handlers attached');
-      console.log('[Modal] === END MODAL SETUP ===');
-      if (ui) ui.log('[Modal] All handlers attached', 'ok');
+      // Проверяем, что модалка добавлена в DOM
+      console.log('[Modal] Modal in document:', document.contains(modalOverlayRef));
+      console.log('[Modal] Close button in document:', document.contains(modalCloseBtnRef));
       
-      // ДОБАВЛЯЕМ: экспортируем функцию для показа модалки
-      window._showModal = function() {
-        console.log('[Modal] Manual show modal called');
-        modalOverlayRef.style.display = 'flex';
-        modalOverlayRef.style.position = 'fixed';
-        modalOverlayRef.style.top = '0';
-        modalOverlayRef.style.left = '0';
-        modalOverlayRef.style.width = '100%';
-        modalOverlayRef.style.height = '100%';
-        modalOverlayRef.style.zIndex = '99999';
-        modalOverlayRef.style.background = 'rgba(0,0,0,0.7)';
-        modalOverlayRef.style.alignItems = 'center';
-        modalOverlayRef.style.justifyContent = 'center';
-        console.log('[Modal] Modal should be visible now');
-        console.log('[Modal] Close button visibility:', window.getComputedStyle(modalCloseBtnRef).display);
-        console.log('[Modal] Modal overlay style:', modalOverlayRef.style.display);
-      };
+      // Логируем стили кнопки
+      console.log('[Modal] Close button computed styles:');
+      const styles = window.getComputedStyle(modalCloseBtnRef);
+      console.log('[Modal] pointerEvents:', styles.pointerEvents);
+      console.log('[Modal] display:', styles.display);
+      console.log('[Modal] zIndex:', styles.zIndex);
+      console.log('[Modal] position:', styles.position);
+      
+      console.log('[Modal] === MODAL SETUP COMPLETE ===');
+      
+      // Автоматически показываем модалку для теста (раскомментировать для отладки)
+      // setTimeout(() => {
+      //   console.log('[Modal] Auto-showing modal for test');
+      //   showModal({ title: 'Тестовое окно', body: 'Это тестовое модальное окно для проверки работы кнопки закрытия.' });
+      // }, 1000);
+      
+      // Сохраняем ссылки на функции в элементе
+      el._showModal = showModal;
+      el._closeModal = closeModal;
+      el._modalOverlay = modalOverlayRef;
       
     } else {
       console.warn('[Modal] Modal overlay or close button not found');
       console.log('[Modal] modalOverlay:', modalOverlay);
       console.log('[Modal] modalCloseBtn:', modalCloseBtn);
-      if (ui) ui.log('[Modal] Modal overlay or close button not found', 'warn');
     }
   }
 
@@ -882,7 +890,7 @@ export class ModelFactory {
         btn.type = 'button';
         btn.className = 'ar-quest-btn';
         btn.textContent = opt.text || `Вариант ${idx + 1}`;
-        arInput.bindInteractiveEvent(btn, `OptionButton_${idx + 1}`, () => onAnswer(idx + 1));
+        if (arInput) arInput.bindInteractiveEvent(btn, `OptionButton_${idx + 1}`, () => onAnswer(idx + 1));
         grid.appendChild(btn);
       });
       bodyEl.appendChild(grid);
@@ -893,7 +901,7 @@ export class ModelFactory {
       input.type = 'text';
       input.className = 'ar-quest-input';
       input.placeholder = (this._designPrefab && this._designPrefab.input_ph_text) || 'Введите ответ...';
-      arInput.bindInputField(input);
+      if (arInput) arInput.bindInputField(input);
       input.addEventListener('keydown', (e) => {
         e.stopPropagation();
         if (e.key === 'Enter') {
@@ -905,7 +913,7 @@ export class ModelFactory {
       submitBtn.type = 'button';
       submitBtn.className = 'ar-quest-submit-btn';
       submitBtn.textContent = 'OK';
-      arInput.bindInteractiveEvent(submitBtn, 'InputSubmitButton', () => onAnswer(input.value));
+      if (arInput) arInput.bindInteractiveEvent(submitBtn, 'InputSubmitButton', () => onAnswer(input.value));
       wrap.appendChild(input);
       wrap.appendChild(submitBtn);
       bodyEl.appendChild(wrap);
@@ -914,7 +922,7 @@ export class ModelFactory {
       btn.type = 'button';
       btn.className = 'ar-quest-submit-btn ar-quest-ok-btn';
       btn.textContent = 'OK';
-      arInput.bindInteractiveEvent(btn, 'ArtOKButton', () => onAnswer(true));
+      if (arInput) arInput.bindInteractiveEvent(btn, 'ArtOKButton', () => onAnswer(true));
       bodyEl.appendChild(btn);
     } else {
       let idx = 0;
@@ -935,14 +943,16 @@ export class ModelFactory {
       const update = () => {
         slideContent.textContent = options[idx]?.text || data.mainText || data.question || '';
       };
-      arInput.bindInteractiveEvent(prev, 'SliderPrev', () => {
-        idx = (idx - 1 + total) % total;
-        update();
-      });
-      arInput.bindInteractiveEvent(next, 'SliderNext', () => {
-        idx = (idx + 1) % total;
-        update();
-      });
+      if (arInput) {
+        arInput.bindInteractiveEvent(prev, 'SliderPrev', () => {
+          idx = (idx - 1 + total) % total;
+          update();
+        });
+        arInput.bindInteractiveEvent(next, 'SliderNext', () => {
+          idx = (idx + 1) % total;
+          update();
+        });
+      }
       slider.appendChild(prev);
       slider.appendChild(slideContent);
       slider.appendChild(next);
@@ -952,7 +962,7 @@ export class ModelFactory {
       okBtn.type = 'button';
       okBtn.className = 'ar-quest-submit-btn ar-quest-ok-btn';
       okBtn.textContent = 'OK';
-      arInput.bindInteractiveEvent(okBtn, 'SliderOK', () => onAnswer(idx + 1));
+      if (arInput) arInput.bindInteractiveEvent(okBtn, 'SliderOK', () => onAnswer(idx + 1));
       bodyEl.appendChild(okBtn);
     }
   }
