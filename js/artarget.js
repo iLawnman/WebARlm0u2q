@@ -504,15 +504,22 @@ export class ModelFactory {
     if (nextBtn) nextBtn.style.display = 'none';
 
     // ============================================================
-    // МОДАЛКА - ИЗНАЧАЛЬНО СКРЫТА
+    // МОДАЛКА - ПОЛНОСТЬЮ ПЕРЕРАБОТАННЫЙ БЛОК С ЛОГИРОВАНИЕМ
     // ============================================================
     const modalOverlay = el.querySelector('.modal-overlay');
     const modalCloseBtn = el.querySelector('.modal-close-btn');
     
+    console.log('[Modal] === START MODAL SETUP ===');
+    console.log('[Modal] modalOverlay found:', !!modalOverlay);
+    console.log('[Modal] modalCloseBtn found:', !!modalCloseBtn);
+    
     if (modalOverlay && modalCloseBtn) {
       console.log('[Modal] Found modal overlay and close button');
-      if (ui) ui.log('[Modal] Found modal overlay and close button', 'info');
+      console.log('[Modal] modalOverlay:', modalOverlay);
+      console.log('[Modal] modalCloseBtn:', modalCloseBtn);
       
+      if (ui) ui.log('[Modal] Found modal overlay and close button', 'info');
+
       // ВАЖНО: модалка изначально скрыта
       modalOverlay.style.display = 'none';
       modalOverlay.style.pointerEvents = 'auto';
@@ -520,25 +527,46 @@ export class ModelFactory {
       
       // Убеждаемся, что кнопка видима и кликабельна
       modalCloseBtn.style.display = 'block';
-      modalCloseBtn.style.pointerEvents = 'auto';
-      modalCloseBtn.style.touchAction = 'manipulation';
-      modalCloseBtn.style.cursor = 'pointer';
-      modalCloseBtn.style.zIndex = '99999';
+      modalCloseBtn.style.pointerEvents = 'auto !important';
+      modalCloseBtn.style.touchAction = 'manipulation !important';
+      modalCloseBtn.style.cursor = 'pointer !important';
+      modalCloseBtn.style.zIndex = '99999 !important';
       modalCloseBtn.style.position = 'relative';
       modalCloseBtn.style.minWidth = '40px';
       modalCloseBtn.style.minHeight = '40px';
       modalCloseBtn.style.padding = '8px';
       modalCloseBtn.style.fontSize = '20px';
       modalCloseBtn.style.lineHeight = '1';
+      modalCloseBtn.style.background = 'rgba(255,255,255,0.2)';
+      modalCloseBtn.style.border = '2px solid #ff4444';
+      modalCloseBtn.style.borderRadius = '50%';
+      modalCloseBtn.style.color = '#ff4444';
+      modalCloseBtn.style.fontWeight = 'bold';
+      
+      // ДОБАВЛЯЕМ: логгируем HTML структуру модалки
+      console.log('[Modal] Modal HTML structure:', modalOverlay.outerHTML);
+      
+      // ДОБАВЛЯЕМ: проверяем, что кнопка находится внутри модалки
+      console.log('[Modal] Is close button inside modal?', modalOverlay.contains(modalCloseBtn));
+      
+      // ДОБАВЛЯЕМ: проверяем z-index и позиционирование
+      console.log('[Modal] Close button z-index:', window.getComputedStyle(modalCloseBtn).zIndex);
+      console.log('[Modal] Close button position:', window.getComputedStyle(modalCloseBtn).position);
       
       const modalOverlayRef = modalOverlay;
       const modalCloseBtnRef = modalCloseBtn;
       const elRef = el;
-      
+
       const closeModal = (e) => {
-        console.log('[Modal] closeModal called!', e ? e.type : 'no event');
-        if (ui) ui.log('[Modal] closeModal called!', 'ok');
+        console.log('[Modal] === closeModal called! ===');
+        console.log('[Modal] Event:', e);
+        console.log('[Modal] Event type:', e ? e.type : 'no event');
+        console.log('[Modal] Event target:', e ? e.target : 'no target');
+        console.log('[Modal] Event currentTarget:', e ? e.currentTarget : 'no currentTarget');
+        console.log('[Modal] Event phase:', e ? e.eventPhase : 'no phase');
         
+        if (ui) ui.log('[Modal] closeModal called!', 'ok');
+
         try {
           const modalBody = elRef.querySelector('.modal-body');
           const modalBodyText = modalBody ? modalBody.textContent : '';
@@ -558,25 +586,98 @@ export class ModelFactory {
           if (ui) ui.log('[Modal] Error: ' + err.message, 'error');
         }
       };
-      
-      // Навешиваем обработчики
+
+      // ДОБАВЛЯЕМ: функция для логирования всех событий
+      const logEvent = (eventName) => (e) => {
+        console.log(`[Modal] EVENT: ${eventName} on close button`);
+        console.log(`[Modal] Event details:`, {
+          type: e.type,
+          target: e.target,
+          currentTarget: e.currentTarget,
+          bubbles: e.bubbles,
+          cancelable: e.cancelable,
+          defaultPrevented: e.defaultPrevented,
+          eventPhase: e.eventPhase,
+          composed: e.composed
+        });
+        if (e.type === 'touchstart' || e.type === 'touchend') {
+          console.log('[Modal] Touch details:', {
+            touches: e.touches?.length,
+            changedTouches: e.changedTouches?.length,
+            targetTouches: e.targetTouches?.length
+          });
+        }
+        if (e.type === 'click' || e.type === 'pointerup') {
+          console.log('[Modal] Click position:', {
+            clientX: e.clientX,
+            clientY: e.clientY,
+            screenX: e.screenX,
+            screenY: e.screenY
+          });
+        }
+      };
+
+      // ВАРИАНТ 1: Через arInput.bindInteractiveEvent
       if (typeof arInput.bindInteractiveEvent === 'function') {
-        arInput.bindInteractiveEvent(modalCloseBtnRef, 'ModalCloseButton', closeModal);
+        console.log('[Modal] Binding via arInput.bindInteractiveEvent');
+        arInput.bindInteractiveEvent(modalCloseBtnRef, 'ModalCloseButton', (e) => {
+          console.log('[Modal] arInput.bindInteractiveEvent callback triggered!', e);
+          closeModal(e);
+        });
         console.log('[Modal] Bound via arInput.bindInteractiveEvent');
         if (ui) ui.log('[Modal] Bound via arInput.bindInteractiveEvent', 'info');
+      } else {
+        console.warn('[Modal] arInput.bindInteractiveEvent is not a function!');
       }
+
+      // ВАРИАНТ 2: Прямые обработчики на кнопке
+      console.log('[Modal] Adding direct event handlers...');
       
+      // click
       modalCloseBtnRef.addEventListener('click', function(e) {
-        console.log('[Modal] Direct click handler (capture)');
+        console.log('[Modal] DIRECT click handler on close button');
+        console.log('[Modal] Click event details:', {
+          type: e.type,
+          target: e.target,
+          currentTarget: e.currentTarget,
+          button: e.button,
+          clientX: e.clientX,
+          clientY: e.clientY
+        });
         e.stopPropagation();
         e.stopImmediatePropagation();
         if (e.cancelable) e.preventDefault();
         closeModal(e);
       }, true);
       
+      // pointerdown
+      modalCloseBtnRef.addEventListener('pointerdown', function(e) {
+        console.log('[Modal] DIRECT pointerdown handler on close button');
+        console.log('[Modal] Pointer event details:', {
+          type: e.type,
+          pointerId: e.pointerId,
+          button: e.button,
+          clientX: e.clientX,
+          clientY: e.clientY,
+          isPrimary: e.isPrimary
+        });
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        if (e.cancelable) e.preventDefault();
+      }, true);
+      
+      // pointerup
       modalCloseBtnRef.addEventListener('pointerup', function(e) {
+        console.log('[Modal] DIRECT pointerup handler on close button');
+        console.log('[Modal] Pointerup details:', {
+          type: e.type,
+          pointerId: e.pointerId,
+          button: e.button,
+          clientX: e.clientX,
+          clientY: e.clientY
+        });
         if (e.button === 0) {
-          console.log('[Modal] Direct pointerup handler (capture)');
+          console.log('[Modal] Left click detected on close button');
           e.stopPropagation();
           e.stopImmediatePropagation();
           if (e.cancelable) e.preventDefault();
@@ -584,31 +685,97 @@ export class ModelFactory {
         }
       }, true);
       
+      // touchstart
       modalCloseBtnRef.addEventListener('touchstart', function(e) {
-        console.log('[Modal] Touchstart handler');
+        console.log('[Modal] DIRECT touchstart handler on close button');
+        console.log('[Modal] Touch event details:', {
+          touches: e.touches?.length,
+          changedTouches: e.changedTouches?.length,
+          target: e.target
+        });
         e.stopPropagation();
         e.stopImmediatePropagation();
         if (e.cancelable) e.preventDefault();
-      }, true);
+      }, { passive: false, capture: true });
       
+      // touchend
       modalCloseBtnRef.addEventListener('touchend', function(e) {
-        console.log('[Modal] Touchend handler');
+        console.log('[Modal] DIRECT touchend handler on close button');
+        console.log('[Modal] Touch end details:', {
+          changedTouches: e.changedTouches?.length,
+          target: e.target
+        });
         e.stopPropagation();
         e.stopImmediatePropagation();
         if (e.cancelable) e.preventDefault();
         closeModal(e);
+      }, { passive: false, capture: true });
+
+      // ВАРИАНТ 3: mousedown/mouseup для десктопа
+      modalCloseBtnRef.addEventListener('mousedown', function(e) {
+        console.log('[Modal] DIRECT mousedown on close button', e.button);
       }, true);
       
-      modalOverlayRef.addEventListener('click', function(e) {
-        if (e.target === modalOverlayRef) {
-          console.log('[Modal] Click on overlay - ignoring');
-        }
+      modalCloseBtnRef.addEventListener('mouseup', function(e) {
+        console.log('[Modal] DIRECT mouseup on close button', e.button);
+      }, true);
+
+      // ДОБАВЛЯЕМ: проверка, что кнопка получает события
+      const computedStyles = window.getComputedStyle(modalCloseBtnRef);
+      console.log('[Modal] Close button computed styles:', {
+        pointerEvents: computedStyles.pointerEvents,
+        touchAction: computedStyles.touchAction,
+        display: computedStyles.display,
+        zIndex: computedStyles.zIndex,
+        position: computedStyles.position,
+        width: computedStyles.width,
+        height: computedStyles.height,
+        visibility: computedStyles.visibility
       });
+
+      // ДОБАВЛЯЕМ: слушаем события на документе для отладки
+      const docHandler = (e) => {
+        if (e.target === modalCloseBtnRef || modalCloseBtnRef.contains(e.target)) {
+          console.log(`[Modal] Document event: ${e.type} on close button or child`);
+          console.log('[Modal] Event path:', e.composedPath ? e.composedPath() : 'not available');
+        }
+      };
+      
+      document.addEventListener('click', docHandler, true);
+      document.addEventListener('pointerdown', docHandler, true);
+      document.addEventListener('pointerup', docHandler, true);
+      document.addEventListener('touchstart', docHandler, true);
+      document.addEventListener('touchend', docHandler, true);
+      
+      // Сохраняем обработчики для очистки
+      modalCloseBtnRef._docHandlers = docHandler;
       
       console.log('[Modal] All handlers attached');
+      console.log('[Modal] === END MODAL SETUP ===');
       if (ui) ui.log('[Modal] All handlers attached', 'ok');
+      
+      // ДОБАВЛЯЕМ: экспортируем функцию для показа модалки
+      window._showModal = function() {
+        console.log('[Modal] Manual show modal called');
+        modalOverlayRef.style.display = 'flex';
+        modalOverlayRef.style.position = 'fixed';
+        modalOverlayRef.style.top = '0';
+        modalOverlayRef.style.left = '0';
+        modalOverlayRef.style.width = '100%';
+        modalOverlayRef.style.height = '100%';
+        modalOverlayRef.style.zIndex = '99999';
+        modalOverlayRef.style.background = 'rgba(0,0,0,0.7)';
+        modalOverlayRef.style.alignItems = 'center';
+        modalOverlayRef.style.justifyContent = 'center';
+        console.log('[Modal] Modal should be visible now');
+        console.log('[Modal] Close button visibility:', window.getComputedStyle(modalCloseBtnRef).display);
+        console.log('[Modal] Modal overlay style:', modalOverlayRef.style.display);
+      };
+      
     } else {
       console.warn('[Modal] Modal overlay or close button not found');
+      console.log('[Modal] modalOverlay:', modalOverlay);
+      console.log('[Modal] modalCloseBtn:', modalCloseBtn);
       if (ui) ui.log('[Modal] Modal overlay or close button not found', 'warn');
     }
   }
