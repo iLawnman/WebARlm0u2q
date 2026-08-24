@@ -1,4 +1,5 @@
 // arpanel.js - AR Panel Creator
+import * as THREE from 'three';
 import { CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
 import { ARDataParser } from './arparser.js';
 import { ARButtonCreator } from './arbutton.js';
@@ -184,7 +185,23 @@ export class ARPanelCreator {
     cssObject.position.set(0, 0.05, 0);
     cssObject.rotation.set(-Math.PI / 2, 0, 0);
 
-    return { el, cssObject };
+    // CSS3DObject не содержит геометрии, поэтому THREE.Raycaster не может
+    // его пересечь (клики в 3D-сцене через ARInput._onCanvasEvent находили
+    // 0 intersects). Создаем невидимый плоский меш той же формы, размера
+    // и трансформации, который будет служить "хитбоксом" для рейкастинга,
+    // и связываем его с cssObject через arInput.addCSSObject().
+    const raycastMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(SCREEN_WIDTH_PX * SCREEN_SCALE, SCREEN_HEIGHT_PX * SCREEN_SCALE),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
+    );
+    raycastMesh.name = 'ScreenRaycastProxy';
+    raycastMesh.position.copy(cssObject.position);
+    raycastMesh.rotation.copy(cssObject.rotation);
+    // raycastMesh не масштабируется через CSS_SCALE - его геометрия уже
+    // задана в мировых единицах (метрах), в отличие от cssObject, чей
+    // scale переводит "пиксельные" размеры DOM-элемента в мировые.
+
+    return { el, cssObject, raycastMesh };
   }
 
   _fillScreen(el, data, onAnswer, ui, arInput) {

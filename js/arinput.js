@@ -12,6 +12,7 @@ export class ARInput {
     this._raycaster = new THREE.Raycaster();
     this._pointer = new THREE.Vector2();
     this._cssObjects = [];
+    this._raycastMeshes = [];
     this._isInitialized = false;
     this._sceneGroups = [];
   }
@@ -35,9 +36,19 @@ export class ARInput {
     }
   }
 
-  addCSSObject(cssObject) {
+  addCSSObject(cssObject, raycastMesh = null) {
     if (cssObject && !this._cssObjects.includes(cssObject)) {
       this._cssObjects.push(cssObject);
+    }
+    // CSS3DObject не имеет геометрии, поэтому THREE.Raycaster не может
+    // пересечь его напрямую (Object3D.raycast по умолчанию - пустая функция).
+    // Поэтому используем невидимый прокси-меш той же формы/трансформации
+    // и связываем его с исходным CSS3DObject через userData.
+    if (raycastMesh) {
+      raycastMesh.userData.cssObject = cssObject;
+      if (!this._raycastMeshes.includes(raycastMesh)) {
+        this._raycastMeshes.push(raycastMesh);
+      }
     }
   }
 
@@ -92,17 +103,17 @@ export class ARInput {
     this._pointer.set(x, y);
 
     this._raycaster.setFromCamera(this._pointer, this.camera);
-    const cssObjects = this._getAllCSSObjects();
+    const raycastMeshes = this._getAllRaycastMeshes();
 
-    if (cssObjects.length === 0) return;
+    if (raycastMeshes.length === 0) return;
 
-    const intersects = this._raycaster.intersectObjects(cssObjects);
+    const intersects = this._raycaster.intersectObjects(raycastMeshes);
 
     if (intersects.length > 0) {
       const hit = intersects[0];
-      const cssObject = hit.object;
+      const cssObject = hit.object.userData && hit.object.userData.cssObject;
 
-      if (cssObject.element) {
+      if (cssObject && cssObject.element) {
         const canvas = this.renderer.domElement;
         const prevPointerEvents = canvas.style.pointerEvents;
         
@@ -144,23 +155,29 @@ export class ARInput {
     }
   }
 
-  _getAllCSSObjects() {
-    const objects = [];
-    if (!this.scene) return objects;
-    
-    for (const obj of this._cssObjects) {
-      if (obj && obj.isCSS3DObject && obj.visible !== false) {
-        objects.push(obj);
+  _getAllRaycastMeshes() {
+    const meshes = [];
+
+    for (const m of this._raycastMeshes) {
+      if (m && m.visible !== false) {
+        meshes.push(m);
       }
     }
-    
-    this.scene.traverse((child) => {
-      if (child.isCSS3DObject && !objects.includes(child) && child.visible !== false) {
-        objects.push(child);
-      }
-    });
-    
-    return objects;
+
+    if (this.scene) {
+      this.scene.traverse((child) => {
+        if (
+          child.userData &&
+          child.userData.cssObject &&
+          !meshes.includes(child) &&
+          child.visible !== false
+        ) {
+          meshes.push(child);
+        }
+      });
+    }
+
+    return meshes;
   }
 
   bindPanelEvents(element, panelName) {

@@ -138,8 +138,9 @@ export class ModelFactory {
     };
 
     // Создаем CSS экран
-    const { el, cssObject } = this.panelCreator.createCSSScreen(data, handleAnswer, ui, activeArInput);
+    const { el, cssObject, raycastMesh } = this.panelCreator.createCSSScreen(data, handleAnswer, ui, activeArInput);
     group.add(cssObject);
+    if (raycastMesh) group.add(raycastMesh);
 
     // Привязываем панели к ARInput
     const zoneMainPanel = el.querySelector('.main-panel');
@@ -152,8 +153,8 @@ export class ModelFactory {
     if (zoneRightPanel) activeArInput.bindPanelEvents(zoneRightPanel, 'RightBlock');
     if (zoneButtons) activeArInput.bindPanelEvents(zoneButtons, 'ButtonsBlock');
 
-    // Добавляем CSS объект в ARInput
-    activeArInput.addCSSObject(cssObject);
+    // Добавляем CSS объект (и его прокси-меш для рейкастинга) в ARInput
+    activeArInput.addCSSObject(cssObject, raycastMesh);
 
     const panels = { 
       Screen: cssObject, 
