@@ -557,114 +557,149 @@ export class ModelFactory {
     if (nextBtn) nextBtn.style.display = 'none';
 
     // ============================================================
-    // МОДАЛКА - УЛУЧШЕННАЯ ВЕРСИЯ
+    // МОДАЛКА - ПРИНУДИТЕЛЬНЫЙ ПОКАЗ
     // ============================================================
-    const modalOverlay = el.querySelector('.modal-overlay');
-    const modalCloseBtn = el.querySelector('.modal-close-btn');
-    
-    console.log('[Modal] === MODAL SETUP START ===');
+    console.log('[Modal] === START MODAL SETUP ===');
+
+    // Ищем модалку разными способами
+    let modalOverlay = el.querySelector('.modal-overlay');
+    let modalCloseBtn = el.querySelector('.modal-close-btn');
+
+    // Если не нашли, пробуем искать в корне документа
+    if (!modalOverlay) {
+      console.log('[Modal] Looking for modal in document');
+      modalOverlay = document.querySelector('.modal-overlay');
+      modalCloseBtn = document.querySelector('.modal-close-btn');
+    }
+
     console.log('[Modal] modalOverlay found:', !!modalOverlay);
     console.log('[Modal] modalCloseBtn found:', !!modalCloseBtn);
-    
+
+    // Если модалки нет - создаем её принудительно
+    if (!modalOverlay) {
+      console.log('[Modal] Creating modal overlay programmatically');
+
+      // Создаем модалку
+      modalOverlay = document.createElement('div');
+      modalOverlay.className = 'modal-overlay';
+      modalOverlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        z-index: 999999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: auto;
+      `;
+
+      const modalWindow = document.createElement('div');
+      modalWindow.className = 'modal-window';
+      modalWindow.style.cssText = `
+        background: linear-gradient(145deg, #1a1a2e, #16213e);
+        padding: 40px;
+        border-radius: 20px;
+        max-width: 90%;
+        max-height: 90%;
+        overflow: auto;
+        color: white;
+        position: relative;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+        border: 1px solid rgba(255, 215, 0, 0.2);
+        pointer-events: auto;
+        min-width: 300px;
+      `;
+
+      modalCloseBtn = document.createElement('button');
+      modalCloseBtn.className = 'modal-close-btn';
+      modalCloseBtn.textContent = '✕';
+      modalCloseBtn.style.cssText = `
+        position: absolute;
+        top: 10px;
+        right: 15px;
+        font-size: 30px;
+        font-weight: bold;
+        background: none;
+        border: none;
+        color: #ff6b6b;
+        cursor: pointer;
+        z-index: 9999999;
+        pointer-events: auto;
+        padding: 10px 15px;
+        min-width: 48px;
+        min-height: 48px;
+        transition: transform 0.2s;
+      `;
+      modalCloseBtn.onmouseover = function() { this.style.transform = 'scale(1.3)'; };
+      modalCloseBtn.onmouseout = function() { this.style.transform = 'scale(1)'; };
+
+      const modalTitle = document.createElement('div');
+      modalTitle.className = 'modal-title';
+      modalTitle.style.cssText = `
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 20px;
+        color: #ffd700;
+        text-align: center;
+      `;
+      modalTitle.textContent = data.title || 'Внимание!';
+
+      const modalBody = document.createElement('div');
+      modalBody.className = 'modal-body';
+      modalBody.style.cssText = `
+        font-size: 18px;
+        line-height: 1.8;
+        color: #e0e0e0;
+        margin-bottom: 20px;
+      `;
+      modalBody.textContent = storySrc || 'Добро пожаловать!';
+
+      modalWindow.appendChild(modalCloseBtn);
+      modalWindow.appendChild(modalTitle);
+      modalWindow.appendChild(modalBody);
+      modalOverlay.appendChild(modalWindow);
+
+      // Добавляем в body
+      document.body.appendChild(modalOverlay);
+      console.log('[Modal] Created and added to body');
+    }
+
     if (modalOverlay && modalCloseBtn) {
-      console.log('[Modal] Found modal overlay and close button');
-      
-      // Настраиваем модалку
-      modalOverlay.style.display = 'none';
-      modalOverlay.style.position = 'fixed';
-      modalOverlay.style.top = '0';
-      modalOverlay.style.left = '0';
-      modalOverlay.style.width = '100%';
-      modalOverlay.style.height = '100%';
-      modalOverlay.style.zIndex = '99999';
-      modalOverlay.style.background = 'rgba(0,0,0,0.8)';
-      modalOverlay.style.alignItems = 'center';
-      modalOverlay.style.justifyContent = 'center';
-      modalOverlay.style.pointerEvents = 'none';
-      
-      // Настраиваем окно модалки
-      const modalWindow = modalOverlay.querySelector('.modal-window');
-      if (modalWindow) {
-        modalWindow.style.pointerEvents = 'auto';
-        modalWindow.style.position = 'relative';
-        modalWindow.style.background = '#1a1a2e';
-        modalWindow.style.padding = '30px';
-        modalWindow.style.borderRadius = '15px';
-        modalWindow.style.maxWidth = '80%';
-        modalWindow.style.maxHeight = '80%';
-        modalWindow.style.overflow = 'auto';
-        modalWindow.style.color = 'white';
-        modalWindow.style.boxShadow = '0 10px 40px rgba(0,0,0,0.5)';
-        modalWindow.style.border = '1px solid rgba(255,215,0,0.3)';
-      }
-      
-      // Настраиваем кнопку закрытия
-      modalCloseBtn.style.display = 'block';
-      modalCloseBtn.style.position = 'absolute';
-      modalCloseBtn.style.top = '10px';
-      modalCloseBtn.style.right = '15px';
-      modalCloseBtn.style.fontSize = '28px';
-      modalCloseBtn.style.fontWeight = 'bold';
-      modalCloseBtn.style.background = 'none';
-      modalCloseBtn.style.border = 'none';
-      modalCloseBtn.style.color = '#ff6b6b';
-      modalCloseBtn.style.cursor = 'pointer';
-      modalCloseBtn.style.zIndex = '999999';
-      modalCloseBtn.style.pointerEvents = 'auto';
-      modalCloseBtn.style.padding = '10px 15px';
-      modalCloseBtn.style.minWidth = '48px';
-      modalCloseBtn.style.minHeight = '48px';
-      modalCloseBtn.style.transition = 'transform 0.2s';
-      
-      // Hover эффект для кнопки
-      modalCloseBtn.onmouseover = function() {
-        this.style.transform = 'scale(1.2)';
-      };
-      modalCloseBtn.onmouseout = function() {
-        this.style.transform = 'scale(1)';
-      };
-      
+      console.log('[Modal] Setting up modal handlers');
+
+      // Сохраняем ссылки
       const modalOverlayRef = modalOverlay;
       const modalCloseBtnRef = modalCloseBtn;
-      
+
       // Функция закрытия
       const closeModal = (e) => {
-        console.log('[Modal] ★★★ closeModal called ★★★');
+        console.log('[Modal] ★★★ CLOSE MODAL CALLED ★★★');
         if (e) {
-          console.log('[Modal] Event type:', e.type);
-          console.log('[Modal] Event target:', e.target);
           e.stopPropagation();
           e.stopImmediatePropagation();
           if (e.cancelable) e.preventDefault();
         }
-        
+
         try {
           modalOverlayRef.style.display = 'none';
-          console.log('[Modal] Modal closed successfully');
-          if (ui) ui.log('[Modal] Closed successfully', 'ok');
+          console.log('[Modal] Modal closed');
+          if (ui) ui.log('[Modal] Closed', 'ok');
         } catch (err) {
-          console.error('[Modal] Error in closeModal:', err);
+          console.error('[Modal] Error closing:', err);
         }
       };
-      
-      // Функция показа модалки
-      const showModal = (data) => {
-        console.log('[Modal] showModal called with data:', data);
+
+      // Функция показа
+      const showModal = () => {
+        console.log('[Modal] ★★★ SHOW MODAL CALLED ★★★');
         modalOverlayRef.style.display = 'flex';
-        modalOverlayRef.style.pointerEvents = 'auto';
-        
-        // Обновляем содержимое если передано
-        if (data) {
-          const titleEl = modalOverlayRef.querySelector('.modal-title');
-          const bodyEl = modalOverlayRef.querySelector('.modal-body');
-          if (titleEl && data.title) titleEl.textContent = data.title;
-          if (bodyEl && data.body) bodyEl.textContent = data.body;
-        }
-        
-        console.log('[Modal] Modal should be visible now');
-        if (ui) ui.log('[Modal] Modal shown', 'info');
-        
-        // Логируем для отладки
+        console.log('[Modal] Modal display:', modalOverlayRef.style.display);
+        console.log('[Modal] Modal in DOM:', document.contains(modalOverlayRef));
+
+        // Проверяем видимость
         setTimeout(() => {
           const rect = modalOverlayRef.getBoundingClientRect();
           console.log('[Modal] Modal rect:', {
@@ -673,118 +708,83 @@ export class ModelFactory {
             display: modalOverlayRef.style.display
           });
         }, 100);
+
+        if (ui) ui.log('[Modal] Shown', 'info');
       };
-      
-      // Сохраняем функции в глобальный доступ для отладки
-      window._modalShow = showModal;
-      window._modalClose = closeModal;
+
+      // Сохраняем в глобальный доступ
+      window._showModal = showModal;
+      window._closeModal = closeModal;
       window._modalOverlay = modalOverlayRef;
-      
-      // 1. Обработчик через ARInput (если доступен)
-      if (arInput && typeof arInput.bindInteractiveEvent === 'function') {
-        console.log('[Modal] Binding via arInput.bindInteractiveEvent');
-        arInput.bindInteractiveEvent(modalCloseBtnRef, 'ModalCloseButton', function(e) {
-          console.log('[Modal] ★★★ ARInput callback triggered! ★★★');
-          closeModal(e);
-        });
-      } else {
-        console.warn('[Modal] ARInput not available or bindInteractiveEvent not a function');
-      }
-      
-      // 2. Прямой обработчик onclick (самый надежный)
+
+      // Навешиваем обработчики на кнопку
+      console.log('[Modal] Adding event listeners to close button');
+
+      // 1. onclick
       modalCloseBtnRef.onclick = function(e) {
-        console.log('[Modal] ★★★ ONCLICK FIRED! ★★★');
-        console.log('[Modal] Event:', e);
+        console.log('[Modal] ★★★ ONCLICK CLOSE BUTTON ★★★');
         closeModal(e);
         return false;
       };
-      
-      // 3. Обработчик через addEventListener (capture phase)
+
+      // 2. addEventListener click
       modalCloseBtnRef.addEventListener('click', function(e) {
-        console.log('[Modal] ★★★ addEventListener CLICK (capture) FIRED! ★★★');
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        if (e.cancelable) e.preventDefault();
+        console.log('[Modal] ★★★ CLICK EVENT LISTENER ★★★');
         closeModal(e);
       }, true);
-      
-      // 4. Обработчик pointerup
+
+      // 3. pointerup
       modalCloseBtnRef.addEventListener('pointerup', function(e) {
         if (e.button === 0) {
-          console.log('[Modal] ★★★ pointerup FIRED! ★★★');
-          e.stopPropagation();
-          e.stopImmediatePropagation();
-          if (e.cancelable) e.preventDefault();
+          console.log('[Modal] ★★★ POINTERUP ★★★');
           closeModal(e);
         }
       }, true);
-      
-      // 5. Обработчик touchstart/touchend для мобильных
-      modalCloseBtnRef.addEventListener('touchstart', function(e) {
-        console.log('[Modal] ★★★ touchstart FIRED! ★★★');
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        if (e.cancelable) e.preventDefault();
-      }, { passive: false, capture: true });
-      
+
+      // 4. touch
       modalCloseBtnRef.addEventListener('touchend', function(e) {
-        console.log('[Modal] ★★★ touchend FIRED! ★★★');
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        if (e.cancelable) e.preventDefault();
+        console.log('[Modal] ★★★ TOUCHEND ★★★');
         closeModal(e);
       }, { passive: false, capture: true });
-      
-      // 6. Глобальный обработчик для отладки
+
+      // 5. Закрытие по клику на оверлей
+      modalOverlayRef.addEventListener('click', function(e) {
+        if (e.target === modalOverlayRef) {
+          console.log('[Modal] Click on overlay - closing');
+          closeModal(e);
+        }
+      }, true);
+
+      // Глобальный обработчик для отладки
       const globalHandler = function(e) {
-        const target = e.target;
-        if (target === modalCloseBtnRef || modalCloseBtnRef.contains(target)) {
-          console.log('[Modal] ★★★ GLOBAL HANDLER: Close button clicked! ★★★');
-          console.log('[Modal] Event details:', {
-            type: e.type,
-            target: target.tagName,
-            className: target.className
-          });
+        if (e.target === modalCloseBtnRef || modalCloseBtnRef.contains(e.target)) {
+          console.log('[Modal] ★★★ GLOBAL: Close button clicked ★★★');
         }
       };
-      
-      // Добавляем глобальные обработчики на capture phase
       document.addEventListener('click', globalHandler, true);
-      document.addEventListener('pointerdown', globalHandler, true);
-      document.addEventListener('touchstart', globalHandler, true);
-      
-      // Сохраняем для очистки
-      modalCloseBtnRef._globalHandler = globalHandler;
-      
-      // Проверяем, что модалка добавлена в DOM
-      console.log('[Modal] Modal in document:', document.contains(modalOverlayRef));
-      console.log('[Modal] Close button in document:', document.contains(modalCloseBtnRef));
-      
-      // Логируем стили кнопки
-      console.log('[Modal] Close button computed styles:');
-      const styles = window.getComputedStyle(modalCloseBtnRef);
-      console.log('[Modal] pointerEvents:', styles.pointerEvents);
-      console.log('[Modal] display:', styles.display);
-      console.log('[Modal] zIndex:', styles.zIndex);
-      console.log('[Modal] position:', styles.position);
-      
+
       console.log('[Modal] === MODAL SETUP COMPLETE ===');
-      
-      // Автоматически показываем модалку для теста (раскомментировать для отладки)
-      // setTimeout(() => {
-      //   console.log('[Modal] Auto-showing modal for test');
-      //   showModal({ title: 'Тестовое окно', body: 'Это тестовое модальное окно для проверки работы кнопки закрытия.' });
-      // }, 1000);
-      
-      // Сохраняем ссылки на функции в элементе
-      el._showModal = showModal;
-      el._closeModal = closeModal;
-      el._modalOverlay = modalOverlayRef;
-      
+
+      // ПРИНУДИТЕЛЬНО ПОКАЗЫВАЕМ МОДАЛКУ
+      console.log('[Modal] ★★★ FORCING MODAL SHOW ★★★');
+      showModal();
+
+      // Дополнительная проверка через 500ms
+      setTimeout(() => {
+        console.log('[Modal] Checking modal visibility after 500ms');
+        console.log('[Modal] Modal display:', modalOverlayRef.style.display);
+        console.log('[Modal] Modal computed display:', window.getComputedStyle(modalOverlayRef).display);
+        console.log('[Modal] Modal visibility:', window.getComputedStyle(modalOverlayRef).visibility);
+
+        // Если модалка не видна - показываем снова
+        if (modalOverlayRef.style.display === 'none' || window.getComputedStyle(modalOverlayRef).display === 'none') {
+          console.log('[Modal] Modal is hidden, forcing show again');
+          modalOverlayRef.style.display = 'flex';
+        }
+      }, 500);
+
     } else {
-      console.warn('[Modal] Modal overlay or close button not found');
-      console.log('[Modal] modalOverlay:', modalOverlay);
-      console.log('[Modal] modalCloseBtn:', modalCloseBtn);
+      console.error('[Modal] FAILED - no modal overlay or close button');
     }
   }
 
