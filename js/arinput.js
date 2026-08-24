@@ -13,6 +13,7 @@ export class ARInput {
     this._pointer = new THREE.Vector2();
     this._cssObjects = [];
     this._isInitialized = false;
+    this._sceneGroups = []; // Для отслеживания добавленных групп
   }
 
   /**
@@ -25,16 +26,83 @@ export class ARInput {
     
     // Добавляем глобальные обработчики событий
     this._setupGlobalListeners();
+    
+    // Логируем все объекты в сцене для отладки
+    this._logSceneObjects();
+  }
+
+  /**
+   * Добавляем группу с AR объектами в сцену для отслеживания
+   */
+  addSceneGroup(group) {
+    console.log('[ARInput] addSceneGroup called with group:', group.name);
+    if (group && !this._sceneGroups.includes(group)) {
+      this._sceneGroups.push(group);
+      console.log('[ARInput] Group added, total groups:', this._sceneGroups.length);
+    }
   }
 
   /**
    * Добавляем CSS3D объект для отслеживания
    */
   addCSSObject(cssObject) {
-    console.log('[ARInput] addCSSObject', cssObject);
+    console.log('[ARInput] addCSSObject called');
+    if (cssObject) {
+      console.log('[ARInput] CSS Object details:', {
+        name: cssObject.name || 'unnamed',
+        type: cssObject.type,
+        isCSS3DObject: cssObject.isCSS3DObject,
+        position: cssObject.position,
+        element: cssObject.element ? 'has element' : 'no element'
+      });
+    }
     if (cssObject && !this._cssObjects.includes(cssObject)) {
       this._cssObjects.push(cssObject);
+      console.log('[ARInput] CSS object added, total:', this._cssObjects.length);
+    } else if (cssObject) {
+      console.log('[ARInput] CSS object already in list');
     }
+  }
+
+  /**
+   * Логирование всех объектов в сцене для отладки
+   */
+  _logSceneObjects() {
+    console.log('[ARInput] === SCENE OBJECTS DEBUG ===');
+    if (!this.scene) {
+      console.log('[ARInput] Scene is null!');
+      return;
+    }
+    
+    let objectCount = 0;
+    let cssCount = 0;
+    this.scene.traverse((child) => {
+      objectCount++;
+      if (child.isCSS3DObject) {
+        cssCount++;
+        console.log(`[ARInput] CSS3D Object #${cssCount}:`, {
+          name: child.name || 'unnamed',
+          type: child.type,
+          position: child.position.toArray(),
+          visible: child.visible,
+          element: child.element ? 'has element' : 'no element',
+          elementHTML: child.element ? child.element.outerHTML.substring(0, 200) + '...' : 'none'
+        });
+      }
+    });
+    console.log(`[ARInput] Total objects: ${objectCount}, CSS3D objects: ${cssCount}`);
+    console.log('[ARInput] === END SCENE DEBUG ===');
+    
+    // Логируем отдельно CSS объекты из нашего массива
+    console.log('[ARInput] CSS objects in _cssObjects array:', this._cssObjects.length);
+    this._cssObjects.forEach((obj, idx) => {
+      console.log(`[ARInput] _cssObjects[${idx}]:`, {
+        name: obj.name || 'unnamed',
+        type: obj.type,
+        visible: obj.visible,
+        element: obj.element ? 'has element' : 'no element'
+      });
+    });
   }
 
   /**
@@ -51,8 +119,8 @@ export class ARInput {
       canvas.addEventListener('click', this._onCanvasEvent.bind(this), true);
       canvas.addEventListener('pointerdown', this._onCanvasEvent.bind(this), true);
       canvas.addEventListener('pointerup', this._onCanvasEvent.bind(this), true);
-      canvas.addEventListener('touchstart', this._onCanvasEvent.bind(this), true);
-      canvas.addEventListener('touchend', this._onCanvasEvent.bind(this), true);
+      canvas.addEventListener('touchstart', this._onCanvasEvent.bind(this), { passive: true, capture: true });
+      canvas.addEventListener('touchend', this._onCanvasEvent.bind(this), { passive: true, capture: true });
       
       console.log('[ARInput] Canvas event listeners added');
     } else {
@@ -67,10 +135,15 @@ export class ARInput {
    * Обработка событий на canvas (3D сцена)
    */
   _onCanvasEvent(e) {
-    console.log('[ARInput] Canvas event:', e.type, e);
+    console.log('[ARInput] ★★★ CANVAS EVENT ★★★:', e.type, 'target:', e.target);
     
     if (!this._isInitialized) {
       console.warn('[ARInput] Not initialized yet');
+      return;
+    }
+    
+    if (!this.renderer || !this.renderer.domElement) {
+      console.warn('[ARInput] Renderer or domElement is null');
       return;
     }
     
@@ -79,30 +152,75 @@ export class ARInput {
     const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
     
+    console.log('[ARInput] Click position:', {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+      normalized: { x, y }
+    });
+    
     this._pointer.set(x, y);
     
     // Делаем raycast
+    console.log('[ARInput] ★★★ PERFORMING RAYCAST ★★★');
     this._raycaster.setFromCamera(this._pointer, this.camera);
+    console.log('[ARInput] Raycaster origin:', this._raycaster.ray.origin);
+    console.log('[ARInput] Raycaster direction:', this._raycaster.ray.direction);
     
     // Получаем все CSS3D объекты из сцены
     const cssObjects = this._getAllCSSObjects();
     console.log('[ARInput] Found', cssObjects.length, 'CSS objects in scene');
     
     if (cssObjects.length === 0) {
-      console.warn('[ARInput] No CSS objects found');
+      console.warn('[ARInput] ⚠️ No CSS objects found in scene!');
+      console.log('[ARInput] Scene children count:', this.scene?.children?.length || 0);
+      // Дополнительный обход для поиска
+      if (this.scene) {
+        this.scene.traverse((child) => {
+          if (child.isCSS3DObject) {
+            console.log('[ARInput] Found CSS object during traversal:', child.name);
+          }
+        });
+      }
       return;
     }
     
+    // Логируем найденные объекты
+    cssObjects.forEach((obj, idx) => {
+      console.log(`[ARInput] CSS object ${idx}:`, {
+        name: obj.name || 'unnamed',
+        visible: obj.visible,
+        position: obj.position.toArray(),
+        element: obj.element ? 'has element' : 'no element'
+      });
+    });
+    
     // Проверяем пересечения с CSS3D объектами
+    console.log('[ARInput] ★★★ INTERSECTING WITH RAY ★★★');
     const intersects = this._raycaster.intersectObjects(cssObjects);
-    console.log('[ARInput] Intersections:', intersects.length);
+    console.log('[ARInput] Intersections count:', intersects.length);
     
     if (intersects.length > 0) {
+      console.log('[ARInput] ★★★ INTERSECTION FOUND! ★★★');
+      // Логируем все пересечения
+      intersects.forEach((intersect, idx) => {
+        console.log(`[ARInput] Intersection ${idx}:`, {
+          object: intersect.object.name || 'unnamed',
+          distance: intersect.distance,
+          point: intersect.point.toArray(),
+          element: intersect.object.element ? 'has element' : 'no element'
+        });
+      });
+      
       // Берем первый попавшийся объект
       const hit = intersects[0];
       const cssObject = hit.object;
       
-      console.log('[ARInput] Hit CSS object:', cssObject.name, cssObject);
+      console.log('[ARInput] ★★★ HIT CSS OBJECT ★★★:', {
+        name: cssObject.name || 'unnamed',
+        type: cssObject.type,
+        element: cssObject.element ? 'has element' : 'no element'
+      });
       
       if (cssObject.element) {
         // Получаем координаты клика на элементе
@@ -110,7 +228,13 @@ export class ARInput {
         const clickX = e.clientX - elementRect.left;
         const clickY = e.clientY - elementRect.top;
         
-        console.log('[ARInput] Element click at:', clickX, clickY);
+        console.log('[ARInput] Element rect:', {
+          left: elementRect.left,
+          top: elementRect.top,
+          width: elementRect.width,
+          height: elementRect.height
+        });
+        console.log('[ARInput] Element click at:', { clickX, clickY });
         
         // Создаем событие на элементе
         const eventOptions = {
@@ -127,6 +251,7 @@ export class ARInput {
         console.log('[ARInput] Found element at position:', targetElement);
         
         if (targetElement) {
+          console.log('[ARInput] ★★★ DISPATCHING EVENT TO:', targetElement.tagName, targetElement.className);
           // Создаем событие для целевого элемента
           const newEvent = new Event(e.type, {
             bubbles: true,
@@ -140,9 +265,34 @@ export class ARInput {
           
           console.log('[ARInput] Dispatching event to:', targetElement);
           targetElement.dispatchEvent(newEvent);
+        } else {
+          console.log('[ARInput] No target element found at click position');
+          // Попробуем найти интерактивные элементы внутри
+          const interactive = cssObject.element.querySelectorAll('button, .modal-close-btn, .ar-quest-btn, .ar-quest-submit-btn, input, textarea, select, a');
+          console.log('[ARInput] Interactive elements in CSS object:', interactive.length);
+          interactive.forEach((el, idx) => {
+            const rect = el.getBoundingClientRect();
+            console.log(`[ARInput] Interactive element ${idx}:`, {
+              tag: el.tagName,
+              class: el.className,
+              rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+              containsPoint: this._isPointInRect(e.clientX, e.clientY, rect)
+            });
+          });
         }
+      } else {
+        console.warn('[ARInput] Hit CSS object has no element!');
       }
+    } else {
+      console.log('[ARInput] No intersections found');
     }
+  }
+
+  /**
+   * Проверка, находится ли точка в прямоугольнике
+   */
+  _isPointInRect(x, y, rect) {
+    return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
   }
 
   /**
@@ -176,14 +326,26 @@ export class ARInput {
    */
   _getAllCSSObjects() {
     const objects = [];
-    if (!this.scene) return objects;
+    if (!this.scene) {
+      console.warn('[ARInput] Scene is null in _getAllCSSObjects');
+      return objects;
+    }
     
+    // Сначала добавляем объекты из нашего массива
+    for (const obj of this._cssObjects) {
+      if (obj && obj.isCSS3DObject && obj.visible !== false) {
+        objects.push(obj);
+      }
+    }
+    
+    // Затем ищем в сцене
     this.scene.traverse((child) => {
-      if (child.isCSS3DObject) {
+      if (child.isCSS3DObject && !objects.includes(child)) {
         objects.push(child);
       }
     });
     
+    console.log('[ARInput] _getAllCSSObjects found:', objects.length, 'objects');
     return objects;
   }
 
@@ -191,28 +353,45 @@ export class ARInput {
    * Находит элемент в CSS3D объекте по координатам
    */
   _findElementAt(root, x, y) {
-    if (!root) return null;
-    
-    // Проверяем все интерактивные элементы
-    const interactive = root.querySelectorAll('button, .modal-close-btn, .ar-quest-btn, .ar-quest-submit-btn');
-    
-    for (const el of interactive) {
-      const rect = el.getBoundingClientRect();
-      // Используем глобальные координаты
-      // В CSS3D они могут быть смещены, поэтому используем более простой метод
-      if (el === root.querySelector('.modal-close-btn')) {
-        return el; // Возвращаем кнопку закрытия
-      }
+    if (!root) {
+      console.log('[ARInput] _findElementAt: root is null');
+      return null;
     }
     
-    // Если не нашли, проверяем все дочерние элементы
-    const allElements = root.querySelectorAll('*');
-    for (const el of allElements) {
-      if (el === root.querySelector('.modal-close-btn')) {
+    console.log('[ARInput] _findElementAt: searching in root', root.tagName, root.className);
+    
+    // Проверяем все интерактивные элементы
+    const interactive = root.querySelectorAll('button, .modal-close-btn, .ar-quest-btn, .ar-quest-submit-btn, input, textarea, select, a, .ar-quest-ok-btn, .ar-slide-nav');
+    console.log('[ARInput] _findElementAt: found', interactive.length, 'interactive elements');
+    
+    // Используем глобальные координаты, проверяем попадание
+    for (const el of interactive) {
+      const rect = el.getBoundingClientRect();
+      const isInside = this._isPointInRect(x + (rect.left - root.getBoundingClientRect().left), y + (rect.top - root.getBoundingClientRect().top), rect);
+      
+      console.log(`[ARInput] Checking element ${el.tagName}.${el.className}:`, {
+        rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+        point: { x, y },
+        isInside
+      });
+      
+      if (isInside) {
+        console.log('[ARInput] ★★★ Found target element:', el.tagName, el.className);
         return el;
       }
     }
     
+    // Если не нашли, проверяем специальные элементы
+    const closeBtn = root.querySelector('.modal-close-btn');
+    if (closeBtn) {
+      const rect = closeBtn.getBoundingClientRect();
+      if (this._isPointInRect(x + (rect.left - root.getBoundingClientRect().left), y + (rect.top - root.getBoundingClientRect().top), rect)) {
+        console.log('[ARInput] ★★★ Found close button!');
+        return closeBtn;
+      }
+    }
+    
+    console.log('[ARInput] _findElementAt: no element found');
     return null;
   }
 
@@ -221,6 +400,11 @@ export class ARInput {
    */
   bindPanelEvents(element, panelName) {
     console.log(`[ARInput] bindPanelEvents called for: ${panelName}`, element);
+    
+    if (!element) {
+      console.warn(`[ARInput] bindPanelEvents: element is null for ${panelName}`);
+      return;
+    }
     
     element.style.pointerEvents = 'auto';
     element.style.touchAction = 'manipulation';
