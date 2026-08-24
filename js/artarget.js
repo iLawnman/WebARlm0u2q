@@ -195,8 +195,8 @@ export class ModelFactory {
       if (typeof onAnswer === 'function') onAnswer(value);
     };
 
-    const SCREEN_WIDTH_PX = 500;
-    const SCREEN_HEIGHT_PX = 600;
+    const SCREEN_WIDTH_PX = 340;
+    const SCREEN_HEIGHT_PX = 480;
     const SCREEN_SCALE = 0.0005;
 
     const screenSrc = this._getScreenRoot(ui);
@@ -403,7 +403,7 @@ export class ModelFactory {
       <div class="screen active" id="screen-fallback">
         <div class="bg"></div>
         <div class="bg-img"></div>
-        <div class="modal-overlay" style="display:flex;">
+        <div class="modal-overlay" style="display:none;">
           <div class="modal-window">
             <button class="modal-close-btn" type="button">✕</button>
             <div class="modal-title"></div>
@@ -504,7 +504,7 @@ export class ModelFactory {
     if (nextBtn) nextBtn.style.display = 'none';
 
     // ============================================================
-    // МОДАЛКА - ИСПРАВЛЕННАЯ ОБРАБОТКА
+    // МОДАЛКА - ИЗНАЧАЛЬНО СКРЫТА
     // ============================================================
     const modalOverlay = el.querySelector('.modal-overlay');
     const modalCloseBtn = el.querySelector('.modal-close-btn');
@@ -513,8 +513,8 @@ export class ModelFactory {
       console.log('[Modal] Found modal overlay and close button');
       if (ui) ui.log('[Modal] Found modal overlay and close button', 'info');
       
-      // Убеждаемся, что модалка видима
-      modalOverlay.style.display = 'flex';
+      // ВАЖНО: модалка изначально скрыта
+      modalOverlay.style.display = 'none';
       modalOverlay.style.pointerEvents = 'auto';
       modalOverlay.style.touchAction = 'manipulation';
       
@@ -531,7 +531,6 @@ export class ModelFactory {
       modalCloseBtn.style.fontSize = '20px';
       modalCloseBtn.style.lineHeight = '1';
       
-      // Сохраняем ссылки для обработчика
       const modalOverlayRef = modalOverlay;
       const modalCloseBtnRef = modalCloseBtn;
       const elRef = el;
@@ -541,22 +540,15 @@ export class ModelFactory {
         if (ui) ui.log('[Modal] closeModal called!', 'ok');
         
         try {
-          // Читаем текст модалки до удаления
           const modalBody = elRef.querySelector('.modal-body');
           const modalBodyText = modalBody ? modalBody.textContent : '';
-          console.log('[Modal] modal body text length:', modalBodyText ? modalBodyText.length : 0);
           
-          // Скрываем и удаляем модалку
           modalOverlayRef.style.display = 'none';
           modalOverlayRef.remove();
-          console.log('[Modal] modal overlay removed');
           
-          // Переносим текст в правую панель
           const noteEl = elRef.querySelector('.panels > .side-panel:last-child .right-panel-content');
           if (noteEl && !noteEl.textContent.trim() && modalBodyText) {
             noteEl.textContent = modalBodyText;
-            console.log('[Modal] text moved to right panel');
-            if (ui) ui.log('[Modal] Text moved to right panel', 'info');
           }
           
           console.log('[Modal] Closed successfully');
@@ -567,16 +559,13 @@ export class ModelFactory {
         }
       };
       
-      // ===== НАВЕШИВАЕМ ОБРАБОТЧИКИ ВСЕМИ ВОЗМОЖНЫМИ СПОСОБАМИ =====
-      
-      // 1. Через ARInput
+      // Навешиваем обработчики
       if (typeof arInput.bindInteractiveEvent === 'function') {
         arInput.bindInteractiveEvent(modalCloseBtnRef, 'ModalCloseButton', closeModal);
         console.log('[Modal] Bound via arInput.bindInteractiveEvent');
         if (ui) ui.log('[Modal] Bound via arInput.bindInteractiveEvent', 'info');
       }
       
-      // 2. Прямой обработчик click (capture phase)
       modalCloseBtnRef.addEventListener('click', function(e) {
         console.log('[Modal] Direct click handler (capture)');
         e.stopPropagation();
@@ -585,16 +574,6 @@ export class ModelFactory {
         closeModal(e);
       }, true);
       
-      // 3. Прямой обработчик click (bubble phase)
-      modalCloseBtnRef.addEventListener('click', function(e) {
-        console.log('[Modal] Direct click handler (bubble)');
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        if (e.cancelable) e.preventDefault();
-        closeModal(e);
-      }, false);
-      
-      // 4. Pointerup (capture)
       modalCloseBtnRef.addEventListener('pointerup', function(e) {
         if (e.button === 0) {
           console.log('[Modal] Direct pointerup handler (capture)');
@@ -605,7 +584,6 @@ export class ModelFactory {
         }
       }, true);
       
-      // 5. Touch events для мобильных
       modalCloseBtnRef.addEventListener('touchstart', function(e) {
         console.log('[Modal] Touchstart handler');
         e.stopPropagation();
@@ -621,17 +599,14 @@ export class ModelFactory {
         closeModal(e);
       }, true);
       
-      // 6. Клик по оверлею - НЕ закрываем модалку
       modalOverlayRef.addEventListener('click', function(e) {
         if (e.target === modalOverlayRef) {
           console.log('[Modal] Click on overlay - ignoring');
-          if (ui) ui.log('[Modal] Click on overlay - ignoring', 'info');
         }
       });
       
       console.log('[Modal] All handlers attached');
       if (ui) ui.log('[Modal] All handlers attached', 'ok');
-      
     } else {
       console.warn('[Modal] Modal overlay or close button not found');
       if (ui) ui.log('[Modal] Modal overlay or close button not found', 'warn');

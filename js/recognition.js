@@ -222,7 +222,7 @@ export class Recognition {
           }
 
           const markerName = this.imageReco.getMarkerName(idx);
-          console.log('[Recognition] 🎯 New marker detected:', markerName, 'state:', this.state);
+          console.log('[Recognition] 🎯 New marker detected:', markerName);
 
           const policyCheck = this.policies.canRecognize(markerName);
           if (!policyCheck.ok) {
@@ -248,7 +248,7 @@ export class Recognition {
             questData
           };
 
-          console.log('[Recognition] 🏗️ Creating AR Target (hidden) for:', markerName);
+          console.log('[Recognition] 🏗️ Creating AR Target (HIDDEN) for:', markerName);
 
           // Создаем AR Target, но пока скрываем его
           const arTarget = createArTargetSync(targetInfoData, {
@@ -263,7 +263,7 @@ export class Recognition {
           arTarget.visible = false;
           arScene.scene.add(arTarget);
 
-          console.log('[Recognition] AR Target added to scene (hidden)');
+          console.log('[Recognition] ✅ AR Target added to scene (HIDDEN) for:', markerName);
 
           entry = {
             arTarget,
@@ -291,7 +291,6 @@ export class Recognition {
           console.log('[Recognition] 🔄 Starting scan effect for marker:', markerName);
           this.ui.log(`[Recognition] 🔄 Starting scan effect for: ${markerName}`, 'info');
 
-          // Сохраняем ссылки для колбэка
           const idxRef = idx;
 
           try {
@@ -328,6 +327,17 @@ export class Recognition {
                     e.arTarget.visible = true;
                     console.log('[Recognition] ✅ AR Target SHOWN for:', markerName);
                     this.ui.log(`[Recognition] ✅ AR Target shown: ${markerName}`, 'ok');
+                    
+                    // ПОКАЗЫВАЕМ МОДАЛКУ после того как AR Target стал видимым
+                    const panelEl = e.arTarget.userData?.panelEl;
+                    if (panelEl) {
+                      const modalOverlay = panelEl.querySelector('.modal-overlay');
+                      if (modalOverlay) {
+                        modalOverlay.style.display = 'flex';
+                        console.log('[Recognition] ✅ Modal shown after AR Target visible');
+                        this.ui.log('[Recognition] ✅ Modal shown', 'ok');
+                      }
+                    }
                   }
                 }, 100);
               } else {
