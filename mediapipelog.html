@@ -3,10 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>loged MediaPipe Object Detection</title>
+  <title>MediaPipe Object Detection</title>
   
   <style>
-    /* Основные стили */
     * {
       margin: 0;
       padding: 0;
@@ -132,7 +131,7 @@
       }
     }
     
-    /* ===== WEBLOG СТИЛИ ===== */
+    /* WEBLOG СТИЛИ */
     #weblog-container {
       position: fixed;
       top: 10px;
@@ -212,14 +211,8 @@
     }
     
     @keyframes slideIn {
-      from {
-        opacity: 0;
-        transform: translateY(-10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
     
     #weblog-header {
@@ -306,12 +299,6 @@
       color: #e0e0e0;
     }
     
-    .log-entry .msg .highlight {
-      color: #4CAF50;
-      font-weight: bold;
-    }
-    
-    /* Адаптив для лога */
     @media (max-width: 480px) {
       #weblog-container {
         width: 260px;
@@ -361,22 +348,24 @@
   </div>
 </div>
 
+<!-- ИСПРАВЛЕННЫЙ IMPORT MAP - используем .mjs -->
 <script type="importmap">
 {
   "imports": {
-    "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm/vision_bundle.js"
+    "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm/vision_bundle.mjs"
   }
 }
 </script>
 
 <script type="module">
+// Импортируем из правильного файла .mjs
 import { 
   ObjectDetector, 
   FilesetResolver 
 } from '@mediapipe/tasks-vision';
 
 // ==========================================
-// 1. WEBLOG - система логирования
+// WEBLOG
 // ==========================================
 class WebLog {
   constructor() {
@@ -403,19 +392,16 @@ class WebLog {
   }
   
   initEvents() {
-    // Toggle панели
     this.toggleBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.toggle();
     });
     
-    // Очистка
     this.clearBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.clear();
     });
     
-    // Закрытие по клику вне
     document.addEventListener('click', (e) => {
       if (this.isOpen && !this.container.closest('#weblog-container').contains(e.target)) {
         this.close();
@@ -474,13 +460,11 @@ class WebLog {
     this.renderEntry(entry);
     this.updateBadge();
     
-    // Также выводим в консоль для разработчика
     const consoleMethod = level === 'error' ? 'error' : 
                          level === 'warn' ? 'warn' : 
                          level === 'debug' ? 'debug' : 'log';
     console[consoleMethod](`[${timeStr}] [${category}] ${message}`, data || '');
     
-    // Автоскролл
     const content = this.container;
     if (content) {
       content.scrollTop = content.scrollHeight;
@@ -516,38 +500,21 @@ class WebLog {
     this.badge.style.display = count > 0 ? 'flex' : 'none';
   }
   
-  // Удобные методы для разных уровней
-  info(category, message, data) {
-    this.log(category, message, 'info', data);
-  }
-  warn(category, message, data) {
-    this.log(category, message, 'warn', data);
-  }
-  error(category, message, data) {
-    this.log(category, message, 'error', data);
-  }
-  debug(category, message, data) {
-    this.log(category, message, 'debug', data);
-  }
-  success(category, message, data) {
-    this.log(category, message, 'success', data);
-  }
-  start(category, message, data) {
-    this.log(category, message, 'start', data);
-  }
-  done(category, message, data) {
-    this.log(category, message, 'done', data);
-  }
+  info(category, message, data) { this.log(category, message, 'info', data); }
+  warn(category, message, data) { this.log(category, message, 'warn', data); }
+  error(category, message, data) { this.log(category, message, 'error', data); }
+  debug(category, message, data) { this.log(category, message, 'debug', data); }
+  success(category, message, data) { this.log(category, message, 'success', data); }
+  start(category, message, data) { this.log(category, message, 'start', data); }
+  done(category, message, data) { this.log(category, message, 'done', data); }
 }
 
-// Создаем глобальный экземпляр лога
 const log = new WebLog();
 
 // ==========================================
-// 2. ОСНОВНОЙ КОД ПРИЛОЖЕНИЯ
+// ОСНОВНОЙ КОД
 // ==========================================
 
-// DOM элементы
 const video = document.getElementById('webcam');
 const canvas = document.getElementById('canvas');
 const canvasCtx = canvas.getContext('2d');
@@ -555,18 +522,19 @@ const statusEl = document.getElementById('status');
 const loadingEl = document.getElementById('loading');
 const errorEl = document.getElementById('error');
 
-// Настройки
+// URL модели
 const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/int8/1/efficientdet_lite0_uint8.tflite';
 const MAX_DETECTIONS = 5;
 const SCORE_THRESHOLD = 0.3;
-const WASM_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm';
+
+// ИСПРАВЛЕННЫЙ URL WASM - используем правильный путь с .mjs
+const WASM_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm';
 
 let objectDetector = null;
 let isRunning = false;
 let frameCount = 0;
 let startTime = Date.now();
 
-// === ОТОБРАЖЕНИЕ ОШИБКИ ===
 function showError(message) {
   errorEl.textContent = '❌ ' + message;
   errorEl.style.display = 'block';
@@ -575,7 +543,7 @@ function showError(message) {
   log.error('app', 'Ошибка: ' + message);
 }
 
-// === ИНИЦИАЛИЗАЦИЯ КАМЕРЫ ===
+// === КАМЕРА ===
 async function initCamera() {
   log.start('camera', 'Инициализация камеры...');
   statusEl.textContent = '📷 Запрос доступа к камере...';
@@ -590,10 +558,7 @@ async function initCamera() {
       audio: false
     });
     
-    log.info('camera', 'Доступ к камере получен', { 
-      tracks: stream.getVideoTracks().length,
-      settings: stream.getVideoTracks()[0]?.getSettings() 
-    });
+    log.info('camera', 'Доступ к камере получен');
     
     video.srcObject = stream;
     await video.play();
@@ -601,29 +566,25 @@ async function initCamera() {
     canvas.width = video.videoWidth || 640;
     canvas.height = video.videoHeight || 480;
     
-    log.success('camera', 'Камера запущена', { 
-      width: canvas.width, 
-      height: canvas.height 
-    });
-    
+    log.success('camera', 'Камера запущена', { width: canvas.width, height: canvas.height });
     statusEl.textContent = '📷 Камера готова, загружаем модель...';
     return true;
   } catch (error) {
-    log.error('camera', 'Ошибка доступа к камере: ' + error.message);
+    log.error('camera', 'Ошибка: ' + error.message);
     showError('Доступ к камере: ' + error.message);
     return false;
   }
 }
 
-// === ИНИЦИАЛИЗАЦИЯ MEDIAPIPE ===
+// === MEDIAPIPE - ИСПРАВЛЕННАЯ ВЕРСИЯ ===
 async function initMediaPipe() {
   log.start('mediapipe', 'Инициализация MediaPipe...');
   loadingEl.style.display = 'block';
   statusEl.textContent = '⏳ Загрузка WASM и модели...';
   
   try {
-    // Шаг 1: Загрузка WASM
-    log.info('mediapipe', 'Загрузка WASM файлов из ' + WASM_URL);
+    // Загрузка WASM
+    log.info('mediapipe', 'Загрузка WASM из ' + WASM_URL);
     const visionStart = performance.now();
     
     const vision = await FilesetResolver.forVisionTasks(WASM_URL);
@@ -631,9 +592,8 @@ async function initMediaPipe() {
     const visionTime = (performance.now() - visionStart).toFixed(0);
     log.success('mediapipe', 'WASM загружен за ' + visionTime + 'ms');
     
-    // Шаг 2: Создание детектора
+    // Создание детектора
     log.info('mediapipe', 'Загрузка модели EfficientDet Lite0');
-    log.debug('mediapipe', 'URL модели: ' + MODEL_URL);
     const modelStart = performance.now();
     
     objectDetector = await ObjectDetector.createFromOptions(vision, {
@@ -651,22 +611,19 @@ async function initMediaPipe() {
     
     loadingEl.style.display = 'none';
     statusEl.textContent = '✅ Готово! Начинаем детекцию';
-    log.done('mediapipe', 'MediaPipe полностью инициализирован', {
-      maxDetections: MAX_DETECTIONS,
-      scoreThreshold: SCORE_THRESHOLD,
-      delegate: 'GPU'
-    });
+    log.done('mediapipe', 'MediaPipe полностью инициализирован');
     
     return true;
   } catch (error) {
-    log.error('mediapipe', 'Ошибка инициализации: ' + error.message);
+    log.error('mediapipe', 'Ошибка: ' + (error.message || 'Неизвестная ошибка'));
+    log.error('mediapipe', 'Stack: ' + (error.stack || 'Нет стека'));
     loadingEl.style.display = 'none';
-    showError('Модель: ' + error.message);
+    showError('Модель: ' + (error.message || 'Неизвестная ошибка'));
     return false;
   }
 }
 
-// === ОТРИСОВКА РЕЗУЛЬТАТОВ ===
+// === ОТРИСОВКА ===
 function drawResults(results) {
   const width = canvas.width;
   const height = canvas.height;
@@ -744,14 +701,13 @@ function drawResults(results) {
     canvasCtx.textBaseline = 'top';
     canvasCtx.fillText(text, textX + padding, textY + padding);
     
-    // Номер объекта
     canvasCtx.font = `${fontSize * 0.6}px Arial`;
     canvasCtx.fillStyle = 'rgba(255,255,255,0.4)';
     canvasCtx.fillText(`#${index + 1}`, x + padding, y + h + padding + 2);
   });
 }
 
-// === ОСНОВНОЙ ЦИКЛ ===
+// === ЦИКЛ ===
 function detectLoop() {
   if (!isRunning) return;
   
@@ -769,26 +725,17 @@ function detectLoop() {
         const topScore = Math.round((detections.detections[0].categories[0]?.score || 0) * 100);
         statusEl.textContent = `🎯 ${count} объектов | ${topLabel} (${topScore}%) | ${detectTime}ms`;
         
-        // Логируем каждый 30-й кадр с детекцией
         if (frameCount % 30 === 0) {
-          log.debug('detection', `Кадр ${frameCount}: ${count} объектов, ${detectTime}ms`, {
-            objects: detections.detections.map(d => ({
-              label: d.categories[0]?.categoryName,
-              score: Math.round(d.categories[0]?.score * 100) + '%'
-            }))
-          });
+          log.debug('detection', `Кадр ${frameCount}: ${count} объектов, ${detectTime}ms`);
         }
       } else {
         statusEl.textContent = `🔍 Сканирование... ${detectTime}ms`;
-        if (frameCount % 60 === 0) {
-          log.debug('detection', `Кадр ${frameCount}: объектов не найдено, ${detectTime}ms`);
-        }
       }
       
       drawResults(detections);
       
     } catch (error) {
-      log.error('detection', 'Ошибка детекции: ' + error.message);
+      log.error('detection', 'Ошибка: ' + error.message);
       statusEl.textContent = '⚠️ Ошибка детекции';
     }
   }
@@ -799,10 +746,9 @@ function detectLoop() {
 // === ЗАПУСК ===
 async function start() {
   log.start('app', '🚀 Запуск приложения');
-  log.info('app', 'Версия MediaPipe: @mediapipe/tasks-vision@0.10.14');
+  log.info('app', 'MediaPipe: @mediapipe/tasks-vision (последняя версия)');
   log.info('app', 'Модель: EfficientDet Lite0');
   log.info('app', 'Платформа: ' + navigator.platform);
-  log.info('app', 'User Agent: ' + navigator.userAgent);
   
   isRunning = true;
   
@@ -820,33 +766,24 @@ async function start() {
     return;
   }
   
-  log.success('app', '✅ Все компоненты готовы, запускаем цикл детекции');
+  log.success('app', '✅ Все готово, запускаем детекцию');
   detectLoop();
 }
 
-// === ОБРАБОТЧИКИ ГЛОБАЛЬНЫХ ОШИБОК ===
+// Обработчики ошибок
 window.addEventListener('error', (event) => {
-  log.error('global', 'Глобальная ошибка: ' + (event.error?.message || event.message));
-  showError('Ошибка: ' + (event.error?.message || 'Неизвестная ошибка'));
+  log.error('global', 'Ошибка: ' + (event.error?.message || event.message));
 });
 
 window.addEventListener('unhandledrejection', (event) => {
   log.error('global', 'Unhandled rejection: ' + (event.reason?.message || event.reason));
 });
 
-// Запускаем
+// Запуск
 start().catch(error => {
-  log.error('app', 'Критическая ошибка запуска: ' + error.message);
+  log.error('app', 'Критическая ошибка: ' + error.message);
   showError('Запуск: ' + error.message);
 });
-
-// Периодический лог производительности
-setInterval(() => {
-  if (isRunning) {
-    const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
-    log.debug('system', `Аптайм: ${elapsed}s, кадров: ${frameCount}`);
-  }
-}, 30000);
 
 </script>
 </body>
