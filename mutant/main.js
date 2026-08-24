@@ -2,129 +2,174 @@ import { XRSetup } from './modules/xr-setup.js';
 import { MediaPipeDetector } from './modules/mediapipe.js';
 import { SlotsManager } from './modules/slots.js';
 import { MutationEngine } from './modules/mutation.js';
+import { DebugLogger } from './modules/debug.js';
 
 class AnimalMutatorApp {
     constructor() {
-        this.xr = new XRSetup();
-        this.mediapipe = new MediaPipeDetector();
-        this.slots = new SlotsManager();
-        this.mutation = new MutationEngine();
+        this.logger = new DebugLogger();
+        this.logger.info('🚀 Запуск приложения Animal Mutator');
+        
+        this.xr = new XRSetup(this.logger);
+        this.mediapipe = new MediaPipeDetector(this.logger);
+        this.slots = new SlotsManager(this.logger);
+        this.mutation = new MutationEngine(this.logger);
         
         this.isCapturing = false;
         this.detectionCount = 0;
         this.statusEl = document.getElementById('status');
+        this.hintEl = document.getElementById('hint');
+        this.initialized = false;
         
         this.init();
     }
     
     async init() {
         try {
+            this.logger.info('📦 Инициализация XR...');
             await this.xr.init();
+            this.logger.success('✅ XR инициализирован');
+            
+            this.logger.info('📦 Инициализация MediaPipe...');
             await this.mediapipe.init();
+            this.logger.success('✅ MediaPipe инициализирован');
             
-            this.statusEl.textContent = '✅ Готов, наведите камеру на животное';
-            
-            // Запуск детекции
+            this.logger.info('📦 Запуск детекции...');
             this.mediapipe.startDetection((results) => {
                 this.onDetection(results);
             });
+            this.logger.success('✅ Детекция запущена');
             
-            // WebXR рендер-луп
+            this.logger.info('📦 Запуск рендер-лупа...');
             this.xr.startRenderLoop(() => {
                 // Можно добавлять 3D-объекты в сцену
             });
+            this.logger.success('✅ Рендер-луп запущен');
+            
+            this.initialized = true;
+            this.statusEl.textContent = '✅ Готов, наведите камеру на животное';
+            this.logger.success('🎯 Приложение готово к работе!');
             
         } catch (err) {
+            this.logger.error('❌ Ошибка инициализации:', err.message);
+            this.logger.error('Stack:', err.stack);
             this.statusEl.textContent = '❌ Ошибка: ' + err.message;
+            this.statusEl.style.color = '#ef4444';
             console.error(err);
         }
     }
     
     onDetection(results) {
+        if (!this.initialized) return;
         if (this.isCapturing) return;
         
         const hasAnimal = results.detections && results.detections.length > 0;
         
         if (hasAnimal) {
-            this.statusEl.textContent = '🐾 Животное обнаружено!';
+            const animal = results.detections[0];
+            const name = animal.categories[0]?.categoryName || 'unknown';
+            const score = (animal.categories[0]?.score || 0).toFixed(2);
             
-            // Показываем подсказку для захвата
+            this.logger.debug(`🐾 Обнаружено животное: ${name} (${score})`);
+            this.statusEl.textContent = `🐾 ${name} обнаружен!`;
+            
             if (!this.slots.isFull()) {
+                this.logger.info(`📸 Захват фото (${this.slots.getCount() + 1}/2)`);
                 this.capturePhoto();
+            } else {
+                this.logger.debug('⏳ Слоты заполнены, ожидание мутации');
             }
         } else {
-            this.statusEl.textContent = '🔍 Наведите на животное';
+            if (this.statusEl.textContent.includes('обнаружен')) {
+                this.statusEl.textContent = '🔍 Наведите на животное';
+            }
         }
     }
     
     capturePhoto() {
         this.isCapturing = true;
+        this.logger.info('📸 Захват кадра...');
         this.statusEl.textContent = '📸 Фото...';
         
-        // Получаем кадр из MediaPipe
-        const video = document.querySelector('video');
+        const video = this.mediapipe.getVideo();
         if (!video) {
+            this.logger.error('❌ Видео не доступно');
             this.isCapturing = false;
             return;
         }
         
-        // Создаем canvas для захвата
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth || 640;
-        canvas.height = video.videoHeight || 480;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        // Добавляем в слот
-        const slotIndex = this.slots.addPhoto(canvas.toDataURL('image/jpeg', 0.8));
-        
-        if (slotIndex !== null) {
-            this.statusEl.textContent = `✅ Фото в слоте ${slotIndex + 1}`;
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth || 640;
+            canvas.height = video.videoHeight || 480;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             
-            // Если оба слота заполнены - запускаем мутацию
-            if (this.slots.isFull()) {
-                setTimeout(() => this.runMutation(), 500);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            this.logger.debug(`📷 Размер фото: ${(dataUrl.length / 1024).toFixed(1)} KB`);
+            
+            const slotIndex = this.slots.addPhoto(dataUrl);
+            
+            if (slotIndex !== null) {
+                this.logger.success(`✅ Фото сохранено в слот ${slotIndex + 1}`);
+                this.statusEl.textContent = `✅ Фото в слоте ${slotIndex + 1}`;
+                
+                if (this.slots.isFull()) {
+                    this.logger.info('🎉 Оба слота заполнены! Запуск мутации...');
+                    setTimeout(() => this.runMutation(), 500);
+                }
+            } else {
+                this.logger.warn('⚠️ Нет свободных слотов');
             }
+        } catch (err) {
+            this.logger.error('❌ Ошибка захвата фото:', err.message);
         }
         
         this.isCapturing = false;
     }
     
     async runMutation() {
+        this.logger.info('🧬 Начало мутации...');
         this.statusEl.textContent = '🧬 Создание мутанта...';
-        document.getElementById('hint').textContent = '🧬 Мутация...';
+        this.hintEl.textContent = '🧬 Мутация...';
         
         const images = this.slots.getImages();
+        this.logger.debug(`📸 Изображения для мутации: ${images.length} шт.`);
         
         try {
+            this.logger.info('🎨 Генерация мутанта...');
             const result = await this.mutation.mutate(images[0], images[1]);
+            this.logger.success('✅ Мутант создан!');
             
-            // Показываем результат
             const resultDiv = document.getElementById('result');
             const resultImg = document.getElementById('result-img');
             resultImg.src = result;
             resultDiv.style.display = 'block';
             
-            this.statusEl.textContent = '🎉 Мутант создан!';
-            document.getElementById('hint').textContent = '🔄 Сделайте новое фото для повторной мутации';
+            this.logger.debug(`📊 Размер результата: ${(result.length / 1024).toFixed(1)} KB`);
             
-            // Анимация появления
+            this.statusEl.textContent = '🎉 Мутант создан!';
+            this.hintEl.textContent = '🔄 Сделайте новое фото для повторной мутации';
+            
             resultDiv.style.animation = 'none';
             setTimeout(() => {
                 resultDiv.style.animation = 'fadeInScale 0.8s ease';
             }, 10);
             
-            // Сбрасываем слоты через 3 секунды
+            this.logger.info('⏳ Автосброс через 5 секунд...');
             setTimeout(() => {
+                this.logger.info('🔄 Сброс слотов');
                 this.slots.clear();
                 document.getElementById('result').style.display = 'none';
-                document.getElementById('hint').textContent = '🔍 Наведите на животное';
+                this.hintEl.textContent = '🔍 Наведите на животное';
                 this.statusEl.textContent = '🔍 Готов к новым фото';
+                this.logger.info('✅ Готов к новой мутации');
             }, 5000);
             
         } catch (err) {
+            this.logger.error('❌ Ошибка мутации:', err.message);
+            this.logger.error('Stack:', err.stack);
             this.statusEl.textContent = '❌ Ошибка мутации: ' + err.message;
-            console.error(err);
+            this.statusEl.style.color = '#ef4444';
         }
     }
 }
@@ -140,4 +185,6 @@ style.textContent = `
 document.head.appendChild(style);
 
 // Запуск приложения
-new AnimalMutatorApp();
+window.addEventListener('load', () => {
+    new AnimalMutatorApp();
+});

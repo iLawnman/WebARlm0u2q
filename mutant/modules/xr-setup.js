@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
 
 export class XRSetup {
-    constructor() {
+    constructor(logger) {
+        this.logger = logger;
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x0a0a1a);
         
@@ -11,16 +12,22 @@ export class XRSetup {
         
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         this.renderer.xr.enabled = true;
         document.body.prepend(this.renderer.domElement);
+        this.logger.debug('🎨 THREE.js рендерер создан');
         
-        // Добавляем AR кнопку
-        this.arButton = ARButton.createButton(this.renderer, {
-            requiredFeatures: ['camera'],
-            optionalFeatures: ['depth-sensing']
-        });
-        document.body.prepend(this.arButton);
+        // AR кнопка
+        try {
+            this.arButton = ARButton.createButton(this.renderer, {
+                requiredFeatures: ['camera'],
+                optionalFeatures: ['depth-sensing']
+            });
+            document.body.prepend(this.arButton);
+            this.logger.debug('🔘 AR кнопка создана');
+        } catch (err) {
+            this.logger.warn('⚠️ ARButton не поддерживается:', err.message);
+        }
         
         // Освещение
         const light = new THREE.AmbientLight(0xffffff, 0.6);
@@ -29,23 +36,23 @@ export class XRSetup {
         dirLight.position.set(0, 5, 5);
         this.scene.add(dirLight);
         
-        // Сетка для ориентации
+        // Сетка
         const gridHelper = new THREE.GridHelper(3, 20, 0x4ade80, 0x1a3a2a);
         gridHelper.position.y = -0.5;
         this.scene.add(gridHelper);
+        this.logger.debug('📐 Сетка добавлена в сцену');
         
         window.addEventListener('resize', () => this.onResize());
+        this.logger.debug('📐 Обработчик resize добавлен');
     }
     
     async init() {
-        // Ждем готовности WebXR
         return new Promise((resolve) => {
-            if (this.renderer.xr.isPresenting) {
+            this.logger.debug('⏳ Ожидание WebXR...');
+            setTimeout(() => {
+                this.logger.debug('✅ WebXR готов');
                 resolve();
-            } else {
-                // Просто разрешаем через 1 секунду, если не в AR
-                setTimeout(resolve, 1000);
-            }
+            }, 1000);
         });
     }
     
@@ -54,11 +61,13 @@ export class XRSetup {
             this.renderer.render(this.scene, this.camera);
             if (callback) callback();
         });
+        this.logger.debug('🔄 Рендер-луп запущен');
     }
     
     onResize() {
         this.camera.aspect = window.innerWidth / window.innerHeight;
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.logger.debug(`📐 Resize: ${window.innerWidth}x${window.innerHeight}`);
     }
 }
