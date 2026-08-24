@@ -229,6 +229,7 @@ export class Recognition {
             questData
           };
 
+          // Создаем AR Target, но пока скрываем его
           const arTarget = createArTargetSync(targetInfoData, {
             ui: this.ui,
             onAnswer: (value) => {
@@ -237,6 +238,7 @@ export class Recognition {
             }
           });
 
+          // ВАЖНО: Target изначально скрыт, пока не завершится эффект сканирования
           arTarget.visible = false;
           arScene.scene.add(arTarget);
 
@@ -252,7 +254,9 @@ export class Recognition {
             recognizing: true,
             poseSamples: [],
             effectDone: false,
-            pendingAnchorPose: null
+            pendingAnchorPose: null,
+            // Флаг, что эффект сканирования запущен
+            scanEffectStarted: false
           };
 
           this.imageReco.trackedMarkers.set(idx, entry);
@@ -262,23 +266,44 @@ export class Recognition {
           this.ui.hideQuestStart();
           playSound('click');
 
-          this.ui.playScanEffect(() => {
-            const e = this.imageReco.trackedMarkers.get(idx);
-            if (!e || e.dismissed) return;
+          // ЗАПУСКАЕМ ЭФФЕКТ СКАНИРОВАНИЯ
+          // Target пока скрыт, он появится только в колбэке playScanEffect
+          console.log('[Recognition] Starting scan effect for marker:', markerName);
+          this.ui.log(`[Recognition] Starting scan effect for: ${markerName}`, 'info');
 
+          this.ui.playScanEffect(() => {
+            // Этот колбэк вызывается, когда эффект сканирования завершен
+            console.log('[Recognition] Scan effect completed for marker:', markerName);
+            this.ui.log(`[Recognition] Scan effect completed for: ${markerName}`, 'ok');
+
+            const e = this.imageReco.trackedMarkers.get(idx);
+            if (!e || e.dismissed) {
+              console.log('[Recognition] Entry dismissed, skipping show');
+              return;
+            }
+
+            // Отмечаем, что эффект завершен
             e.effectDone = true;
             e.pendingAnchorPose = this.imageReco.computeStablePose(e.poseSamples);
             e.recognizing = false;
 
+            // Скрываем рамку сканирования и подсказку
             this.ui.hideScanFrame();
             this.ui.hideQuestStart();
 
-            if (e.arTarget) e.arTarget.visible = true;
+            // ПОКАЗЫВАЕМ AR TARGET только после завершения эффекта
+            if (e.arTarget) {
+              e.arTarget.visible = true;
+              console.log('[Recognition] AR Target shown after scan effect');
+              this.ui.log('[Recognition] AR Target shown after scan effect', 'ok');
+            }
 
+            // Переходим в состояние ожидания ввода
             this.state = 'waitingInput';
           });
         }
 
+        // --- Остальная логика обработки трекинга ---
         if (entry.dismissed) {
           entry.lastState = trackingState;
           continue;
@@ -287,6 +312,8 @@ export class Recognition {
         const target = entry.arTarget;
         if (!target) continue;
 
+        // Если эффект не завершен или мы в процессе распознавания - обновляем позицию
+        // НО НЕ ПОКАЗЫВАЕМ TARGET (он скрыт)
         if (entry.recognizing || !entry.effectDone) {
           const t = pose.transform;
           if (t.position && t.orientation) {
@@ -294,6 +321,7 @@ export class Recognition {
               px: t.position.x, py: t.position.y, pz: t.position.z,
               qx: t.orientation.x, qy: t.orientation.y, qz: t.orientation.z, qw: t.orientation.w
             });
+            // Обновляем позицию скрытого объекта, чтобы он был готов к показу
             target.position.set(t.position.x, t.position.y, t.position.z);
             target.quaternion.set(t.orientation.x, t.orientation.y, t.orientation.z, t.orientation.w);
           }
@@ -301,6 +329,7 @@ export class Recognition {
           continue;
         }
 
+        // --- Анкер и плавное позиционирование (только когда target видим) ---
         if (!entry.anchor && !entry.anchorCreating && typeof frame.createAnchor === 'function') {
           entry.anchorCreating = true;
           const createPromise = frame.createAnchor(pose.transform, xrRefSpace);
@@ -338,6 +367,7 @@ export class Recognition {
         }
       }
 
+      // --- Очистка потерянных маркеров ---
       for (const [idx, entry] of this.imageReco.trackedMarkers) {
         if (!seen.has(idx) && entry.lastState !== 'lost') {
           entry.lastState = 'lost';
@@ -354,6 +384,7 @@ export class Recognition {
       }
     } catch (e) {
       // Игнорируем ошибки кадра
+      console.warn('[Recognition] processTracking error:', e);
     }
   }
 }
