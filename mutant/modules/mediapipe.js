@@ -52,7 +52,7 @@ export class MediaPipeDetector {
             
             // Загружаем скрипт
             const script = document.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm/vision_bundle.js';
+            script.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm/vision_bundle.mjs';
             script.onload = () => resolve();
             script.onerror = () => reject(new Error('Failed to load MediaPipe'));
             document.head.appendChild(script);
