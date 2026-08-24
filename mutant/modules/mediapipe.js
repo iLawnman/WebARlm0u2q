@@ -33,13 +33,13 @@ export class MediaPipeDetector {
             
             // Загружаем MediaPipe
             const { ObjectDetector, FilesetResolver } = await import(
-                'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm/vision_bundle.js'
+                'script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.mjs'
             );
             
             this.logger.debug('✅ MediaPipe модуль загружен');
             
             const vision = await FilesetResolver.forVisionTasks(
-                'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm'
+                'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm'
             );
             
             this.logger.debug('✅ FilesetResolver создан');
