@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Animal Mutator XR</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #0a0a1a; font-family: 'Segoe UI', sans-serif; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; background: #0a0a1a; font-family: 'Segoe UI', sans-serif; }
         canvas { display: block; }
         
         #ui-overlay {
@@ -111,11 +112,160 @@
             padding: 6px 16px;
             border-radius: 20px;
             pointer-events: none;
+            z-index: 20;
+        }
+        
+        /* DEBUG PANEL */
+        #debug-toggle {
+            position: fixed;
+            left: 10px;
+            bottom: 10px;
+            z-index: 1000;
+            background: rgba(0,0,0,0.8);
+            color: #4ade80;
+            border: 1px solid #4ade80;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: monospace;
+            pointer-events: all;
+            transition: all 0.3s;
+        }
+        #debug-toggle:hover {
+            background: #4ade80;
+            color: #0a0a1a;
+        }
+        
+        #debug-panel {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 400px;
+            max-width: 90vw;
+            height: 100vh;
+            background: rgba(10, 10, 26, 0.95);
+            backdrop-filter: blur(10px);
+            border-right: 2px solid #4ade80;
+            z-index: 999;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            pointer-events: all;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+        }
+        #debug-panel.open {
+            transform: translateX(0);
+        }
+        
+        #debug-header {
+            padding: 12px 16px;
+            background: rgba(74, 222, 128, 0.1);
+            border-bottom: 1px solid rgba(74, 222, 128, 0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        #debug-header h3 {
+            color: #4ade80;
+            font-size: 14px;
+            font-weight: normal;
+            letter-spacing: 1px;
+        }
+        #debug-header .close {
+            color: #ef4444;
+            cursor: pointer;
+            font-size: 18px;
+            padding: 0 8px;
+        }
+        #debug-header .close:hover {
+            color: #ff6b6b;
+        }
+        
+        #debug-controls {
+            padding: 8px 16px;
+            border-bottom: 1px solid rgba(74, 222, 128, 0.1);
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+            flex-wrap: wrap;
+        }
+        #debug-controls button {
+            background: rgba(74, 222, 128, 0.15);
+            color: #4ade80;
+            border: 1px solid rgba(74, 222, 128, 0.3);
+            padding: 4px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 10px;
+            font-family: monospace;
+            transition: all 0.2s;
+        }
+        #debug-controls button:hover {
+            background: rgba(74, 222, 128, 0.3);
+        }
+        #debug-controls .clear-btn:hover {
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+        
+        #debug-logs {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 16px;
+            color: #a0aec0;
+            line-height: 1.6;
+            font-size: 11px;
+        }
+        #debug-logs::-webkit-scrollbar {
+            width: 4px;
+        }
+        #debug-logs::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.3);
+        }
+        #debug-logs::-webkit-scrollbar-thumb {
+            background: #4ade80;
+            border-radius: 2px;
+        }
+        
+        .log-entry {
+            padding: 2px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            display: flex;
+            gap: 8px;
+        }
+        .log-time {
+            color: #4a5568;
+            flex-shrink: 0;
+            min-width: 70px;
+        }
+        .log-level {
+            flex-shrink: 0;
+            min-width: 50px;
+            font-weight: bold;
+        }
+        .log-level.info { color: #63b3ed; }
+        .log-level.success { color: #4ade80; }
+        .log-level.warn { color: #fbbf24; }
+        .log-level.error { color: #ef4444; }
+        .log-level.debug { color: #a78bfa; }
+        .log-message {
+            word-break: break-word;
+            color: #e2e8f0;
+        }
+        
+        .log-entry.highlight {
+            background: rgba(74, 222, 128, 0.05);
+            border-left: 2px solid #4ade80;
         }
         
         @media (max-width: 600px) {
             .slot { width: 80px; height: 80px; }
             #result { width: 200px; height: 200px; }
+            #debug-panel { width: 100vw; max-width: 100vw; }
         }
     </style>
 </head>
@@ -138,11 +288,25 @@
         </div>
         
         <div id="hint">🔍 Наведите на животное</div>
-        <div id="status">⏳ Загрузка...</div>
+        <div id="status">⏳ Инициализация...</div>
         <div id="result">
             <img id="result-img" alt="mutation">
             <div class="label">🧬 МУТАНТ</div>
         </div>
+    </div>
+    
+    <button id="debug-toggle">🐞 DEBUG</button>
+    <div id="debug-panel">
+        <div id="debug-header">
+            <h3>🐞 DEBUG LOG</h3>
+            <span class="close" id="debug-close">✕</span>
+        </div>
+        <div id="debug-controls">
+            <button id="debug-clear" class="clear-btn">✕ Очистить</button>
+            <button id="debug-scroll">📌 Авто-скролл</button>
+            <button id="debug-test">🧪 Тест</button>
+        </div>
+        <div id="debug-logs"></div>
     </div>
     
     <script type="importmap">
