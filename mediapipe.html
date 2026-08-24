@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>MediaPipe Object Detection</title>
+  
+  <!-- Стили для камеры и canvas -->
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+    
+    #container {
+      position: relative;
+      width: 100%;
+      max-width: 640px;
+      margin: 0 auto;
+    }
+    
+    #webcam {
+      width: 100%;
+      display: block;
+      border-radius: 8px;
+    }
+    
+    #canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      border-radius: 8px;
+    }
+    
+    #status {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: white;
+      background: rgba(0,0,0,0.7);
+      padding: 12px 20px;
+      border-radius: 25px;
+      font-size: 14px;
+      text-align: center;
+      pointer-events: none;
+      white-space: nowrap;
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    
+    #loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-size: 18px;
+      text-align: center;
+      background: rgba(0,0,0,0.8);
+      padding: 20px 30px;
+      border-radius: 12px;
+      display: none;
+    }
+    
+    .loader {
+      border: 4px solid rgba(255,255,255,0.1);
+      border-top: 4px solid #4CAF50;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 10px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    @media (max-width: 480px) {
+      #status {
+        font-size: 12px;
+        padding: 8px 16px;
+        bottom: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div id="container">
+  <!-- Видео с камеры -->
+  <video id="webcam" autoplay playsinline></video>
+  
+  <!-- Canvas для отрисовки результатов -->
+  <canvas id="canvas"></canvas>
+  
+  <!-- Статус -->
+  <div id="status">⏳ Инициализация камеры...</div>
+  
+  <!-- Загрузка -->
+  <div id="loading">
+    <div class="loader"></div>
+    Загрузка модели...
+  </div>
+</div>
+
+<!-- Подключаем MediaPipe через CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm/vision_bundle.js"></script>
+
+<script>
+  (async function() {
+    'use strict';
+    
+    // DOM элементы
+    const video = document.getElementById('webcam');
+    const canvas = document.getElementById('canvas');
+    const canvasCtx = canvas.getContext('2d');
+    const statusEl = document.getElementById('status');
+    const loadingEl = document.getElementById('loading');
+    
+    // Настройки
+    const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/int8/1/efficientdet_lite0_uint8.tflite';
+    const MAX_DETECTIONS = 5;
+    const SCORE_THRESHOLD = 0.3;
+    
+    let objectDetector = null;
+    let isRunning = false;
+    
+    // === ИНИЦИАЛИЗАЦИЯ КАМЕРЫ ===
+    async function initCamera() {
+      try {
+        // Запрашиваем доступ к камере с правильными настройками для Android
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'environment', // или 'user' для фронтальной
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          },
+          audio: false
+        });
+        
+        video.srcObject = stream;
+        await video.play();
+        
+        // Устанавливаем размер canvas
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+        
+        statusEl.textContent = '📷 Камера готова, загружаем модель...';
+        return true;
+      } catch (error) {
+        console.error('Ошибка доступа к камере:', error);
+        statusEl.textContent = '❌ Ошибка: ' + error.message;
+        return false;
+      }
+    }
+    
+    // === ИНИЦИАЛИЗАЦИЯ MEDIAPIPE ===
+    async function initMediaPipe() {
+      try {
+        loadingEl.style.display = 'block';
+        statusEl.textContent = '⏳ Загрузка модели...';
+        
+        // Создаем детектор объектов
+        const vision = await FilesetResolver.forVisionTasks(
+          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
+        );
+        
+        objectDetector = await ObjectDetector.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath: MODEL_URL,
+            delegate: 'GPU' // Используем GPU для ускорения на Android
+          },
+          runningMode: 'VIDEO',
+          maxResults: MAX_DETECTIONS,
+          scoreThreshold: SCORE_THRESHOLD
+        });
+        
+        loadingEl.style.display = 'none';
+        statusEl.textContent = '✅ Модель загружена, начинаем детекцию';
+        return true;
+      } catch (error) {
+        console.error('Ошибка загрузки модели:', error);
+        loadingEl.style.display = 'none';
+        statusEl.textContent = '❌ Ошибка модели: ' + error.message;
+        return false;
+      }
+    }
+    
+    // === ОТРИСОВКА РЕЗУЛЬТАТОВ ===
+    function drawResults(results) {
+      const width = canvas.width;
+      const height = canvas.height;
+      
+      // Очищаем canvas
+      canvasCtx.clearRect(0, 0, width, height);
+      
+      // Рисуем видео на canvas
+      canvasCtx.drawImage(video, 0, 0, width, height);
+      
+      if (!results || !results.detections || results.detections.length === 0) {
+        return;
+      }
+      
+      // Рисуем каждый обнаруженный объект
+      results.detections.forEach((detection) => {
+        const bbox = detection.boundingBox;
+        const categories = detection.categories;
+        
+        if (!bbox || !categories || categories.length === 0) return;
+        
+        const category = categories[0];
+        const label = category.categoryName || 'Объект';
+        const score = category.score || 0;
+        const scorePercent = Math.round(score * 100);
+        
+        // Координаты bounding box (нормализованные)
+        const x = bbox.originX * width;
+        const y = bbox.originY * height;
+        const w = bbox.width * width;
+        const h = bbox.height * height;
+        
+        // Цвет в зависимости от уверенности
+        const hue = Math.min(120, Math.max(0, 120 * score)); // От красного к зеленому
+        const color = `hsl(${hue}, 80%, 50%)`;
+        const bgColor = `hsla(${hue}, 80%, 50%, 0.2)`;
+        
+        // Рисуем bounding box
+        canvasCtx.strokeStyle = color;
+        canvasCtx.lineWidth = 3;
+        canvasCtx.shadowColor = 'rgba(0,0,0,0.5)';
+        canvasCtx.shadowBlur = 8;
+        canvasCtx.strokeRect(x, y, w, h);
+        canvasCtx.shadowBlur = 0;
+        
+        // Заливка полупрозрачная
+        canvasCtx.fillStyle = bgColor;
+        canvasCtx.fillRect(x, y, w, h);
+        
+        // Подготовка текста
+        const text = `${label} ${scorePercent}%`;
+        const fontSize = Math.max(14, Math.min(20, w / 10));
+        canvasCtx.font = `bold ${fontSize}px Arial`;
+        const textMetrics = canvasCtx.measureText(text);
+        const textWidth = textMetrics.width;
+        const textHeight = fontSize + 10;
+        const padding = 8;
+        
+        // Фон для текста
+        const textX = x;
+        const textY = Math.max(0, y - textHeight - 5);
+        const textBgWidth = textWidth + padding * 2;
+        const textBgHeight = textHeight + padding;
+        
+        canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        canvasCtx.shadowBlur = 10;
+        canvasCtx.shadowColor = 'rgba(0,0,0,0.5)';
+        canvasCtx.roundRect(textX, textY, textBgWidth, textBgHeight, 6);
+        canvasCtx.fill();
+        canvasCtx.shadowBlur = 0;
+        
+        // Текст
+        canvasCtx.fillStyle = 'white';
+        canvasCtx.textBaseline = 'top';
+        canvasCtx.fillText(text, textX + padding, textY + padding);
+        
+        // Дополнительная информация - количество ключевых точек
+        if (detection.keypoints && detection.keypoints.length > 0) {
+          canvasCtx.font = `${fontSize * 0.7}px Arial`;
+          canvasCtx.fillStyle = 'rgba(255,255,255,0.6)';
+          canvasCtx.fillText(
+            `🔍 ${detection.keypoints.length} точек`,
+            x + padding,
+            y + h + padding + 5
+          );
+        }
+      });
+    }
+    
+    // === ОСНОВНОЙ ЦИКЛ ДЕТЕКЦИИ ===
+    function detectLoop() {
+      if (!isRunning) return;
+      
+      if (objectDetector && video.readyState >= 2) {
+        try {
+          // Запускаем детекцию на текущем кадре
+          const detections = objectDetector.detectForVideo(video, performance.now());
+          
+          // Обновляем статус
+          const count = detections.detections ? detections.detections.length : 0;
+          if (count > 0) {
+            const topLabel = detections.detections[0].categories[0]?.categoryName || 'объект';
+            const topScore = Math.round((detections.detections[0].categories[0]?.score || 0) * 100);
+            statusEl.textContent = `🎯 Найдено: ${count} | ${topLabel} (${topScore}%)`;
+          } else {
+            statusEl.textContent = '🔍 Сканирование...';
+          }
+          
+          // Рисуем результаты
+          drawResults(detections);
+          
+        } catch (error) {
+          console.error('Ошибка детекции:', error);
+          statusEl.textContent = '⚠️ Ошибка детекции';
+        }
+      }
+      
+      // Запускаем следующий кадр
+      requestAnimationFrame(detectLoop);
+    }
+    
+    // === ЗАПУСК ===
+    async function start() {
+      isRunning = true;
+      
+      // Инициализируем камеру
+      const cameraReady = await initCamera();
+      if (!cameraReady) {
+        isRunning = false;
+        return;
+      }
+      
+      // Инициализируем MediaPipe
+      const modelReady = await initMediaPipe();
+      if (!modelReady) {
+        isRunning = false;
+        return;
+      }
+      
+      // Запускаем цикл детекции
+      detectLoop();
+    }
+    
+    // === ОБРАБОТЧИКИ ===
+    // Добавляем поддержку roundRect для старых браузеров
+    if (!CanvasRenderingContext2D.prototype.roundRect) {
+      CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+        if (r > w/2) r = w/2;
+        if (r > h/2) r = h/2;
+        this.moveTo(x + r, y);
+        this.lineTo(x + w - r, y);
+        this.quadraticCurveTo(x + w, y, x + w, y + r);
+        this.lineTo(x + w, y + h - r);
+        this.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        this.lineTo(x + r, y + h);
+        this.quadraticCurveTo(x, y + h, x, y + h - r);
+        this.lineTo(x, y + r);
+        this.quadraticCurveTo(x, y, x + r, y);
+        this.closePath();
+        return this;
+      };
+    }
+    
+    // Запускаем при загрузке страницы
+    start().catch(error => {
+      console.error('Ошибка запуска:', error);
+      statusEl.textContent = '❌ Критическая ошибка: ' + error.message;
+    });
+    
+    // Обработка ошибок
+    window.addEventListener('error', (event) => {
+      console.error('Глобальная ошибка:', event.error);
+      statusEl.textContent = '⚠️ Ошибка: ' + (event.error?.message || 'Неизвестная ошибка');
+    });
+    
+  })();
+</script>
+
+</body>
+</html>
