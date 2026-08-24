@@ -1,9 +1,6 @@
 // artarget.js - Main entry point
 import { ModelFactory } from './arobjects.js';
 
-// Экспорты для обратной совместимости
-export { ModelFactory, createArTarget, createArTargetSync, setArTargetDesignPrefab, getArTargetDesignPrefab, preloadArTargetPrefab, preloadArTargetDesign };
-
 // Singleton instance for convenience functions
 const defaultFactory = new ModelFactory();
 

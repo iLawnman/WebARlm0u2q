@@ -239,5 +239,3 @@ export class ModelFactory {
     if (ui) ui.log(`[Debug] Saved ${a.download}`, 'ok');
   }
 }
-
-export { ModelFactory as default };
