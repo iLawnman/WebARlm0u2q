@@ -7,10 +7,6 @@ import { MediaPipeReco } from './mediapipe.js';
 import { ImageReco } from './imagereco.js';
 
 export class Recognition {
-  /**
-   * @param {import('./ui.js').UI} ui
-   * @param {import('./settings.js').Settings} settings
-   */
   constructor(ui, settings) {
     this.ui = ui;
     this.settings = settings;
@@ -32,6 +28,9 @@ export class Recognition {
 
     this._tmpPos = new THREE.Vector3();
     this._tmpQuat = new THREE.Quaternion();
+    
+    // Флаг для предотвращения множественных распознаваний
+    this._isRecognizing = false;
   }
 
   async init() {
@@ -94,6 +93,7 @@ export class Recognition {
 
   presentSearchPrompt() {
     this.state = 'waitingImage';
+    this._isRecognizing = false;
     this.ui.hideScanFrame();
     if (!this.imageReco.targetBitmaps.length) return;
 
@@ -110,6 +110,8 @@ export class Recognition {
   }
 
   reset(arScene) {
+    this._isRecognizing = false;
+    
     for (const [, entry] of this.imageReco.trackedMarkers) {
       if (entry.arTarget && arScene) {
         arScene.scene.remove(entry.arTarget);
@@ -208,11 +210,28 @@ export class Recognition {
         let entry = this.imageReco.trackedMarkers.get(idx);
 
         if (!entry) {
-          if (this.state !== 'waitingImage') continue;
+          // Предотвращаем множественные распознавания
+          if (this._isRecognizing) {
+            console.log('[Recognition] ⏳ Already recognizing, skipping new marker');
+            continue;
+          }
+          
+          if (this.state !== 'waitingImage') {
+            console.log('[Recognition] Skipping: state is', this.state, 'not waitingImage');
+            continue;
+          }
 
           const markerName = this.imageReco.getMarkerName(idx);
+          console.log('[Recognition] 🎯 New marker detected:', markerName, 'state:', this.state);
+
           const policyCheck = this.policies.canRecognize(markerName);
-          if (!policyCheck.ok) continue;
+          if (!policyCheck.ok) {
+            console.log('[Recognition] Policy check failed for', markerName, ':', policyCheck.reason);
+            continue;
+          }
+
+          // Устанавливаем флаг, что началось распознавание
+          this._isRecognizing = true;
 
           const bitmapEntry = this.imageReco.targetBitmaps.find(t => t.name === markerName);
           const questData = this.questManager.getArTargetData(markerName);
@@ -229,6 +248,8 @@ export class Recognition {
             questData
           };
 
+          console.log('[Recognition] 🏗️ Creating AR Target (hidden) for:', markerName);
+
           // Создаем AR Target, но пока скрываем его
           const arTarget = createArTargetSync(targetInfoData, {
             ui: this.ui,
@@ -238,9 +259,11 @@ export class Recognition {
             }
           });
 
-          // ВАЖНО: Target изначально скрыт, пока не завершится эффект сканирования
+          // ВАЖНО: Target изначально скрыт
           arTarget.visible = false;
           arScene.scene.add(arTarget);
+
+          console.log('[Recognition] AR Target added to scene (hidden)');
 
           entry = {
             arTarget,
@@ -254,9 +277,7 @@ export class Recognition {
             recognizing: true,
             poseSamples: [],
             effectDone: false,
-            pendingAnchorPose: null,
-            // Флаг, что эффект сканирования запущен
-            scanEffectStarted: false
+            pendingAnchorPose: null
           };
 
           this.imageReco.trackedMarkers.set(idx, entry);
@@ -267,43 +288,73 @@ export class Recognition {
           playSound('click');
 
           // ЗАПУСКАЕМ ЭФФЕКТ СКАНИРОВАНИЯ
-          // Target пока скрыт, он появится только в колбэке playScanEffect
-          console.log('[Recognition] Starting scan effect for marker:', markerName);
-          this.ui.log(`[Recognition] Starting scan effect for: ${markerName}`, 'info');
+          console.log('[Recognition] 🔄 Starting scan effect for marker:', markerName);
+          this.ui.log(`[Recognition] 🔄 Starting scan effect for: ${markerName}`, 'info');
 
-          this.ui.playScanEffect(() => {
-            // Этот колбэк вызывается, когда эффект сканирования завершен
-            console.log('[Recognition] Scan effect completed for marker:', markerName);
-            this.ui.log(`[Recognition] Scan effect completed for: ${markerName}`, 'ok');
+          // Сохраняем ссылки для колбэка
+          const idxRef = idx;
 
-            const e = this.imageReco.trackedMarkers.get(idx);
-            if (!e || e.dismissed) {
-              console.log('[Recognition] Entry dismissed, skipping show');
-              return;
+          try {
+            this.ui.playScanEffect(() => {
+              // Колбэк вызывается ПОСЛЕ завершения эффекта
+              console.log('[Recognition] ✅ SCAN EFFECT COMPLETED for marker:', markerName);
+              this.ui.log(`[Recognition] ✅ Scan effect completed for: ${markerName}`, 'ok');
+
+              const e = this.imageReco.trackedMarkers.get(idxRef);
+              if (!e) {
+                console.log('[Recognition] ❌ Entry not found after scan effect');
+                this._isRecognizing = false;
+                return;
+              }
+              if (e.dismissed) {
+                console.log('[Recognition] ❌ Entry dismissed, skipping show');
+                this._isRecognizing = false;
+                return;
+              }
+
+              // Отмечаем, что эффект завершен
+              e.effectDone = true;
+              e.recognizing = false;
+
+              // Скрываем рамку сканирования и подсказку
+              this.ui.hideScanFrame();
+              this.ui.hideQuestStart();
+
+              // ПОКАЗЫВАЕМ AR Target ТОЛЬКО ПОСЛЕ завершения эффекта
+              if (e.arTarget) {
+                // Добавляем небольшую задержку для плавности
+                setTimeout(() => {
+                  if (e && e.arTarget && !e.dismissed) {
+                    e.arTarget.visible = true;
+                    console.log('[Recognition] ✅ AR Target SHOWN for:', markerName);
+                    this.ui.log(`[Recognition] ✅ AR Target shown: ${markerName}`, 'ok');
+                  }
+                }, 100);
+              } else {
+                console.log('[Recognition] ❌ arTarget is null');
+              }
+
+              // Переходим в состояние ожидания ввода
+              this.state = 'waitingInput';
+              this._isRecognizing = false;
+              console.log('[Recognition] State → waitingInput');
+            });
+          } catch (err) {
+            console.error('[Recognition] ❌ Error in playScanEffect:', err);
+            this.ui.log('[Recognition] ❌ Error: ' + err.message, 'error');
+            
+            // В случае ошибки показываем AR Target сразу
+            if (entry.arTarget) {
+              entry.arTarget.visible = true;
+              console.log('[Recognition] ⚠️ Showing AR Target immediately due to error');
             }
-
-            // Отмечаем, что эффект завершен
-            e.effectDone = true;
-            e.pendingAnchorPose = this.imageReco.computeStablePose(e.poseSamples);
-            e.recognizing = false;
-
-            // Скрываем рамку сканирования и подсказку
-            this.ui.hideScanFrame();
-            this.ui.hideQuestStart();
-
-            // ПОКАЗЫВАЕМ AR TARGET только после завершения эффекта
-            if (e.arTarget) {
-              e.arTarget.visible = true;
-              console.log('[Recognition] AR Target shown after scan effect');
-              this.ui.log('[Recognition] AR Target shown after scan effect', 'ok');
-            }
-
-            // Переходим в состояние ожидания ввода
+            entry.recognizing = false;
             this.state = 'waitingInput';
-          });
+            this._isRecognizing = false;
+          }
         }
 
-        // --- Остальная логика обработки трекинга ---
+        // --- Обработка трекинга ---
         if (entry.dismissed) {
           entry.lastState = trackingState;
           continue;
@@ -312,25 +363,25 @@ export class Recognition {
         const target = entry.arTarget;
         if (!target) continue;
 
-        // Если эффект не завершен или мы в процессе распознавания - обновляем позицию
-        // НО НЕ ПОКАЗЫВАЕМ TARGET (он скрыт)
-        if (entry.recognizing || !entry.effectDone) {
-          const t = pose.transform;
-          if (t.position && t.orientation) {
+        // Обновляем позицию ДАЖЕ если target скрыт
+        const t = pose.transform;
+        if (t.position && t.orientation) {
+          if (entry.recognizing || !entry.effectDone) {
             entry.poseSamples.push({
               px: t.position.x, py: t.position.y, pz: t.position.z,
               qx: t.orientation.x, qy: t.orientation.y, qz: t.orientation.z, qw: t.orientation.w
             });
-            // Обновляем позицию скрытого объекта, чтобы он был готов к показу
-            target.position.set(t.position.x, t.position.y, t.position.z);
-            target.quaternion.set(t.orientation.x, t.orientation.y, t.orientation.z, t.orientation.w);
           }
-          entry.lastState = trackingState;
-          continue;
+          
+          // Всегда обновляем позицию
+          target.position.set(t.position.x, t.position.y, t.position.z);
+          target.quaternion.set(t.orientation.x, t.orientation.y, t.orientation.z, t.orientation.w);
         }
 
-        // --- Анкер и плавное позиционирование (только когда target видим) ---
-        if (!entry.anchor && !entry.anchorCreating && typeof frame.createAnchor === 'function') {
+        entry.lastState = trackingState;
+
+        // Анкер только когда target видим
+        if (entry.effectDone && !entry.anchor && !entry.anchorCreating && typeof frame.createAnchor === 'function') {
           entry.anchorCreating = true;
           const createPromise = frame.createAnchor(pose.transform, xrRefSpace);
           if (createPromise && typeof createPromise.then === 'function') {
@@ -342,32 +393,29 @@ export class Recognition {
           }
         }
 
-        let usePose = pose;
-        if (entry.anchor && entry.anchor.anchorSpace) {
+        // Плавное позиционирование только если target видим
+        if (entry.effectDone && entry.anchor && entry.anchor.anchorSpace) {
           const anchorPose = frame.getPose(entry.anchor.anchorSpace, xrRefSpace);
-          if (anchorPose && anchorPose.transform) usePose = anchorPose;
+          if (anchorPose && anchorPose.transform) {
+            const pos = anchorPose.transform.position;
+            const ori = anchorPose.transform.orientation;
+            if (pos) {
+              this._tmpPos.set(pos.x, pos.y, pos.z);
+              target.position.lerp(this._tmpPos, ImageReco.SMOOTH_FACTOR);
+            }
+            if (ori) {
+              this._tmpQuat.set(ori.x, ori.y, ori.z, ori.w);
+              target.quaternion.slerp(this._tmpQuat, ImageReco.SMOOTH_FACTOR);
+            }
+          }
         }
 
-        const pos = usePose.transform.position;
-        const ori = usePose.transform.orientation;
-
-        if (pos) {
-          this._tmpPos.set(pos.x, pos.y, pos.z);
-          target.position.lerp(this._tmpPos, ImageReco.SMOOTH_FACTOR);
-        }
-        if (ori) {
-          this._tmpQuat.set(ori.x, ori.y, ori.z, ori.w);
-          target.quaternion.slerp(this._tmpQuat, ImageReco.SMOOTH_FACTOR);
-        }
-
-        entry.lastState = trackingState;
-
-        if (frameCount % 30 === 0) {
+        if (frameCount % 30 === 0 && entry.effectDone) {
           this.mediaPipeReco.processDetection(entry, arScene);
         }
       }
 
-      // --- Очистка потерянных маркеров ---
+      // Очистка потерянных маркеров
       for (const [idx, entry] of this.imageReco.trackedMarkers) {
         if (!seen.has(idx) && entry.lastState !== 'lost') {
           entry.lastState = 'lost';
@@ -378,12 +426,12 @@ export class Recognition {
           this.imageReco.trackedMarkers.delete(idx);
 
           if (!entry.dismissed) {
+            this._isRecognizing = false;
             this.presentSearchPrompt();
           }
         }
       }
     } catch (e) {
-      // Игнорируем ошибки кадра
       console.warn('[Recognition] processTracking error:', e);
     }
   }
