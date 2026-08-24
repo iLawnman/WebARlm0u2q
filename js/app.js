@@ -1,10 +1,11 @@
-// js/app.js
 import { UI } from './ui.js';
 import { Recognition } from './recognition.js';
 import { ARScene } from './arscene.js';
 import { playSound } from "./audio.js";
 import { Settings } from './settings.js';
 import { ARSettings } from './arsettings.js';
+import { ARInput } from './arinput.js';
+import { UIInput } from './uiinput.js';
 
 export class App {
   constructor() {
@@ -13,6 +14,9 @@ export class App {
     this.arSettings = new ARSettings();
     this.recognition = null;
     this.arScene = new ARScene(this.ui);
+
+    this.arInput = new ARInput(this.ui);
+    this.uiInput = new UIInput(this.ui);
 
     this.xrSession = null;
     this.imageTrackingEnabled = false;
@@ -26,8 +30,10 @@ export class App {
   async init() {
     this.ui.log('App init (WebGL / Three.js WebXR)...', 'info');
 
+    this.uiInput.attach();
     this.ui.showCurtain();
 
+    // 0. AR CSS-темы
     this.ui.log('Loading AR CSS themes...', 'info');
     try {
       await this.arSettings.init();
@@ -39,6 +45,7 @@ export class App {
       this.ui.log('AR themes failed: ' + (e && e.message ? e.message : e), 'warn');
     }
 
+    // 1. Settings
     this.ui.log('Loading settings...', 'info');
     await this.settings.load();
     if (this.settings.isLoaded) {
@@ -50,6 +57,7 @@ export class App {
       this.ui.log('Settings failed to load, using defaults (unique_targets=0)', 'warn');
     }
 
+    // 2. Recognition
     this.recognition = new Recognition(this.ui, this.settings);
     await this.recognition.init();
 

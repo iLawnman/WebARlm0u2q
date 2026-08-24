@@ -1,33 +1,42 @@
-// js/recognition.js
 import * as THREE from 'three';
 import { createArTargetSync, preloadArTargetPrefab, preloadArTargetDesign } from './artarget.js';
 import { playSound } from './audio.js';
 import { QuestManager } from './quests.js';
 import { Policies } from './policies.js';
+import { MediaPipeReco } from './mediapipe.js';
 import { ImageReco } from './imagereco.js';
 
 export class Recognition {
+  /**
+   * @param {import('./ui.js').UI} ui
+   * @param {import('./settings.js').Settings} settings
+   */
   constructor(ui, settings) {
     this.ui = ui;
     this.settings = settings;
 
     this.questManager = new QuestManager();
     this.policies = new Policies(settings, this.questManager);
+
     this.imageReco = new ImageReco(ui, settings, this.questManager, this.policies);
+    this.mediaPipeReco = new MediaPipeReco(ui);
 
     this.state = 'waitingImage';
+
     this._raycaster = new THREE.Raycaster();
     this._pointerNdc = new THREE.Vector2(0, 0);
     this._boundOnSelect = null;
     this._boundOnClick = null;
     this._arScene = null;
     this._xrSession = null;
+
     this._tmpPos = new THREE.Vector3();
     this._tmpQuat = new THREE.Quaternion();
   }
 
   async init() {
     this.state = 'waitingImage';
+
     this.ui.log('Loading quest table & answers...', 'info');
     await this.questManager.loadData();
     if (this.questManager.isLoaded) {
@@ -108,7 +117,8 @@ export class Recognition {
       this.imageReco.disposeEntry(entry);
     }
     this.imageReco.trackedMarkers.clear();
-    this.imageReco.clear(arScene);
+
+    this.mediaPipeReco.clear(arScene);
 
     this.state = 'waitingImage';
     this.policies.reset();
@@ -116,6 +126,7 @@ export class Recognition {
     this.ui.hideQuestStart();
     this.ui.hideResult();
     this.ui.hideScanFrame();
+    this.ui.hideDetectedObjectsInfo();
   }
 
   _parseRichText(text) {
@@ -323,7 +334,7 @@ export class Recognition {
         entry.lastState = trackingState;
 
         if (frameCount % 30 === 0) {
-          this.imageReco.processMediaPipe(entry, arScene);
+          this.mediaPipeReco.processDetection(entry, arScene);
         }
       }
 
