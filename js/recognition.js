@@ -29,10 +29,7 @@ export class Recognition {
     this._tmpPos = new THREE.Vector3();
     this._tmpQuat = new THREE.Quaternion();
     
-    // Флаг для предотвращения множественных распознаваний
     this._isRecognizing = false;
-    
-    // Счетчик кадров для отладки
     this._frameCounter = 0;
   }
 
@@ -194,29 +191,14 @@ export class Recognition {
   processTracking(frame, xrRefSpace, frameCount, arScene) {
     this._frameCounter++;
     
-    // Логируем каждый 30-й кадр для отладки
-    if (this._frameCounter % 30 === 0) {
-      console.log('[Recognition] 🔄 processTracking frame:', this._frameCounter, 'state:', this.state, 'trackedMarkers:', this.imageReco.trackedMarkers.size);
-    }
-    
     try {
       if (!frame || typeof frame.getImageTrackingResults !== 'function') {
-        if (this._frameCounter % 30 === 0) {
-          console.log('[Recognition] ⚠️ frame or getImageTrackingResults not available');
-        }
         return;
       }
 
       const results = frame.getImageTrackingResults();
       if (!results) {
-        if (this._frameCounter % 30 === 0) {
-          console.log('[Recognition] ⚠️ no results from getImageTrackingResults');
-        }
         return;
-      }
-
-      if (results.length > 0 && this._frameCounter % 10 === 0) {
-        console.log('[Recognition] 📷 results count:', results.length, 'state:', this.state);
       }
 
       const seen = new Set();
@@ -234,8 +216,6 @@ export class Recognition {
         let entry = this.imageReco.trackedMarkers.get(idx);
 
         if (!entry) {
-          console.log('[Recognition] 🚀 NEW MARKER DETECTED! idx:', idx, 'state:', this.state, 'isRecognizing:', this._isRecognizing);
-          
           // Предотвращаем множественные распознавания
           if (this._isRecognizing) {
             console.log('[Recognition] ⏳ Already recognizing, skipping new marker');
@@ -243,22 +223,23 @@ export class Recognition {
           }
           
           if (this.state !== 'waitingImage') {
-            console.log('[Recognition] ⏳ Skipping: state is', this.state, 'not waitingImage');
+            console.log('[Recognition] Skipping: state is', this.state, 'not waitingImage');
             continue;
           }
 
           const markerName = this.imageReco.getMarkerName(idx);
           console.log('[Recognition] 🎯 New marker detected:', markerName);
+          this.ui.log(`🎯 New marker detected: ${markerName}`, 'info');
 
           const policyCheck = this.policies.canRecognize(markerName);
           if (!policyCheck.ok) {
-            console.log('[Recognition] 🚫 Policy check failed for', markerName, ':', policyCheck.reason);
+            console.log('[Recognition] Policy check failed for', markerName, ':', policyCheck.reason);
+            this.ui.log(`🚫 Policy check failed: ${policyCheck.reason}`, 'warn');
             continue;
           }
 
           // Устанавливаем флаг, что началось распознавание
           this._isRecognizing = true;
-          console.log('[Recognition] 🔒 _isRecognizing = true');
 
           const bitmapEntry = this.imageReco.targetBitmaps.find(t => t.name === markerName);
           const questData = this.questManager.getArTargetData(markerName);
@@ -276,38 +257,28 @@ export class Recognition {
           };
 
           console.log('[Recognition] 🏗️ Creating AR Target (HIDDEN) for:', markerName);
-          console.log('[Recognition] 📦 targetInfoData:', JSON.stringify(targetInfoData, null, 2));
+          this.ui.log(`🏗️ Creating AR Target (HIDDEN) for: ${markerName}`, 'info');
 
           // Создаем AR Target
           const arTarget = createArTargetSync(targetInfoData, {
             ui: this.ui,
             onAnswer: (value) => {
-              console.log('[Recognition] 📝 Answer received for', markerName, ':', value);
               const e = this.imageReco.trackedMarkers.get(idx);
               if (e) this._onQuestionAnswered(e, value);
             }
           });
 
-          console.log('[Recognition] ✅ AR Target created, type:', typeof arTarget, 'visible:', arTarget.visible);
-
-          // ============================================================
-          // ВАЖНО: Полностью скрываем весь AR Target (группу и все дочерние объекты)
-          // ============================================================
+          // Полностью скрываем весь AR Target
           arTarget.visible = false;
-          console.log('[Recognition] 🔒 AR Target hidden (visible=false)');
-          
-          // Дополнительно скрываем все дочерние объекты в группе
-          let hiddenCount = 0;
           arTarget.traverse((child) => {
             if (child.isCSS3DObject || child.isMesh) {
               child.visible = false;
-              hiddenCount++;
             }
           });
-          console.log('[Recognition] 🔒 Hidden', hiddenCount, 'child objects');
           
           arScene.scene.add(arTarget);
-          console.log('[Recognition] ✅ AR Target added to scene');
+          console.log('[Recognition] ✅ AR Target added to scene (HIDDEN)');
+          this.ui.log(`✅ AR Target added to scene (HIDDEN) for: ${markerName}`, 'ok');
 
           entry = {
             arTarget,
@@ -325,18 +296,15 @@ export class Recognition {
           };
 
           this.imageReco.trackedMarkers.set(idx, entry);
-          console.log('[Recognition] ✅ Entry stored in trackedMarkers, size:', this.imageReco.trackedMarkers.size);
-          
           this.policies.onRecognized(markerName);
           this.state = 'recognizing';
-          console.log('[Recognition] 🔄 State changed to: recognizing');
 
           this.ui.hideQuestStart();
           playSound('click');
 
           // ЗАПУСКАЕМ ЭФФЕКТ СКАНИРОВАНИЯ
           console.log('[Recognition] 🔄 Starting scan effect for marker:', markerName);
-          this.ui.log(`[Recognition] 🔄 Starting scan effect for: ${markerName}`, 'info');
+          this.ui.log(`🔄 Starting scan effect for: ${markerName}`, 'info');
 
           const idxRef = idx;
 
@@ -344,7 +312,7 @@ export class Recognition {
             this.ui.playScanEffect(() => {
               // Колбэк вызывается ПОСЛЕ завершения эффекта
               console.log('[Recognition] ✅ SCAN EFFECT COMPLETED for marker:', markerName);
-              this.ui.log(`[Recognition] ✅ Scan effect completed for: ${markerName}`, 'ok');
+              this.ui.log(`✅ Scan effect completed for: ${markerName}`, 'ok');
 
               const e = this.imageReco.trackedMarkers.get(idxRef);
               if (!e) {
@@ -366,46 +334,32 @@ export class Recognition {
               this.ui.hideScanFrame();
               this.ui.hideQuestStart();
 
-              // ============================================================
               // ПОКАЗЫВАЕМ AR Target ТОЛЬКО ПОСЛЕ завершения эффекта
-              // ============================================================
               if (e.arTarget) {
-                console.log('[Recognition] 📦 Showing AR Target (making visible)...');
+                console.log('[Recognition] 📦 Showing AR Target...');
+                this.ui.log(`📦 Showing AR Target for: ${markerName}`, 'info');
                 
                 // Делаем видимой всю группу
                 e.arTarget.visible = true;
-                console.log('[Recognition] 🔓 AR Target visible=true');
-                
-                // Делаем видимыми все дочерние объекты
-                let shownCount = 0;
                 e.arTarget.traverse((child) => {
                   if (child.isCSS3DObject || child.isMesh) {
                     child.visible = true;
-                    shownCount++;
                   }
                 });
-                console.log('[Recognition] 🔓 Shown', shownCount, 'child objects');
                 
                 console.log('[Recognition] ✅ AR Target SHOWN for:', markerName);
-                this.ui.log(`[Recognition] ✅ AR Target shown: ${markerName}`, 'ok');
+                this.ui.log(`✅ AR Target SHOWN: ${markerName}`, 'ok');
                 
                 // Небольшая задержка перед показом модалки
                 setTimeout(() => {
-                  // ПОКАЗЫВАЕМ МОДАЛКУ после того как AR Target стал видимым
                   const panelEl = e.arTarget.userData?.panelEl;
-                  console.log('[Recognition] 🔍 panelEl:', panelEl ? 'found' : 'not found');
                   if (panelEl) {
                     const modalOverlay = panelEl.querySelector('.modal-overlay');
                     if (modalOverlay) {
                       modalOverlay.style.display = 'flex';
                       console.log('[Recognition] ✅ Modal shown');
-                      this.ui.log('[Recognition] ✅ Modal shown', 'ok');
-                    } else {
-                      console.log('[Recognition] ⚠️ Modal overlay not found in panelEl');
+                      this.ui.log('✅ Modal shown', 'ok');
                     }
-                  } else {
-                    console.log('[Recognition] ⚠️ panelEl not found in userData');
-                    console.log('[Recognition] 📦 userData keys:', Object.keys(e.arTarget.userData || {}));
                   }
                 }, 150);
                 
@@ -416,13 +370,13 @@ export class Recognition {
               // Переходим в состояние ожидания ввода
               this.state = 'waitingInput';
               this._isRecognizing = false;
-              console.log('[Recognition] State → waitingInput, _isRecognizing = false');
+              console.log('[Recognition] State → waitingInput');
+              this.ui.log('State → waitingInput', 'info');
             });
           } catch (err) {
             console.error('[Recognition] ❌ Error in playScanEffect:', err);
-            this.ui.log('[Recognition] ❌ Error: ' + err.message, 'error');
+            this.ui.log(`❌ Error in playScanEffect: ${err.message}`, 'error');
             
-            // В случае ошибки показываем AR Target сразу
             if (entry.arTarget) {
               entry.arTarget.visible = true;
               entry.arTarget.traverse((child) => {
@@ -430,7 +384,6 @@ export class Recognition {
                   child.visible = true;
                 }
               });
-              console.log('[Recognition] ⚠️ Showing AR Target immediately due to error');
             }
             entry.recognizing = false;
             this.state = 'waitingInput';
@@ -447,7 +400,6 @@ export class Recognition {
         const target = entry.arTarget;
         if (!target) continue;
 
-        // Обновляем позицию ДАЖЕ если target скрыт
         const t = pose.transform;
         if (t.position && t.orientation) {
           if (entry.recognizing || !entry.effectDone) {
@@ -457,14 +409,12 @@ export class Recognition {
             });
           }
           
-          // Всегда обновляем позицию
           target.position.set(t.position.x, t.position.y, t.position.z);
           target.quaternion.set(t.orientation.x, t.orientation.y, t.orientation.z, t.orientation.w);
         }
 
         entry.lastState = trackingState;
 
-        // Анкер только когда target видим
         if (entry.effectDone && !entry.anchor && !entry.anchorCreating && typeof frame.createAnchor === 'function') {
           entry.anchorCreating = true;
           const createPromise = frame.createAnchor(pose.transform, xrRefSpace);
@@ -477,7 +427,6 @@ export class Recognition {
           }
         }
 
-        // Плавное позиционирование только если target видим
         if (entry.effectDone && entry.anchor && entry.anchor.anchorSpace) {
           const anchorPose = frame.getPose(entry.anchor.anchorSpace, xrRefSpace);
           if (anchorPose && anchorPose.transform) {
@@ -516,7 +465,7 @@ export class Recognition {
         }
       }
     } catch (e) {
-      console.error('[Recognition] ❌ processTracking error:', e);
+      console.error('[Recognition] processTracking error:', e);
     }
   }
 }
