@@ -92,13 +92,21 @@ export class ARInput {
   bindInteractiveEvent(element, btnName, callback) {
     if (!element) return;
 
-    element.style.pointerEvents = 'auto';
-    element.style.touchAction = 'manipulation';
-    element.style.cursor = 'pointer';
+    // Принудительно устанавливаем стили для перехвата событий
+    element.style.pointerEvents = 'auto !important';
+    element.style.touchAction = 'manipulation !important';
+    element.style.cursor = 'pointer !important';
     element.style.minWidth = '48px';
     element.style.minHeight = '40px';
     element.style.position = 'relative';
-    element.style.zIndex = '50';
+    element.style.zIndex = '9999 !important';
+    
+    // Для кнопок с textContent пустым (как крестик) добавляем padding
+    if (!element.textContent.trim() || element.textContent === '✕') {
+      element.style.padding = '8px';
+      element.style.fontSize = '20px';
+      element.style.lineHeight = '1';
+    }
 
     // Помечаем элемент как интерактивный
     this._interactiveElements.add(element);
@@ -131,6 +139,14 @@ export class ARInput {
     element.addEventListener('touchstart', (e) => {
       e.stopPropagation();
       e.stopImmediatePropagation();
+    }, { passive: false, capture: true });
+    
+    // Для мобильных устройств - дополнительный обработчик touchend
+    element.addEventListener('touchend', (e) => {
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      if (e.cancelable) e.preventDefault();
+      fire(e);
     }, { passive: false, capture: true });
   }
 
