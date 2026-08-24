@@ -1,4 +1,6 @@
-import { UIInput } from './uiinput.js';
+// js/ui.js
+import { PanelController } from './panel-controller.js';
+import { InputManager } from './input-manager.js';
 
 export class UI {
   constructor() {
@@ -9,22 +11,9 @@ export class UI {
     this.hint = document.getElementById('hint');
     this.preview = document.getElementById('target-preview');
 
-    // ── новые панели overlay-флоу ──
-    this.curtain = document.getElementById('curtain-panel');
-    this.curtainText = document.querySelector('.curtain-text');
+    this.panels = new PanelController(this);
+    this.input = new InputManager(this);
 
-    this.questStartPanel = document.getElementById('quest-start-panel');
-    this.questStartImg = document.getElementById('quest-start-img');
-    this.questStartText = document.getElementById('quest-start-text');
-
-    this.resultPanel = document.getElementById('result-panel');
-    this.resultSign = document.getElementById('result-sign');
-    this.resultText = document.getElementById('result-text');
-    this.resultCloseBtn = document.getElementById('result-close-btn');
-
-    this.uiInput = new UIInput(this);
-
-    // Лог стартует свернутым
     this.logVisible = false;
     if (this.logPanel) this.logPanel.classList.add('collapsed');
 
@@ -35,184 +24,45 @@ export class UI {
       });
     }
 
-    this._onResultClose = null;
-
-    if (this.resultCloseBtn) {
-      this.resultCloseBtn.addEventListener('click', () => {
-        const cb = this._onResultClose;
-        this.hideResult();
-        if (cb) cb();
+    const closeBtn = document.getElementById('result-close-btn');
+    if (closeBtn) {
+      this.input.bindInteractive(closeBtn, 'ResultClose', () => {
+        this.panels.hide('result-panel');
+        if (this._onResultClose) {
+          const cb = this._onResultClose;
+          this._onResultClose = null;
+          cb();
+        }
       });
     }
 
-    // ── Рамка распознавания (создаём сами, без зависимости от HTML) ──
-    this._injectScanFrameStyles();
-    this.scanFrame = this._createScanFrame();
-    this._scanEffectTimer = null;
+    this._onResultClose = null;
   }
 
-  _injectScanFrameStyles() {
-    if (document.getElementById('ar-scan-frame-styles')) return;
-    const style = document.createElement('style');
-    style.id = 'ar-scan-frame-styles';
-    style.textContent = `
-      #ar-scan-frame {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        width: min(70vw, 380px);
-        height: min(70vw, 380px);
-        transform: translate(-50%, -50%);
-        pointer-events: none;
-        z-index: 40;
-        display: none;
-        box-sizing: border-box;
-      }
-      #ar-scan-frame.visible { display: block; }
-
-      /* углы рамки */
-      #ar-scan-frame .corner {
-        position: absolute;
-        width: 28px;
-        height: 28px;
-        border-color: #00ffaa;
-        border-style: solid;
-        border-width: 0;
-      }
-      #ar-scan-frame .corner.tl { top: 0; left: 0; border-top-width: 3px; border-left-width: 3px; border-top-left-radius: 4px; }
-      #ar-scan-frame .corner.tr { top: 0; right: 0; border-top-width: 3px; border-right-width: 3px; border-top-right-radius: 4px; }
-      #ar-scan-frame .corner.bl { bottom: 0; left: 0; border-bottom-width: 3px; border-left-width: 3px; border-bottom-left-radius: 4px; }
-      #ar-scan-frame .corner.br { bottom: 0; right: 0; border-bottom-width: 3px; border-right-width: 3px; border-bottom-right-radius: 4px; }
-
-      /* мигание в режиме ожидания */
-      #ar-scan-frame.blink .corner {
-        animation: ar-scan-blink 1.1s ease-in-out infinite;
-      }
-      @keyframes ar-scan-blink {
-        0%, 100% { opacity: 0.35; border-color: #00ffaa88; }
-        50% { opacity: 1; border-color: #00ffaa; }
-      }
-
-      /* эффект распознавания 2с: сканирующая линия + пульс углов + заливка */
-      #ar-scan-frame .scan-line {
-        position: absolute;
-        left: 8%;
-        right: 8%;
-        height: 2px;
-        background: linear-gradient(90deg, transparent, #00ffaa, #ffffff, #00ffaa, transparent);
-        box-shadow: 0 0 12px #00ffaa, 0 0 24px #00ffaa88;
-        opacity: 0;
-        top: 10%;
-        pointer-events: none;
-      }
-      #ar-scan-frame .scan-fill {
-        position: absolute;
-        inset: 6px;
-        background: radial-gradient(circle at center, rgba(0,255,170,0.18) 0%, transparent 70%);
-        opacity: 0;
-        pointer-events: none;
-      }
-      #ar-scan-frame.effect .scan-line {
-        opacity: 1;
-        animation: ar-scan-line 2s linear forwards;
-      }
-      #ar-scan-frame.effect .scan-fill {
-        animation: ar-scan-fill 2s ease-out forwards;
-      }
-      #ar-scan-frame.effect .corner {
-        animation: ar-scan-corner-pulse 0.5s ease-in-out infinite;
-        border-color: #00ffcc;
-      }
-      @keyframes ar-scan-line {
-        0% { top: 8%; opacity: 0; }
-        10% { opacity: 1; }
-        90% { opacity: 1; }
-        100% { top: 90%; opacity: 0; }
-      }
-      @keyframes ar-scan-fill {
-        0% { opacity: 0; transform: scale(0.85); }
-        40% { opacity: 1; transform: scale(1); }
-        100% { opacity: 0; transform: scale(1.05); }
-      }
-      @keyframes ar-scan-corner-pulse {
-        0%, 100% { opacity: 1; filter: drop-shadow(0 0 2px #00ffaa); }
-        50% { opacity: 0.6; filter: drop-shadow(0 0 10px #00ffaa); }
-      }
-    `;
-    document.head.appendChild(style);
+  showCurtain() { this.panels.showCurtain(); }
+  hideCurtain() { this.panels.hideCurtain(); }
+  
+  showQuestStart(image, text) { this.panels.showQuestStart(image, text); }
+  hideQuestStart() { this.panels.hide('quest-start-panel'); }
+  
+  showResult(isCorrect, message, onClose) { 
+    this._onResultClose = onClose;
+    this.panels.showResult(isCorrect, message, onClose);
   }
-
-  _createScanFrame() {
-    const el = document.createElement('div');
-    el.id = 'ar-scan-frame';
-    el.innerHTML = `
-      <div class="corner tl"></div>
-      <div class="corner tr"></div>
-      <div class="corner bl"></div>
-      <div class="corner br"></div>
-      <div class="scan-fill"></div>
-      <div class="scan-line"></div>
-    `;
-    document.body.appendChild(el);
-    return el;
+  hideResult() { 
+    this.panels.hide('result-panel');
+    this._onResultClose = null;
   }
-
-  /** Показать рамку в режиме ожидания (мигание). */
-  showScanFrameBlink() {
-    if (!this.scanFrame) return;
-    if (this._scanEffectTimer) {
-      clearTimeout(this._scanEffectTimer);
-      this._scanEffectTimer = null;
-    }
-    this.scanFrame.classList.remove('effect');
-    this.scanFrame.classList.add('visible', 'blink');
-  }
-
-  /**
-   * Запуск 2-секундного эффекта распознавания.
-   * @param {Function} [onDone] вызывается после окончания эффекта
-   */
+  
+  showScanFrameBlink() { this.panels.showScanFrame('blink'); }
+  hideScanFrame() { this.panels.hideScanFrame(); }
+  
   playScanEffect(onDone) {
-    if (!this.scanFrame) {
-      if (typeof onDone === 'function') onDone();
-      return;
-    }
-    if (this._scanEffectTimer) {
-      clearTimeout(this._scanEffectTimer);
-      this._scanEffectTimer = null;
-    }
-    this.scanFrame.classList.remove('blink');
-    this.scanFrame.classList.add('visible', 'effect');
-
-    // перезапуск CSS-анимаций
-    const line = this.scanFrame.querySelector('.scan-line');
-    const fill = this.scanFrame.querySelector('.scan-fill');
-    if (line) {
-      line.style.animation = 'none';
-      // force reflow
-      void line.offsetWidth;
-      line.style.animation = '';
-    }
-    if (fill) {
-      fill.style.animation = 'none';
-      void fill.offsetWidth;
-      fill.style.animation = '';
-    }
-
-    this._scanEffectTimer = setTimeout(() => {
-      this._scanEffectTimer = null;
-      this.hideScanFrame();
-      if (typeof onDone === 'function') onDone();
+    this.panels.showScanFrame('effect');
+    setTimeout(() => {
+      this.panels.hideScanFrame();
+      if (onDone) onDone();
     }, 2000);
-  }
-
-  hideScanFrame() {
-    if (!this.scanFrame) return;
-    if (this._scanEffectTimer) {
-      clearTimeout(this._scanEffectTimer);
-      this._scanEffectTimer = null;
-    }
-    this.scanFrame.classList.remove('visible', 'blink', 'effect');
   }
 
   log(msg, type = '') {
@@ -243,8 +93,8 @@ export class UI {
       this.btnAr.disabled = false;
       this.btnAr.style.display = 'block';
     }
-    // Инициализация завершена — текст «Инициализация AR…» скрывается
-    if (this.curtainText) this.curtainText.classList.add('ready');
+    const text = document.querySelector('.curtain-text');
+    if (text) text.classList.add('ready');
   }
 
   disableArButton() {
@@ -270,67 +120,12 @@ export class UI {
     if (this.btnEndAr) this.btnEndAr.addEventListener('click', handler);
   }
 
-  // ───────────────────────── Curtain (штора инициализации) ─────────────────────────
-
-  /** Показывает штору (закрывает сцену, пока инициализируется/переинициализируется WebXR). */
-  showCurtain() {
-    if (!this.curtain) return;
-    this.curtain.classList.remove('hidden');
-    // Вернуть текст «Инициализация AR…» при повторном показе шторы
-    if (this.curtainText) this.curtainText.classList.remove('ready');
+  // Для обратной совместимости с кодом, который использует showDetectedObjectsInfo
+  showDetectedObjectsInfo(detections) {
+    this.log(`Detected: ${detections.map(d => d.label).join(', ')}`, 'info');
   }
 
-  /** Прячет штору (уезжает вверх) — вызывается, когда пол установлен (сессия готова). */
-  hideCurtain() {
-    if (!this.curtain) return;
-    this.curtain.classList.add('hidden');
-  }
-
-  // ───────────────────────── Quest-start panel ("ИЩИТЕ!") ─────────────────────────
-
-  /**
-   * @param {string} imageSrc Картинка одного из маркеров (recognitionimages)
-   * @param {string} [text]
-   */
-  showQuestStart(imageSrc, text = 'ИЩИТЕ!') {
-    if (!this.questStartPanel) return;
-    if (this.questStartImg) {
-      if (imageSrc) {
-        this.questStartImg.src = imageSrc;
-        this.questStartImg.style.display = 'block';
-      } else {
-        this.questStartImg.style.display = 'none';
-      }
-    }
-    if (this.questStartText) this.questStartText.textContent = text;
-    this.questStartPanel.classList.add('open');
-  }
-
-  hideQuestStart() {
-    if (!this.questStartPanel) return;
-    this.questStartPanel.classList.remove('open');
-  }
-
-  // ───────────────────────── Result panel ─────────────────────────
-
-  /**
-   * @param {boolean} isCorrect
-   * @param {string} text Текст из RightReaction / WrongReaction
-   * @param {Function} [onClose] callback вызывается по кнопке "Дальше"
-   */
-  showResult(isCorrect, text, onClose) {
-    if (!this.resultPanel) return;
-    this._onResultClose = onClose || null;
-    this.resultPanel.classList.remove('result-ok', 'result-fail');
-    this.resultPanel.classList.add(isCorrect ? 'result-ok' : 'result-fail');
-    if (this.resultText) this.resultText.textContent = text || '';
-    if (this.resultSign) this.resultSign.textContent = isCorrect ? '✓' : '✕';
-    this.resultPanel.classList.add('open');
-  }
-
-  hideResult() {
-    if (!this.resultPanel) return;
-    this.resultPanel.classList.remove('open');
-    this._onResultClose = null;
+  hideDetectedObjectsInfo() {
+    // no-op
   }
 }
