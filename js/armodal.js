@@ -1,23 +1,7 @@
 // armodal.js - Modal Manager for AR
-//
-// Модалка (легенда/история таргета) - это разметка ВНУТРИ конкретной
-// CSS3D-панели таргета (el), склонированная вместе с остальным префабом
-// (.modal-overlay/.modal-close-btn/.modal-title/.modal-body). Она НЕ
-// является отдельным глобальным элементом документа: recognition.js
-// показывает её именно через `panelEl.querySelector('.modal-overlay')`,
-// где panelEl === el. Поэтому весь код здесь тоже обязан работать со
-// scoped-узлами внутри el, а не через document.querySelector - иначе
-// закрытие вешается на другой (чужой/несвязанный) узел, и крестик
-// визуально реагирует, но ничего не делает.
 export class ARModalManager {
   constructor() {}
 
-  /**
-   * Настраивает модальное окно (заголовок/текст уже заполнены в
-   * arpanel.js._fillScreen - здесь только логика показа/скрытия).
-   * Показ модалки не выполняется автоматически - им управляет вызывающий
-   * код (recognition.js показывает её с задержкой после появления таргета).
-   */
   setupModal(el, ui, arInput = null) {
     if (!el) return;
 
@@ -25,30 +9,24 @@ export class ARModalManager {
     let modalCloseBtn = el.querySelector('.modal-close-btn');
 
     if (!modalOverlay || !modalCloseBtn) {
-      // Кастомный префаб без встроенной разметки модалки - строим
-      // минимальную структуру и добавляем её внутрь el, чтобы она
-      // осталась частью той же CSS3D-панели (а не отдельным элементом
-      // документа, который легко потерять/перепутать между таргетами).
       const built = this._buildModalMarkup(el);
       modalOverlay = built.modalOverlay;
       modalCloseBtn = built.modalCloseBtn;
     }
 
     // Гарантируем, что модалка стартует скрытой
-    modalOverlay.style.display = modalOverlay.style.display || 'none';
+    if (!modalOverlay.classList.contains('active')) {
+      modalOverlay.classList.remove('active');
+    }
 
     const closeModal = () => {
-      modalOverlay.style.display = 'none';
+      modalOverlay.classList.remove('active');
       if (ui) ui.log('[Modal] Closed', 'ok');
     };
 
     if (arInput) {
-      // Единый проверенный путь обработки кликов/тапов: даёт то же
-      // логирование, звук и защиту от двойного срабатывания click+touchend,
-      // что и остальные интерактивные элементы панели.
       arInput.bindInteractiveEvent(modalCloseBtn, 'ModalCloseButton', closeModal);
     } else {
-      // Фоллбэк на случай, если arInput не передали
       modalCloseBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         closeModal();
@@ -60,7 +38,6 @@ export class ARModalManager {
       }, { passive: false, capture: true });
     }
 
-    // Клик по затемнённому фону (не по самому окну) тоже закрывает модалку
     modalOverlay.addEventListener('click', (e) => {
       if (e.target === modalOverlay) closeModal();
     }, true);
@@ -70,18 +47,15 @@ export class ARModalManager {
     const modalOverlay = document.createElement('div');
     modalOverlay.className = 'modal-overlay';
     modalOverlay.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(0, 0, 0, 0.85);
       z-index: 99999;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      pointer-events: auto;
+      align-items: center; justify-content: center;
       box-sizing: border-box;
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s, visibility 0.2s;
     `;
 
     const modalWindow = document.createElement('div');
