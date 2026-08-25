@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>fix new panel WebXR AR — Куб на полу + DOM Overlay панель</title>
+  <title>fix2 new panel WebXR AR — Куб на полу + DOM Overlay панель</title>
   <style>
     html, body {
       margin: 0;
@@ -410,8 +410,6 @@
   }
 
   function placeThreeUIPanel(position) {
-    
-    createscene();
     makeUI();
   }
 
@@ -424,8 +422,8 @@
       width: 1
     });
 
-    container.position.set( 0, 1, -1.8 );
-    container.rotation.x = -0.55;
+    container.position.set( 0, 0, 0 );
+    container.rotation.x = 0;
     scene.add( container );
 
     const imageBlock = new ThreeMeshUI.Block({
@@ -441,7 +439,7 @@
       offset: 0.1 // distance separating the inner block from its parent
     });
 
-    loader.load( '../assets/asset.png', (texture)=> {
+    loader.load( './assets/asset.png', (texture)=> {
 
       imageBlock.set({ backgroundTexture: texture });
 
