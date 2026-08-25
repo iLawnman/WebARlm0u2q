@@ -5,7 +5,7 @@ import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { UIPanel, UIButton, UIText } from 'three-mesh-ui';
 
 // --- Глобальные переменные ---
-let scene, camera, renderer, cssRenderer;
+let scene, camera, renderer;
 let cube, edges, reticle;
 let mainPanel, fixedPanel;
 let placed = false;
@@ -76,7 +76,13 @@ async function init() {
   const cubeSize = 0.18;
   cube = new THREE.Mesh(
     new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize),
-    new THREE.MeshStandardMaterial({ color: 0x6366f1, metalness: 0.3, roughness: 0.35, emissive: 0x1e1b4b, emissiveIntensity: 0.4 })
+    new THREE.MeshStandardMaterial({ 
+      color: 0x6366f1, 
+      metalness: 0.3, 
+      roughness: 0.35, 
+      emissive: 0x1e1b4b, 
+      emissiveIntensity: 0.4 
+    })
   );
   cube.visible = false;
   scene.add(cube);
@@ -128,8 +134,8 @@ async function init() {
 function createUIPanels() {
   // --- ПАНЕЛЬ 1: Основная (будет поворачиваться к камере) ---
   mainPanel = new UIPanel({
-    width: 0.5,       // 50 см
-    height: 0.35,     // 35 см
+    width: 0.5,
+    height: 0.35,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundOpacity: 0.85,
@@ -154,18 +160,16 @@ function createUIPanels() {
   });
   testBtn.add(new UIText({ content: '🧪 Тест клика по UI' }));
   
-  // Обработка клика по кнопке
   testBtn.addEventListener('click', () => {
     console.log('✅ Клик по three-mesh-ui кнопке сработал!');
-    // Визуальный фидбек (можно добавить изменение текста)
   });
   
   mainPanel.add(testBtn);
 
   // --- ПАНЕЛЬ 2: Фиксированная (НЕ поворачивается к камере) ---
   fixedPanel = new UIPanel({
-    width: 0.35,      // 35 см
-    height: 0.25,     // 25 см
+    width: 0.35,
+    height: 0.25,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundOpacity: 0.85,
@@ -191,22 +195,16 @@ function createUIPanels() {
 function onSelect() {
   if (!reticle.visible) return;
 
-  // Размещаем куб
   cube.position.setFromMatrixPosition(reticle.matrix);
-  cube.position.y += 0.09; // половина высоты куба
+  cube.position.y += 0.09;
   edges.position.copy(cube.position);
   cube.visible = true;
   edges.visible = true;
 
-  // Размещаем Панель 1 (чуть выше куба)
   mainPanel.position.set(cube.position.x, cube.position.y + 0.28, cube.position.z);
   mainPanel.visible = true;
 
-  // Размещаем Панель 2 (со смещением вправо)
   fixedPanel.position.set(cube.position.x + 0.4, cube.position.y + 0.15, cube.position.z);
-  
-  // ЖЕСТКАЯ ФИКСАЦИЯ ПОВОРОТА ВТОРОЙ ПАНЕЛИ
-  // Мы явно задаем rotation и НИКОГДА не вызываем для неё lookAt()
   fixedPanel.rotation.set(0, 0, 0); 
   fixedPanel.visible = true;
 
@@ -246,19 +244,14 @@ function animate(timestamp, frame) {
   }
 
   if (placed) {
-    // 1. ПАНЕЛЬ 1: Поворачивается к камере (Billboard эффект)
     mainPanel.lookAt(camera.position);
 
-    // 2. ПАНЕЛЬ 2: НЕ поворачивается. Её rotation остался тем, что мы задали при размещении (0, 0, 0).
-
-    // 3. Обновляем Raycaster для WebXR контроллера (чтобы работали клики по кнопкам)
     const controller = renderer.xr.getController(0);
     controller.updateMatrixWorld();
     tempMatrix.identity().extractRotation(controller.matrixWorld);
     raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
     raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
 
-    // 4. Обновляем состояние UI (анимации кнопок, hover, клики)
     mainPanel.update(timestamp, raycaster);
     fixedPanel.update(timestamp, raycaster);
   }

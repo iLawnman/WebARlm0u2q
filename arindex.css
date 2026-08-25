@@ -45,6 +45,7 @@ html, body {
 
 #unsupported h2 { color: #f8fafc; margin-bottom: 12px; }
 
+/* Кнопка Start AR */
 #ar-button-container {
   position: absolute;
   bottom: 40px;
@@ -64,6 +65,19 @@ html, body {
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 8px 30px rgba(99, 102, 241, 0.4);
+  transition: all 0.2s;
 }
 
-#ar-button-container button:disabled { opacity: 0.5; cursor: not-allowed; }
+#ar-button-container button:hover {
+  background: #4f46e5;
+  transform: scale(1.02);
+}
+
+#ar-button-container button:active {
+  transform: scale(0.95);
+}
+
+#ar-button-container button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
