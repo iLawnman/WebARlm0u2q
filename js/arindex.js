@@ -4,7 +4,7 @@ import { Block, Inline } from 'three-mesh-ui';
 
 let scene, camera, renderer;
 let cube, edges, reticle;
-let mainPanel, fixedPanel, testBtn;
+let mainPanel, fixedPanel, testButton;
 let placed = false;
 let hitTestSource = null;
 let hitTestSourceRequested = false;
@@ -23,11 +23,11 @@ async function init() {
   const unsupportedEl = document.getElementById('unsupported');
   const startBtn = document.getElementById('start-ar-btn');
 
+  // Проверка WebXR
   if (!('xr' in navigator)) {
     console.error('❌ WebXR не поддерживается');
     unsupportedEl.style.display = 'flex';
     startBtn.disabled = true;
-    startBtn.textContent = 'WebXR не поддерживается';
     return;
   }
 
@@ -36,17 +36,16 @@ async function init() {
     supported = await navigator.xr.isSessionSupported('immersive-ar');
     console.log('✅ immersive-ar:', supported);
   } catch (e) {
-    console.error('❌ Ошибка проверки XR:', e);
+    console.error(' Ошибка проверки XR:', e);
   }
 
   if (!supported) {
     unsupportedEl.style.display = 'flex';
     startBtn.disabled = true;
-    startBtn.textContent = 'AR не поддерживается';
     return;
   }
 
-  // Загрузка шрифта
+  // Загрузка шрифта (как в официальном примере)
   const loader = new FontLoader();
   try {
     font = await new Promise((resolve, reject) => {
@@ -63,7 +62,7 @@ async function init() {
     return;
   }
 
-  // Сцена
+  // Сцена и камера
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
@@ -114,7 +113,7 @@ async function init() {
   edges.visible = false;
   scene.add(edges);
 
-  // UI панели
+  // Создаем UI панели
   createUIPanels();
 
   // События сессии
@@ -132,7 +131,7 @@ async function init() {
   });
 
   renderer.xr.addEventListener('sessionend', () => {
-    console.log(' AR сессия завершена');
+    console.log('🔚 AR сессия завершена');
     document.body.classList.remove('ar-active');
     hitTestSource = null;
     hitTestSourceRequested = false;
@@ -140,7 +139,7 @@ async function init() {
     startBtn.textContent = '▶ START AR';
   });
 
-  // Контроллер
+  // Контроллер для тапов
   const controller = renderer.xr.getController(0);
   controller.addEventListener('select', onSelect);
   scene.add(controller);
@@ -180,122 +179,135 @@ async function startARSession() {
   }
 }
 
+// Создание UI панелей (как в официальном примере three-mesh-ui)
 function createUIPanels() {
   console.log('🎨 Создание UI панелей...');
 
-  // Панель 1 (billboard) - используем Block
+  // === ПАНЕЛЬ 1: Основная (поворачивается к камере) ===
   mainPanel = new Block({
+    fontFamily: font,
+    fontSize: 0.05,
     width: 0.5,
     height: 0.35,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundOpacity: 0.9,
     backgroundColor: new THREE.Color(0x0b1120),
+    backgroundOpacity: 0.9,
     borderRadius: 0.02,
-    fontFamily: font,
-    fontSize: 0.025,
-    fontColor: new THREE.Color(0xe2e8f0),
-    padding: 0.02
+    padding: 0.02,
+    justifyContent: 'center',
+    alignItems: 'center'
   });
   mainPanel.visible = false;
   scene.add(mainPanel);
 
-  // Кнопка - тоже Block
-  testBtn = new Block({
+  // Заголовок
+  const title = new Inline({
+    content: 'Main Panel',
+    fontColor: new THREE.Color(0xe2e8f0),
+    fontSize: 0.06,
+    textAlign: 'center'
+  });
+  mainPanel.add(title);
+
+  // Кнопка (как интерактивный Block)
+  testButton = new Block({
     width: 0.4,
     height: 0.08,
     backgroundColor: new THREE.Color(0x6366f1),
     borderRadius: 0.01,
-    fontFamily: font,
-    fontSize: 0.022,
-    fontColor: new THREE.Color(0xffffff),
+    marginTop: 0.03,
     justifyContent: 'center',
     alignItems: 'center',
     cursor: 'pointer'
   });
 
-  // Текст внутри кнопки - используем Inline
   const btnText = new Inline({
-    content: 'Test click',
-    fontFamily: font,
-    fontSize: 0.022
+    content: 'Test Click',
+    fontColor: new THREE.Color(0xffffff),
+    fontSize: 0.045
   });
-  testBtn.add(btnText);
+  testButton.add(btnText);
 
-  // Обработчик клика
-  testBtn.onClick = () => {
+  // Обработчики событий (как в примере)
+  testButton.onClick = () => {
     console.log('✅ Клик по UI кнопке!');
-    testBtn.backgroundColor = new THREE.Color(0x4f46e5);
+    // Визуальный фидбек
+    testButton.backgroundColor = new THREE.Color(0x4f46e5);
     setTimeout(() => {
-      testBtn.backgroundColor = new THREE.Color(0x6366f1);
+      testButton.backgroundColor = new THREE.Color(0x6366f1);
     }, 150);
   };
 
-  // Hover эффект
-  testBtn.onHover = (isHovered) => {
+  testButton.onHover = (isHovered) => {
     if (isHovered) {
-      testBtn.backgroundColor = new THREE.Color(0x5558e8);
+      testButton.backgroundColor = new THREE.Color(0x5558e8);
     } else {
-      testBtn.backgroundColor = new THREE.Color(0x6366f1);
+      testButton.backgroundColor = new THREE.Color(0x6366f1);
     }
   };
 
-  mainPanel.add(testBtn);
+  mainPanel.add(testButton);
 
-  // Панель 2 (фиксированная)
+  // === ПАНЕЛЬ 2: Фиксированная (НЕ поворачивается) ===
   fixedPanel = new Block({
+    fontFamily: font,
+    fontSize: 0.05,
     width: 0.35,
     height: 0.22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundOpacity: 0.9,
     backgroundColor: new THREE.Color(0x0f172a),
+    backgroundOpacity: 0.9,
     borderColor: new THREE.Color(0x06b6d4),
     borderWidth: 0.004,
     borderRadius: 0.02,
-    fontFamily: font,
-    fontSize: 0.02,
-    fontColor: new THREE.Color(0x67e8f9),
     padding: 0.02,
-    textAlign: 'center'
+    justifyContent: 'center',
+    alignItems: 'center'
   });
   fixedPanel.visible = false;
-  
-  fixedPanel.add(new Inline({
-    content: 'Fixed panel',
-    fontFamily: font,
-    fontSize: 0.02
-  }));
-  
-  fixedPanel.add(new Inline({
-    content: 'Rotation is locked',
-    fontFamily: font,
-    fontSize: 0.015,
-    fontColor: new THREE.Color(0x94a3b8)
-  }));
-  
+
+  const fixedTitle = new Inline({
+    content: 'Fixed Panel',
+    fontColor: new THREE.Color(0x67e8f9),
+    fontSize: 0.055,
+    textAlign: 'center'
+  });
+  fixedPanel.add(fixedTitle);
+
+  const fixedText = new Inline({
+    content: 'Rotation locked',
+    fontColor: new THREE.Color(0x94a3b8),
+    fontSize: 0.035,
+    textAlign: 'center',
+    marginTop: 0.02
+  });
+  fixedPanel.add(fixedText);
+
   scene.add(fixedPanel);
 
-  console.log('✅ Панели созданы (Block + Inline)');
+  console.log('✅ Панели созданы');
 }
 
+// Размещение объектов
 function onSelect() {
   console.log('👆 Tap, reticle visible:', reticle.visible);
   if (!reticle.visible) return;
 
+  // Размещаем куб
   cube.position.setFromMatrixPosition(reticle.matrix);
   cube.position.y += 0.09;
   edges.position.copy(cube.position);
   cube.visible = true;
   edges.visible = true;
 
+  // Размещаем панель 1 (billboard)
   if (mainPanel) {
     mainPanel.position.set(cube.position.x, cube.position.y + 0.28, cube.position.z);
     mainPanel.visible = true;
   }
 
+  // Размещаем панель 2 (фиксированная)
   if (fixedPanel) {
     fixedPanel.position.set(cube.position.x + 0.4, cube.position.y + 0.15, cube.position.z);
+    // Жестко фиксируем поворот
     fixedPanel.rotation.set(0, 0, 0);
     fixedPanel.visible = true;
   }
@@ -304,6 +316,7 @@ function onSelect() {
   console.log('✅ Объекты размещены');
 }
 
+// Анимационный цикл
 function animate(timestamp, frame) {
   if (frame) {
     const session = renderer.xr.getSession();
@@ -333,8 +346,14 @@ function animate(timestamp, frame) {
   }
 
   if (placed) {
-    if (mainPanel) mainPanel.lookAt(camera.position);
+    // Панель 1: поворачивается к камере (billboard)
+    if (mainPanel) {
+      mainPanel.lookAt(camera.position);
+    }
 
+    // Панель 2: НЕ поворачивается (сохраняет фиксированный rotation)
+
+    // Обновляем raycaster для XR контроллера
     const controller = renderer.xr.getController(0);
     if (controller) {
       controller.updateMatrixWorld();
@@ -342,6 +361,7 @@ function animate(timestamp, frame) {
       raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
       raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
 
+      // Обновляем UI (необходимо для работы onClick/onHover)
       if (mainPanel) mainPanel.update(timestamp, raycaster);
       if (fixedPanel) fixedPanel.update(timestamp, raycaster);
     }

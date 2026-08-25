@@ -4,7 +4,6 @@ import { ARScene } from './arscene.js';
 import { playSound } from "./audio.js";
 import { Settings } from './settings.js';
 import { ARSettings } from './arsettings.js';
-import { ARInput } from './arinput.js';
 import { UIInput } from './uiinput.js';
 import { setArTargetContext } from './artarget.js';
 
@@ -16,21 +15,15 @@ export class App {
     this.recognition = null;
     this.arScene = new ARScene(this.ui);
 
-    // Передаем зависимости WebGL/CSS сцены в ARInput
-    this.arInput = new ARInput(
-      this.ui,
-      this.arScene.renderer,
-      this.arScene.scene,
-      this.arScene.camera
-    );
-    this.arInput.init();
-
-    // Единственный ARInput приложения также должен быть известен фабрике
-    // AR-таргетов (artarget.js / arobjects.js) на случай, если где-то
-    // createArTarget(Sync) вызовут без явного arInput - иначе там создастся
-    // "мертвый" fallback ARInput с camera=null, и клики по таргету перестанут
-    // работать (raycaster.setFromCamera падает на null-камере).
-    setArTargetContext(this.arScene.renderer, this.arScene.scene, this.arScene.camera);
+    // REFACTOR (CSS3D -> three-mesh-ui): раньше здесь создавался отдельный
+    // ARInput(renderer, scene, camera) - его логика (raycasting по
+    // указателю/тачу) теперь встроена прямо в ARScene, отдельный класс не
+    // нужен и не существует.
+    //
+    // ModelFactory (artarget.js) тоже больше не принимает renderer/scene/
+    // camera по отдельности - ему нужен сам инстанс ARScene, чтобы
+    // регистрировать интерактивные Block'и панелей в его raycast-цикле.
+    setArTargetContext(this.arScene);
 
     this.uiInput = new UIInput(this.ui);
 
@@ -74,7 +67,15 @@ export class App {
     }
 
     // 2. Recognition
-    this.recognition = new Recognition(this.ui, this.settings, this.arInput);
+    // TODO/VERIFY: recognition.js needs checking against its actual use of
+    // this third argument. It used to receive the standalone ARInput
+    // instance (for raycasting/binding target buttons); now that raycasting
+    // lives in ARScene, this passes arScene instead. If recognition.js calls
+    // arInput-specific methods (e.g. bindInteractiveEvent, addCSSObject) on
+    // it directly, those calls need to be updated to the ARScene equivalents
+    // (registerInteractive) or removed, since target buttons register
+    // themselves via ModelFactory now.
+    this.recognition = new Recognition(this.ui, this.settings, this.arScene);
     await this.recognition.init();
 
     this.ui.onStartAR(() => this.startAR());
