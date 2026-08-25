@@ -45,39 +45,50 @@ html, body {
 
 #unsupported h2 { color: #f8fafc; margin-bottom: 12px; }
 
-/* Кнопка Start AR */
+/* ---------- Кнопка Start AR ---------- */
 #ar-button-container {
-  position: absolute;
+  position: fixed;
   bottom: 40px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 10;
-  pointer-events: auto;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  z-index: 1000;
+  pointer-events: none;
 }
 
-#ar-button-container button {
-  padding: 14px 32px;
+#start-ar-btn {
+  pointer-events: auto;
+  padding: 16px 40px;
   border-radius: 12px;
   border: none;
   background: #6366f1;
   color: white;
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.5px;
   cursor: pointer;
-  box-shadow: 0 8px 30px rgba(99, 102, 241, 0.4);
-  transition: all 0.2s;
+  box-shadow: 0 8px 30px rgba(99, 102, 241, 0.5);
+  transition: all 0.2s ease;
 }
 
-#ar-button-container button:hover {
+#start-ar-btn:hover {
   background: #4f46e5;
-  transform: scale(1.02);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 36px rgba(99, 102, 241, 0.6);
 }
 
-#ar-button-container button:active {
-  transform: scale(0.95);
+#start-ar-btn:active {
+  transform: translateY(0);
 }
 
-#ar-button-container button:disabled {
+#start-ar-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  background: #475569;
+}
+
+/* Скрываем кнопку после запуска AR */
+body.ar-active #ar-button-container {
+  display: none;
 }
