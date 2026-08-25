@@ -51,10 +51,10 @@ async function init() {
   try {
     font = await new Promise((resolve, reject) => {
       loader.load(
-          'https://unpkg.com/three-mesh-ui@6.5.4/examples/assets/Roboto-msdf.json',
-          resolve,
-          undefined,
-          reject
+        'https://unpkg.com/three-mesh-ui@6.5.4/examples/assets/Roboto-msdf.json',
+        resolve,
+        undefined,
+        reject
       );
     });
     console.log('✅ Шрифт загружен');
@@ -95,21 +95,21 @@ async function init() {
   // Куб
   const cubeSize = 0.18;
   cube = new THREE.Mesh(
-      new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize),
-      new THREE.MeshStandardMaterial({
-        color: 0x6366f1,
-        metalness: 0.3,
-        roughness: 0.35,
-        emissive: 0x1e1b4b,
-        emissiveIntensity: 0.4
-      })
+    new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize),
+    new THREE.MeshStandardMaterial({
+      color: 0x6366f1,
+      metalness: 0.3,
+      roughness: 0.35,
+      emissive: 0x1e1b4b,
+      emissiveIntensity: 0.4
+    })
   );
   cube.visible = false;
   scene.add(cube);
 
   edges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(cube.geometry),
-      new THREE.LineBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.7 })
+    new THREE.EdgesGeometry(cube.geometry),
+    new THREE.LineBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.7 })
   );
   edges.visible = false;
   scene.add(edges);
@@ -260,20 +260,20 @@ function createUIPanels() {
     textAlign: 'center'
   });
   fixedPanel.visible = false;
-
+  
   fixedPanel.add(new Inline({
     content: 'Fixed panel',
     fontFamily: font,
     fontSize: 0.02
   }));
-
+  
   fixedPanel.add(new Inline({
     content: 'Rotation is locked',
     fontFamily: font,
     fontSize: 0.015,
     fontColor: new THREE.Color(0x94a3b8)
   }));
-
+  
   scene.add(fixedPanel);
 
   console.log('✅ Панели созданы (Block + Inline)');

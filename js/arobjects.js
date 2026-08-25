@@ -1,45 +1,55 @@
-// arobjects.js - Main AR Objects Factory
+// arobjects.js - Main AR Target Factory
+//
+// REFACTOR NOTE (CSS3D -> three-mesh-ui):
+// The prefab-HTML fetching (DEFAULT_PREFAB_URL / ensurePrefab) is gone - it
+// only made sense when panels were built by cloning an HTML template.
+// ARPanel now builds the panel directly as three-mesh-ui Blocks.
+//
+// IMPORTANT INTEGRATION CHANGE: this factory no longer creates a fallback
+// ARInput internally. Interactivity now comes from ARScene's pointer
+// raycasting loop, so you must give the factory a live ARScene - either via
+// `new ModelFactory({ arScene })`, `factory.setARScene(arScene)`, or by
+// passing `{ arScene }` in the options of createArTarget(). Without one, the
+// panel is still built and visible, but its buttons will not respond to
+// clicks (a warning is logged).
+//
+// group.userData also changed shape: the old CSS-specific keys (cssObject,
+// panelEl, Screen/MainBlock/LeftHelpBlock/RightBlock/ButtonsBlock aliases,
+// arInput) are gone. See the new keys below (panelRoot, screen, openModal,
+// closeModal).
 import * as THREE from 'three';
-import { ARDataParser } from './arparser.js';
-import { ARPanelCreator } from './arpanel.js';
-import { ARInput } from './arinput.js';
-import { playSound } from './audio.js';
+import { ARPanel } from './arpanel.js';
 
-const DEFAULT_PREFAB_URL = './assets/artargetPrefabNew.html';
+const DESIGN_JSON_CANDIDATES = [
+  './assets/arprefabdesign.json',
+  './assets/arprefabsdesign.json',
+  './arprefabdesign.json',
+  './arprefabsdesign.json'
+];
 
 export class ModelFactory {
   constructor(defaults = {}) {
-    this.prefabUrl = defaults.prefabUrl || DEFAULT_PREFAB_URL;
-    this.parser = new ARDataParser();
-    this.panelCreator = new ARPanelCreator();
-    this._arInputInstances = [];
-    this._debugSaveBtn = null;
+    this.panel = new ARPanel(defaults);
+    this._arScene = defaults.arScene || null;
     this._designAutoLoadAttempted = false;
+    this._debugSaveBtn = null;
   }
 
-  setRenderer(renderer) {
-    this.panelCreator.setRenderer(renderer);
-  }
-
-  setScene(scene) {
-    this.panelCreator.setScene(scene);
-  }
-
-  setCamera(camera) {
-    this.panelCreator.setCamera(camera);
+  setARScene(arScene) {
+    this._arScene = arScene;
   }
 
   setDesignPrefab(prefab) {
-    this.panelCreator.setDesignPrefab(prefab);
+    this.panel.setDesignPrefab(prefab);
     console.log('[ModelFactory] Design prefab set');
   }
 
   getDesignPrefab() {
-    return this.panelCreator.getDesignPrefab();
+    return this.panel.getDesignPrefab();
   }
 
   async _autoLoadDesignIfNeeded(ui = null) {
-    if (this.panelCreator.getDesignPrefab()) {
+    if (this.panel.getDesignPrefab()) {
       console.log('[ModelFactory] Design prefab already set, skipping autoload');
       return;
     }
@@ -48,13 +58,6 @@ export class ModelFactory {
       return;
     }
     this._designAutoLoadAttempted = true;
-
-    const DESIGN_JSON_CANDIDATES = [
-      './assets/arprefabdesign.json',
-      './assets/arprefabsdesign.json',
-      './arprefabdesign.json',
-      './arprefabsdesign.json'
-    ];
 
     const tryFetchDesignJson = async (path) => {
       if (typeof window !== 'undefined' && window.location && window.location.protocol === 'file:') {
@@ -80,8 +83,8 @@ export class ModelFactory {
     }
 
     if (groups) {
-      const prefab = this.parser.designGroupsToPrefab(groups);
-      this.panelCreator.setDesignPrefab(prefab);
+      const prefab = this.panel.designGroupsToPrefab(groups);
+      this.panel.setDesignPrefab(prefab);
       console.log('[ModelFactory] Design JSON applied');
       if (ui) ui.log('[ModelFactory] Design JSON loaded and applied', 'ok');
     } else {
@@ -90,87 +93,46 @@ export class ModelFactory {
     }
   }
 
-  async _ensurePrefab(url, ui = null) {
-    await this.panelCreator.ensurePrefab(url, ui);
-  }
-
   async createArTarget(targetData = '', options = {}) {
-    const prefabUrl = options.prefabUrl || this.prefabUrl;
     const ui = options.ui || null;
-    console.log('[ModelFactory] createArTarget: requesting prefab from', prefabUrl);
-    
-    await this._ensurePrefab(prefabUrl, ui);
     await this._autoLoadDesignIfNeeded(ui);
-
     return this.createArTargetSync(targetData, options);
   }
 
   createArTargetSync(targetData = '', options = {}) {
-    const { onAnswer = null, ui = null, arInput = null } = options;
-    const data = this.parser.normalizeTargetData(targetData);
-    
+    const { onAnswer = null, ui = null, arScene = this._arScene } = options;
+
+    const panelResult = this.panel.createPanel(targetData, { onAnswer, ui });
+    const data = panelResult.data;
+
     console.log('[ModelFactory] createArTargetSync: creating target:', data.groupName);
 
-    // Берем рабочий переданный arInput или создаем фоллбэк при необходимости
-    let activeArInput = arInput;
-    if (!activeArInput) {
-      activeArInput = new ARInput(ui, this.panelCreator.renderer, this.panelCreator.scene, this.panelCreator.camera);
-      activeArInput.init();
-      this._arInputInstances.push(activeArInput);
-    }
-    
     const group = new THREE.Group();
     group.name = `arTarget_${data.groupName}`;
 
-    // Создаем сферу (маркер)
     const sphere = this._createSphere();
     group.add(sphere);
+    group.add(panelResult.root);
 
-    // Обработчик ответа
-    const handleAnswer = (value) => {
-      if (ui) ui.log(`[Target:${data.groupName}] Answer: ${value}`, 'ok');
-      playSound('click');
-      if (typeof onAnswer === 'function') onAnswer(value);
-    };
-
-    // Создаем CSS экран
-    const { el, cssObject, raycastMesh } = this.panelCreator.createCSSScreen(data, handleAnswer, ui, activeArInput);
-    group.add(cssObject);
-    if (raycastMesh) group.add(raycastMesh);
-
-    // Привязываем панели к ARInput
-    const zoneMainPanel = el.querySelector('.main-panel');
-    const zoneLeftPanel = el.querySelector('.panels > .side-panel');
-    const zoneRightPanel = el.querySelectorAll('.panels > .side-panel')[1] || null;
-    const zoneButtons = el.querySelector('.buttons-area');
-    
-    if (zoneMainPanel) activeArInput.bindPanelEvents(zoneMainPanel, 'MainBlock');
-    if (zoneLeftPanel) activeArInput.bindPanelEvents(zoneLeftPanel, 'LeftHelpBlock');
-    if (zoneRightPanel) activeArInput.bindPanelEvents(zoneRightPanel, 'RightBlock');
-    if (zoneButtons) activeArInput.bindPanelEvents(zoneButtons, 'ButtonsBlock');
-
-    // Добавляем CSS объект (и его прокси-меш для рейкастинга) в ARInput
-    activeArInput.addCSSObject(cssObject, raycastMesh);
-
-    const panels = { 
-      Screen: cssObject, 
-      MainBlock: cssObject, 
-      LeftHelpBlock: cssObject, 
-      RightBlock: cssObject, 
-      ButtonsBlock: cssObject 
-    };
+    if (arScene) {
+      panelResult.interactives.forEach((block) => arScene.registerInteractive(block));
+    } else if (ui) {
+      ui.log('[ModelFactory] No ARScene attached - panel buttons will not be interactive. Call setARScene() or pass options.arScene.', 'warn');
+    } else {
+      console.warn('[ModelFactory] No ARScene attached - panel buttons will not be interactive.');
+    }
 
     group.userData = {
       targetInfo: data.raw,
       normalized: data,
       sphere,
-      ...panels,
-      panelEl: el,
-      cssObject,
-      onAnswer: handleAnswer,
+      panelRoot: panelResult.root,
+      screen: panelResult.screen,
+      openModal: panelResult.openModal,
+      closeModal: panelResult.closeModal,
+      onAnswer,
       answerType: data.answerType,
-      groupName: data.groupName,
-      arInput: activeArInput
+      groupName: data.groupName
     };
 
     this._ensureDebugSaveButton(group, ui);
@@ -203,25 +165,23 @@ export class ModelFactory {
     this._debugSaveBtn = btn;
   }
 
+  // NOTE: previously dumped each CSS3D panel's outerHTML. There is no HTML
+  // anymore, so this now dumps the normalized data plus the screen Block's
+  // transform - still enough to diff/reproduce a target's placement.
   _saveTargetDebug(group, ui) {
     const ud = group.userData || {};
+    const screen = ud.screen;
     const snapshot = {
       name: group.name,
       groupName: ud.groupName,
       answerType: ud.answerType,
       normalized: ud.normalized,
-      panels: {}
+      screenTransform: screen ? {
+        position: screen.position.toArray(),
+        rotation: screen.rotation.toArray().slice(0, 3).map((r) => +(r * 180 / Math.PI).toFixed(1)),
+        scale: screen.scale.toArray()
+      } : null
     };
-    for (const [key, obj] of Object.entries(ud)) {
-      if (obj?.isCSS3DObject && obj.element) {
-        snapshot.panels[key] = {
-          position: obj.position.toArray(),
-          rotation: obj.rotation.toArray().map((r) => +(r * 180 / Math.PI).toFixed(1)),
-          scale: obj.scale.x,
-          html: obj.element.outerHTML
-        };
-      }
-    }
     const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
