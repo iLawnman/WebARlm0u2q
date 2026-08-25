@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>2.2panel WebXR AR — Куб на полу + DOM Overlay панель</title>
+  <title>2.3panel WebXR AR — Куб на полу + DOM Overlay панель</title>
   <link rel="stylesheet" href="arindex.css">
   <script type="importmap">
   {
@@ -32,9 +32,7 @@
   <div id="ar-overlay">
     <div id="place-hint">Коснитесь пола, чтобы поставить куб и панель</div>
 
-    <!-- Контейнер, куда CSS3DRenderer будет выводить свои элементы -->
     <div id="css-container">
-      <!-- Основная панель -->
       <div id="anchor-panel" class="ar-anchored-panel">
         <div class="panel-frame">
           <iframe src="about.html" scrolling="yes"></iframe>
@@ -45,7 +43,6 @@
         </div>
       </div>
 
-      <!-- Вторая панель (её поворот зафиксирован в JS) -->
       <div id="second-panel" class="ar-anchored-panel">
         <div class="panel-frame">
           📌 Вторая панель

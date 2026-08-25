@@ -19,6 +19,10 @@ const debugBtn = document.getElementById('debug-btn');
 const debugLog = document.getElementById('debug-log');
 const secondPanel = document.getElementById('second-panel');
 
+// МАСШТАБ: 0.0015 означает, что 1000px HTML = 1.5 метра в AR мире.
+// Это делает панель 460px шириной примерно 0.69 метра, что идеально для AR.
+const PANEL_SCALE = 0.0015;
+
 let debugClickCount = 0;
 function logToOverlay(message) {
   debugClickCount += 1;
@@ -35,18 +39,17 @@ debugBtn.addEventListener('click', () => {
   logToOverlay('Клик по кнопке в WebXR DOM Overlay сработал ✅');
 });
 
-// ---------- Хранилище динамических панелей ----------
 const anchoredPanels = new Map();
-const anchoredPanelObjects = new Map(); // Храним соответствующие CSS3DObject
+const anchoredPanelObjects = new Map();
 
 function addAnchoredPanel(panelElement, anchorPosition) {
   const id = `panel-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
   panelElement.classList.add('ar-anchored-panel');
   convertorPanelsContainer.appendChild(panelElement);
   
-  // 1. Создаем CSS3DObject для новой панели
   const cssObj = new CSS3DObject(panelElement);
   cssObj.position.copy(anchorPosition);
+  cssObj.scale.setScalar(PANEL_SCALE); // ПРИМЕНЯЕМ МАСШТАБ
   scene.add(cssObj);
   
   const panelData = {
@@ -97,7 +100,6 @@ panelIframe.addEventListener('load', () => {
   }
 });
 
-// ---------- WebXR support check ----------
 if (!('xr' in navigator)) {
   unsupportedEl.style.display = 'flex';
 } else {
@@ -106,18 +108,15 @@ if (!('xr' in navigator)) {
   }).catch(() => { unsupportedEl.style.display = 'flex'; });
 }
 
-// ---------- Scene / Camera ----------
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
-// ---------- WebGL Renderer ----------
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.xr.enabled = true;
 webglContainer.appendChild(renderer.domElement);
 
-// ---------- CSS3D Renderer ----------
 const cssRenderer = new CSS3DRenderer();
 cssRenderer.setSize(window.innerWidth, window.innerHeight);
 cssRenderer.domElement.style.position = 'absolute';
@@ -126,7 +125,6 @@ cssRenderer.domElement.style.left = '0';
 cssRenderer.domElement.style.pointerEvents = 'none';
 cssContainer.appendChild(cssRenderer.domElement);
 
-// ---------- AR entry button ----------
 const arButton = ARButton.createButton(renderer, {
   requiredFeatures: ['hit-test'],
   optionalFeatures: ['local-floor', 'dom-overlay'],
@@ -134,13 +132,11 @@ const arButton = ARButton.createButton(renderer, {
 });
 arButtonContainer.appendChild(arButton);
 
-// ---------- Lights ----------
 scene.add(new THREE.HemisphereLight(0xffffff, 0x333344, 1.2));
 const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
 dirLight.position.set(2, 4, 2);
 scene.add(dirLight);
 
-// ---------- Reticle ----------
 const reticleGeometry = new THREE.RingGeometry(0.08, 0.1, 32).rotateX(-Math.PI / 2);
 const reticleMaterial = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
 const reticle = new THREE.Mesh(reticleGeometry, reticleMaterial);
@@ -148,7 +144,6 @@ reticle.matrixAutoUpdate = false;
 reticle.visible = false;
 scene.add(reticle);
 
-// ---------- Cube ----------
 const cubeSize = 0.18;
 const cube = new THREE.Mesh(
   new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize),
@@ -170,12 +165,14 @@ const edges = new THREE.LineSegments(
 edges.visible = false;
 scene.add(edges);
 
-// ---------- CSS3D Objects для основных панелей ----------
-// 1. Создаем CSS3DObject из существующих HTML-элементов
+// Создаем CSS3DObject для основных панелей
 const anchorPanelObj = new CSS3DObject(anchorPanel);
 const secondPanelObj = new CSS3DObject(secondPanel);
 
-// Добавляем их в сцену (позиции будут заданы при размещении)
+// ПРИМЕНЯЕМ МАСШТАБ СРАЗУ
+anchorPanelObj.scale.setScalar(PANEL_SCALE);
+secondPanelObj.scale.setScalar(PANEL_SCALE);
+
 scene.add(anchorPanelObj);
 scene.add(secondPanelObj);
 
@@ -183,7 +180,6 @@ const panelAnchor = new THREE.Vector3();
 const secondPanelAnchor = new THREE.Vector3();
 const PANEL_HEIGHT_OFFSET = 0.28;
 
-// ---------- Hit-test state ----------
 let hitTestSource = null;
 let hitTestSourceRequested = false;
 let placed = false;
@@ -212,7 +208,6 @@ renderer.xr.addEventListener('sessionend', () => {
   hitTestSourceRequested = false;
 });
 
-// ---------- Конвертор ----------
 convertorTriggerBtn.addEventListener('click', async () => {
   if (!placed) {
     console.warn('Сначала разместите куб на полу');
@@ -225,7 +220,6 @@ convertorTriggerBtn.addEventListener('click', async () => {
 
   try {
     const { results, allExist } = await checkAssetFiles();
-    
     const panel = document.createElement('div');
     panel.className = 'convertor-panel';
     
@@ -262,7 +256,6 @@ convertorTriggerBtn.addEventListener('click', async () => {
     panel.querySelector('.convertor-panel-close').addEventListener('click', () => {
       removeAnchoredPanel(panelId);
     });
-    
   } catch (err) {
     console.error('Ошибка при проверке assets:', err);
   } finally {
@@ -271,7 +264,6 @@ convertorTriggerBtn.addEventListener('click', async () => {
   }
 });
 
-// ---------- Tap to place ----------
 function onSelect() {
   if (!reticle.visible) return;
 
@@ -284,19 +276,14 @@ function onSelect() {
   // --- ПАНЕЛЬ 1: Основная ---
   panelAnchor.set(cube.position.x, cube.position.y + PANEL_HEIGHT_OFFSET, cube.position.z);
   anchorPanelObj.position.copy(panelAnchor);
-  // Если нужно, чтобы первая панель смотрела на камеру, раскомментируйте строку ниже:
-  // anchorPanelObj.lookAt(camera.position); 
 
   // --- ПАНЕЛЬ 2: Фиксированная ---
   secondPanelAnchor.set(cube.position.x + 0.4, cube.position.y + 0.15, cube.position.z);
   secondPanelObj.position.copy(secondPanelAnchor);
   
   // ЖЕСТКАЯ ФИКСАЦИЯ ПОВОРОТА ВТОРОЙ ПАНЕЛИ
-  // Мы НЕ вызываем lookAt(). Мы явно задаем rotation (или оставляем 0, 0, 0).
-  // Например, небольшой наклон, чтобы было видно, что он не меняется:
-  secondPanelObj.rotation.x = 0;
-  secondPanelObj.rotation.y = 0; 
-  secondPanelObj.rotation.z = 0;
+  // Мы НЕ вызываем lookAt(). Мы явно задаем rotation.
+  secondPanelObj.rotation.set(0, 0, 0); 
 
   placed = true;
   placeHint.style.display = 'none';
@@ -306,7 +293,6 @@ const controller = renderer.xr.getController(0);
 controller.addEventListener('select', onSelect);
 scene.add(controller);
 
-// ---------- Resize ----------
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
@@ -314,7 +300,6 @@ window.addEventListener('resize', () => {
   cssRenderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// ---------- Animation loop ----------
 renderer.setAnimationLoop((timestamp, frame) => {
   if (frame) {
     const session = renderer.xr.getSession();
@@ -352,7 +337,12 @@ renderer.setAnimationLoop((timestamp, frame) => {
   }
 
   if (placed) {
-    // Управление видимостью на основе дистанции (CSS3DRenderer сам обработает масштаб и перспективу)
+    // 1. Первая панель ПОВОРАЧИВАЕТСЯ к камере
+    anchorPanelObj.lookAt(camera.position);
+    
+    // 2. Вторая панель НЕ ПОВОРАЧИВАЕТСЯ (мы не вызываем для неё lookAt)
+
+    // Управление видимостью
     const dist1 = camera.position.distanceTo(panelAnchor);
     anchorPanelObj.visible = (dist1 < 8);
     if (dist1 < 8) anchorPanel.classList.add('visible');
@@ -370,7 +360,7 @@ renderer.setAnimationLoop((timestamp, frame) => {
       else data.element.classList.remove('visible');
     }
 
-    // Рендерим CSS3D сцену (это автоматически применит правильные transform ко всем CSS3DObject)
+    // Рендерим CSS3D сцену
     cssRenderer.render(scene, camera);
   }
 

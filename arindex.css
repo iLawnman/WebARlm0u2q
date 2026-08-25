@@ -49,7 +49,7 @@ html, body {
 #ar-overlay {
   position: fixed;
   inset: 0;
-  pointer-events: none;
+  pointer-events: none; /* Пропускаем клики сквозь пустые места */
   display: none;
 }
 
@@ -74,7 +74,12 @@ html, body {
   left: 0;
   width: 100%;
   height: 100%;
-  pointer-events: none; /* Пропускаем клики к панелям внутри */
+  pointer-events: none;
+}
+
+/* ВАЖНО: Разрешаем клики по самим панелям и их оберткам внутри CSS3DRenderer */
+#css-container > div {
+  pointer-events: auto !important;
 }
 
 /* ---------- Базовый стиль для панелей ---------- */
@@ -85,7 +90,7 @@ html, body {
   transform-origin: 50% 100%;
   opacity: 0;
   visibility: hidden;
-  pointer-events: none;
+  pointer-events: auto; /* Панели должны быть кликабельны */
   display: flex;
   flex-direction: column;
   border-radius: 16px;
@@ -94,13 +99,12 @@ html, body {
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
   background: #0b1120;
   transition: opacity 0.15s linear;
-  will-change: opacity; /* Убран transform, чтобы не ломать CSS3DRenderer */
+  will-change: opacity;
 }
 
 .ar-anchored-panel.visible {
   opacity: 1;
   visibility: visible;
-  pointer-events: auto;
 }
 
 /* ---------- Основная панель ---------- */
