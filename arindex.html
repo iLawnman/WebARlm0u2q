@@ -318,8 +318,6 @@
   const arOverlay = document.getElementById('ar-overlay');
   const placeHint = document.getElementById('place-hint');
   const arButtonContainer = document.getElementById('ar-button-container');
-  const convertorTriggerBtn = document.getElementById('convertor-trigger-btn');
-  const convertorPanelsContainer = document.getElementById('convertor-panels-container');
 
   const anchorPanel = document.getElementById('anchor-panel');
   const debugBtn = document.getElementById('debug-btn');
@@ -339,63 +337,6 @@
 
   debugBtn.addEventListener('click', () => {
     logToOverlay('Клик по кнопке в WebXR DOM Overlay сработал ✅');
-  });
-
-  // ---------- Хранилище всех панелей, привязанных к 3D-точкам ----------
-  const anchoredPanels = new Map();
-
-  // ---------- Функция для добавления панели, привязанной к 3D-позиции ----------
-  function addAnchoredPanel(panelElement, anchorPosition) {
-    const id = `panel-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
-
-    panelElement.classList.add('ar-anchored-panel');
-    convertorPanelsContainer.appendChild(panelElement);
-
-    const panelData = {
-      element: panelElement,
-      anchorPosition: anchorPosition.clone(),
-      visible: true
-    };
-
-    anchoredPanels.set(id, panelData);
-    return id;
-  }
-
-  // ---------- Функция удаления панели ----------
-  function removeAnchoredPanel(id) {
-    const data = anchoredPanels.get(id);
-    if (data) {
-      data.element.remove();
-      anchoredPanels.delete(id);
-    }
-  }
-
-  // ---------- Freeze panel tracking while the user is actively touching it ----------
-  let interacting = false;
-
-  function setupPanelInteraction(panelElement) {
-    panelElement.addEventListener('pointerdown', () => { interacting = true; });
-    panelElement.addEventListener('touchstart', () => { interacting = true; }, { passive: true });
-    panelElement.addEventListener('pointerup', () => { interacting = false; });
-    panelElement.addEventListener('pointercancel', () => { interacting = false; });
-    panelElement.addEventListener('touchend', () => { interacting = false; }, { passive: true });
-    panelElement.addEventListener('touchcancel', () => { interacting = false; }, { passive: true });
-  }
-
-  setupPanelInteraction(anchorPanel);
-
-  const panelIframe = anchorPanel.querySelector('iframe');
-  panelIframe.addEventListener('load', () => {
-    try {
-      const doc = panelIframe.contentDocument;
-      doc.addEventListener('touchstart', () => { interacting = true; }, { passive: true });
-      doc.addEventListener('touchend', () => { interacting = false; }, { passive: true });
-      doc.addEventListener('touchcancel', () => { interacting = false; }, { passive: true });
-      doc.addEventListener('pointerdown', () => { interacting = true; });
-      doc.addEventListener('pointerup', () => { interacting = false; });
-    } catch (err) {
-      console.warn('Could not attach listeners inside iframe (cross-origin?)', err);
-    }
   });
 
   // ---------- Basic WebXR support check ----------
@@ -498,77 +439,13 @@
     hitTestSourceRequested = false;
   });
 
-  // ---------- Обработчик для кнопки конвертора ----------
-  convertorTriggerBtn.addEventListener('click', async () => {
-    if (!placed) {
-      console.warn('Сначала разместите куб на полу');
-      return;
-    }
-
-    convertorTriggerBtn.disabled = true;
-    const originalLabel = convertorTriggerBtn.textContent;
-    convertorTriggerBtn.textContent = '⏳ Проверяю…';
-
-    try {
-      const { results, allExist } = await checkAssetFiles();
-
-      const panel = document.createElement('div');
-      panel.className = 'convertor-panel';
-
-      const rowsHtml = results.map(r => `
-      <div class="convertor-row ${r.exists ? 'ok' : 'missing'}">
-        <span>${r.exists ? '✅' : '❌'}</span>
-        <code>${r.path}</code>
-      </div>
-    `).join('');
-
-      const title = allExist ? '✅ Assets найдены' : '❌ Не хватает файлов';
-      const message = allExist
-              ? '<p>Все файлы конвертера на месте!</p>'
-              : `<p>Не все файлы найдены в <code>./assets/</code>:</p>`;
-
-      panel.innerHTML = `
-      <div class="convertor-panel-header">
-        <span>${title}</span>
-        <button type="button" class="convertor-panel-close" aria-label="Закрыть">×</button>
-      </div>
-      <div class="convertor-panel-body">
-        ${message}
-        ${rowsHtml}
-      </div>
-    `;
-
-      // Смещаем панель конвертора вправо от основной
-      const offsetPosition = panelAnchor.clone();
-      offsetPosition.x += 0.30;
-      offsetPosition.y += 0.05;
-
-      const panelId = addAnchoredPanel(panel, offsetPosition);
-      setupPanelInteraction(panel);
-
-      panel.querySelector('.convertor-panel-close').addEventListener('click', () => {
-        removeAnchoredPanel(panelId);
-      });
-
-    } catch (err) {
-      console.error('Ошибка при проверке assets:', err);
-    } finally {
-      convertorTriggerBtn.disabled = false;
-      convertorTriggerBtn.textContent = originalLabel;
-    }
-  });
-
   // ---------- Tap on screen -> place cube ----------
   function onSelect() {
     if (!reticle.visible) return;
 
     cube.position.setFromMatrixPosition(reticle.matrix);
     cube.position.y += cubeSize / 2;
-    // edges.position.copy(cube.position);
     cube.visible = true;
-    // edges.visible = true;
-
-    // panelAnchor.set(cube.position.x, cube.position.y + PANEL_HEIGHT_OFFSET, cube.position.z);
 
     placed = true;
     placeHint.style.display = 'none';
@@ -590,110 +467,6 @@
   const camWorldPos = new THREE.Vector3();
   const directionToPanel = new THREE.Vector3();
   const cameraForward = new THREE.Vector3();
-
-  function updateAnchoredPanels() {
-    if (!placed) return;
-    if (interacting) return;
-
-    camera.getWorldPosition(camWorldPos);
-    camera.getWorldDirection(cameraForward);
-
-    // Основная панель
-    const distance = camWorldPos.distanceTo(panelAnchor);
-    projected.copy(panelAnchor).project(camera);
-
-    if (projected.z > 1 || distance > 8) {
-      anchorPanel.classList.remove('visible');
-    } else {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      const screenX = (projected.x * 0.5 + 0.5) * w;
-      const screenY = (1 - (projected.y * 0.5 + 0.5)) * h;
-
-      const margin = 40;
-      if (screenX < -margin || screenX > w + margin || screenY < -margin || screenY > h + margin) {
-        anchorPanel.classList.remove('visible');
-      } else {
-        // Вычисляем угол поворота в 3D-пространстве
-        directionToPanel.copy(panelAnchor).sub(camWorldPos);
-        directionToPanel.y = 0; // Игнорируем наклон по вертикали для горизонтального поворота
-        directionToPanel.normalize();
-
-        // Угол между направлением камеры и направлением на панель
-        const cameraDirFlat = cameraForward.clone();
-        cameraDirFlat.y = 0;
-        cameraDirFlat.normalize();
-
-        // Вычисляем угол поворота панели в горизонтальной плоскости
-        const angle = Math.atan2(directionToPanel.x, directionToPanel.z) -
-                Math.atan2(cameraDirFlat.x, cameraDirFlat.z);
-
-        // Дополнительный наклон панели в зависимости от вертикального угла обзора
-        const verticalAngle = Math.asin(
-                (panelAnchor.y - camWorldPos.y) / distance
-        );
-
-        const scale = THREE.MathUtils.clamp(0.9 / distance, 0.35, 1.15);
-
-        // Применяем трансформацию с поворотом и перспективным наклоном
-        anchorPanel.style.transform =
-                `translate(${screenX}px, ${screenY}px) translate(-50%, -100%) ` +
-                `scale(${scale}) ` +
-                `rotateY(${-angle}rad) ` +
-                `rotateX(${-verticalAngle * 0.5}rad)`;
-        anchorPanel.classList.add('visible');
-      }
-    }
-
-    // Дополнительные панели
-    for (const [id, data] of anchoredPanels) {
-      if (!data.visible) continue;
-
-      const anchorPos = data.anchorPosition;
-      const dist = camWorldPos.distanceTo(anchorPos);
-      projected.copy(anchorPos).project(camera);
-
-      if (projected.z > 1 || dist > 8) {
-        data.element.classList.remove('visible');
-        continue;
-      }
-
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      const screenX = (projected.x * 0.5 + 0.5) * w;
-      const screenY = (1 - (projected.y * 0.5 + 0.5)) * h;
-
-      const margin = 40;
-      if (screenX < -margin || screenX > w + margin || screenY < -margin || screenY > h + margin) {
-        data.element.classList.remove('visible');
-      } else {
-        // Вычисляем угол поворота для дополнительной панели
-        directionToPanel.copy(anchorPos).sub(camWorldPos);
-        directionToPanel.y = 0;
-        directionToPanel.normalize();
-
-        const cameraDirFlat = cameraForward.clone();
-        cameraDirFlat.y = 0;
-        cameraDirFlat.normalize();
-
-        const angle = Math.atan2(directionToPanel.x, directionToPanel.z) -
-                Math.atan2(cameraDirFlat.x, cameraDirFlat.z);
-
-        const verticalAngle = Math.asin(
-                (anchorPos.y - camWorldPos.y) / dist
-        );
-
-        const scale = THREE.MathUtils.clamp(0.9 / dist, 0.35, 1.15);
-
-        data.element.style.transform =
-                `translate(${screenX}px, ${screenY}px) translate(-50%, -100%) ` +
-                `scale(${scale}) ` +
-                `rotateY(${-angle}rad) ` +
-                `rotateX(${-verticalAngle * 0.5}rad)`;
-        data.element.classList.add('visible');
-      }
-    }
-  }
 
   // ---------- Animation loop ----------
   const clock = new THREE.Clock();
@@ -739,8 +512,6 @@
     if (placed) {
       const t = clock.getElapsedTime();
       cube.rotation.y = t * 0.6;
-      // edges.rotation.copy(cube.rotation);
-      // updateAnchoredPanels();
     }
 
     renderer.render(scene, camera);
