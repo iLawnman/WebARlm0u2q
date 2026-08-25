@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>rotate fix WebXR AR — Куб на полу + DOM Overlay панель</title>
+  <title>no panel WebXR AR — Куб на полу + DOM Overlay панель</title>
   <style>
     html, body {
       margin: 0;
@@ -564,11 +564,11 @@
 
     cube.position.setFromMatrixPosition(reticle.matrix);
     cube.position.y += cubeSize / 2;
-    edges.position.copy(cube.position);
+    // edges.position.copy(cube.position);
     cube.visible = true;
-    edges.visible = true;
+    // edges.visible = true;
 
-    panelAnchor.set(cube.position.x, cube.position.y + PANEL_HEIGHT_OFFSET, cube.position.z);
+    // panelAnchor.set(cube.position.x, cube.position.y + PANEL_HEIGHT_OFFSET, cube.position.z);
 
     placed = true;
     placeHint.style.display = 'none';
