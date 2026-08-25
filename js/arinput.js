@@ -15,6 +15,11 @@ export class ARInput {
     this._raycastMeshes = [];
     this._isInitialized = false;
     this._sceneGroups = [];
+
+    // Состояние жеста "тап двумя пальцами" (debug-рейкаст из центра экрана)
+    this._twoFingerActive = false;
+    this._twoFingerStartTime = 0;
+    this._twoFingerMaxTapMs = 500; // дольше - считаем это не тапом, а долгим удержанием/жестом
   }
 
   /**
@@ -24,7 +29,14 @@ export class ARInput {
     console.log('[ARInput] init called with', cssObjects.length, 'CSS objects');
     this._cssObjects = cssObjects;
     this._isInitialized = true;
-    
+
+    if (this.ui) {
+      this.ui.log(
+        `[ARInput] Старт | renderer=${!!this.renderer} scene=${!!this.scene} camera=${!!this.camera}`,
+        'info'
+      );
+    }
+
     this._setupGlobalListeners();
     this._logSceneObjects();
   }
@@ -77,9 +89,18 @@ export class ARInput {
       canvas.addEventListener('pointerup', this._onCanvasEvent.bind(this), true);
       canvas.addEventListener('touchstart', this._onCanvasEvent.bind(this), { passive: true, capture: true });
       canvas.addEventListener('touchend', this._onCanvasEvent.bind(this), { passive: true, capture: true });
+
+      // Отдельное отслеживание жеста "тап двумя пальцами" - debug raycast
+      // из центра экрана по всем объектам Three.js сцены.
+      canvas.addEventListener('touchstart', this._onTouchStartTwoFinger.bind(this), { passive: true, capture: true });
+      canvas.addEventListener('touchend', this._onTouchEndTwoFinger.bind(this), { passive: true, capture: true });
+
+      if (this.ui) this.ui.log('[ARInput] Слушатели событий подключены к canvas', 'ok');
     } else {
       window.addEventListener('click', this._onWindowEvent.bind(this), true);
       window.addEventListener('touchstart', this._onWindowEvent.bind(this), true);
+
+      if (this.ui) this.ui.log('[ARInput] canvas отсутствует - слушатели подключены к window (fallback)', 'warn');
     }
   }
 
@@ -105,6 +126,10 @@ export class ARInput {
 
     if (clientX === undefined || clientY === undefined) return;
 
+    if (this.ui) {
+      this.ui.log(`[ARInput] Событие '${e.type}' получено @ (${Math.round(clientX)}, ${Math.round(clientY)})`, 'info');
+    }
+
     const rect = this.renderer.domElement.getBoundingClientRect();
     const x = ((clientX - rect.left) / rect.width) * 2 - 1;
     const y = -((clientY - rect.top) / rect.height) * 2 + 1;
@@ -114,9 +139,16 @@ export class ARInput {
     this._raycaster.setFromCamera(this._pointer, this.camera);
     const raycastMeshes = this._getAllRaycastMeshes();
 
-    if (raycastMeshes.length === 0) return;
+    if (raycastMeshes.length === 0) {
+      if (this.ui) this.ui.log('[ARInput] Нет доступных объектов для рейкаста (raycastMeshes пуст)', 'warn');
+      return;
+    }
 
     const intersects = this._raycaster.intersectObjects(raycastMeshes);
+
+    if (this.ui) {
+      this.ui.log(`[ARInput] Raycast: проверено ${raycastMeshes.length} объектов, попаданий: ${intersects.length}`, 'info');
+    }
 
     if (intersects.length > 0) {
       const hit = intersects[0];
@@ -133,6 +165,7 @@ export class ARInput {
 
         if (realTarget && cssObject.element.contains(realTarget)) {
           console.log('[ARInput] ★ Real target hit:', realTarget.tagName, realTarget.className);
+          if (this.ui) this.ui.log(`[ARInput] Попадание в элемент: <${realTarget.tagName.toLowerCase()}> class="${realTarget.className}"`, 'ok');
           
           playSound('click');
           
@@ -143,11 +176,16 @@ export class ARInput {
           // Если клик не попал в конкретный подэлемент, ищем ближайший интерактивный
           const interactive = cssObject.element.querySelector('button, input, a, select, textarea, .modal-close-btn');
           if (interactive) {
+            if (this.ui) this.ui.log('[ARInput] Точного попадания нет, кликаем по ближайшему интерактивному элементу панели', 'ok');
             playSound('click');
             interactive.click();
+          } else if (this.ui) {
+            this.ui.log('[ARInput] Попадание в панель, но интерактивный элемент не найден', 'warn');
           }
         }
       }
+    } else if (this.ui) {
+      this.ui.log('[ARInput] Мимо - ни один объект не задет', 'warn');
     }
   }
 
@@ -161,6 +199,82 @@ export class ARInput {
           closeBtn.click();
         }
       }
+    }
+  }
+
+  /**
+   * Debug-фича: тап двумя пальцами -> raycast из центра экрана по всем
+   * объектам Three.js сцены (не только по CSS3D-панелям), с выводом
+   * в лог имени объекта, в который попали. Удобно для отладки/настройки
+   * положения объектов в 3D-сцене.
+   */
+  _onTouchStartTwoFinger(e) {
+    if (!e.touches) return;
+
+    if (e.touches.length === 2) {
+      this._twoFingerActive = true;
+      this._twoFingerStartTime = performance.now();
+      if (this.ui) this.ui.log('[ARInput] Тап двумя пальцами: начало', 'info');
+    } else if (e.touches.length > 2) {
+      // Более двух пальцев - это не наш жест, сбрасываем
+      this._twoFingerActive = false;
+    }
+  }
+
+  _onTouchEndTwoFinger(e) {
+    if (!this._twoFingerActive) return;
+
+    const remaining = e.touches ? e.touches.length : 0;
+
+    if (remaining > 0) {
+      // Один из двух пальцев ещё не оторван - ждём, пока оторвутся оба
+      return;
+    }
+
+    const elapsed = performance.now() - this._twoFingerStartTime;
+    this._twoFingerActive = false;
+
+    if (elapsed > this._twoFingerMaxTapMs) {
+      if (this.ui) this.ui.log('[ARInput] Тап двумя пальцами: слишком долго, это не тап', 'warn');
+      return;
+    }
+
+    if (this.ui) this.ui.log('[ARInput] Тап двумя пальцами: raycast из центра экрана', 'info');
+    this._raycastFromScreenCenter();
+  }
+
+  _raycastFromScreenCenter() {
+    if (!this.camera) {
+      console.error('[ARInput] _raycastFromScreenCenter: camera is missing');
+      if (this.ui) this.ui.log('[ARInput] Нет камеры для raycast из центра экрана', 'err');
+      return;
+    }
+    if (!this.scene) {
+      console.error('[ARInput] _raycastFromScreenCenter: scene is missing');
+      if (this.ui) this.ui.log('[ARInput] Нет сцены для raycast из центра экрана', 'err');
+      return;
+    }
+
+    // Центр экрана в нормализованных координатах устройства (NDC) - (0, 0)
+    this._pointer.set(0, 0);
+    this._raycaster.setFromCamera(this._pointer, this.camera);
+
+    const intersects = this._raycaster.intersectObjects(this.scene.children, true);
+
+    if (intersects.length > 0) {
+      const hit = intersects[0];
+      const obj = hit.object;
+      const name = obj.name || obj.type || '(без имени)';
+      const distance = hit.distance.toFixed(3);
+
+      console.log('[ARInput] ★ Two-finger center raycast hit:', name, obj);
+      if (this.ui) {
+        this.ui.log(`[ARInput] 2-пальца raycast → объект: "${name}" (${obj.type}), дистанция=${distance}м`, 'ok');
+      }
+      playSound('click');
+    } else {
+      console.log('[ARInput] Two-finger center raycast: no intersection');
+      if (this.ui) this.ui.log('[ARInput] 2-пальца raycast: объект не найден', 'warn');
     }
   }
 
