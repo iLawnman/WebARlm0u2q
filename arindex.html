@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>add update panel WebXR AR — Куб на полу + DOM Overlay панель</title>
+  <title>add button panel WebXR AR — Куб на полу + DOM Overlay панель</title>
   <style>
     html, body {
       margin: 0;
@@ -513,9 +513,55 @@
               fontColor: new THREE.Color(0xefffe8),
             })
     );
+
+    // Создаем кнопку (Block)
+    const button = new ThreeMeshUI.Block({
+      width: 1.2,
+      height: 0.4,
+      justifyContent: 'center',
+      alignContent: 'center',
+      backgroundOpacity: 1,
+      backgroundColor: new THREE.Color(0x007bff), // Синий цвет по умолчанию
+      borderRadius: 0.08
+    });
+
+// Добавляем текст внутрь кнопки
+    const buttonText = new ThreeMeshUI.Text({
+      content: 'Кликни меня',
+      fontSize: 0.08
+    });
+
+    button.add(buttonText);
+    container.add(button);
   }
 
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
 
+  // Массив объектов, на которые можно нажать
+  const targets = [button];
+
+  window.addEventListener('pointermove', (event) => {
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  });
+
+  // Обработка клика
+  window.addEventListener('pointerdown', () => {
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(targets);
+
+    if (intersects.length > 0) {
+      // Переводим кнопку в состояние клика
+      button.setState('selected');
+    }
+  });
+
+  window.addEventListener('pointerup', () => {
+    // Возвращаем в обычное состояние, когда отпустили мышь
+    button.setState('idle');
+  });
+  
   // ---------- Tap on screen -> place cube ----------
   function onSelect() {
     if (!reticle.visible) return;
