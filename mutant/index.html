@@ -1,322 +1,371 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>4 Animal Mutator XR</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { overflow: hidden; background: #0a0a1a; font-family: 'Segoe UI', sans-serif; }
-        canvas { display: block; }
-        
-        #ui-overlay {
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            pointer-events: none;
-            z-index: 10;
-        }
-        
-        .slot {
-            position: absolute;
-            width: 120px; height: 120px;
-            background: rgba(0,0,0,0.5);
-            border: 2px dashed rgba(255,255,255,0.3);
-            border-radius: 12px;
-            overflow: hidden;
-            backdrop-filter: blur(8px);
-            transition: all 0.3s;
-        }
-        .slot.filled {
-            border: 2px solid #4ade80;
-        }
-        .slot img {
-            width: 100%; height: 100%;
-            object-fit: cover;
-            display: none;
-        }
-        .slot .label {
-            color: white;
-            text-align: center;
-            padding: 8px;
-            font-size: 11px;
-            opacity: 0.7;
-        }
-        .slot .placeholder {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            flex-direction: column;
-        }
-        .slot.filled .placeholder { display: none; }
-        .slot.filled img { display: block; }
-        
-        #slot-left { top: 20px; left: 20px; }
-        #slot-right { top: 20px; right: 20px; }
-        
-        #hint {
-            position: absolute;
-            bottom: 40px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: rgba(255,255,255,0.6);
-            background: rgba(0,0,0,0.5);
-            padding: 12px 24px;
-            border-radius: 30px;
-            font-size: 16px;
-            backdrop-filter: blur(4px);
-            border: 1px solid rgba(255,255,255,0.1);
-            pointer-events: none;
-        }
-        
-        #result {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 300px;
-            height: 300px;
-            border-radius: 20px;
-            overflow: hidden;
-            border: 3px solid #fbbf24;
-            box-shadow: 0 0 60px rgba(251,191,36,0.3);
-            display: none;
-            background: #1a1a2e;
-            pointer-events: none;
-        }
-        #result img {
-            width: 100%; height: 100%;
-            object-fit: cover;
-        }
-        #result .label {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: rgba(0,0,0,0.7);
-            color: #fbbf24;
-            padding: 8px;
-            text-align: center;
-            font-size: 14px;
-            letter-spacing: 2px;
-        }
-        
-        #status {
-            position: absolute;
-            bottom: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: #4ade80;
-            font-size: 14px;
-            background: rgba(0,0,0,0.5);
-            padding: 6px 16px;
-            border-radius: 20px;
-            pointer-events: none;
-            z-index: 20;
-        }
-        
-        /* DEBUG PANEL */
-        #debug-toggle {
-            position: fixed;
-            left: 10px;
-            bottom: 10px;
-            z-index: 1000;
-            background: rgba(0,0,0,0.8);
-            color: #4ade80;
-            border: 1px solid #4ade80;
-            padding: 8px 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 12px;
-            font-family: monospace;
-            pointer-events: all;
-            transition: all 0.3s;
-        }
-        #debug-toggle:hover {
-            background: #4ade80;
-            color: #0a0a1a;
-        }
-        
-        #debug-panel {
-            position: fixed;
-            left: 0;
-            top: 0;
-            width: 400px;
-            max-width: 90vw;
-            height: 100vh;
-            background: rgba(10, 10, 26, 0.95);
-            backdrop-filter: blur(10px);
-            border-right: 2px solid #4ade80;
-            z-index: 999;
-            transform: translateX(-100%);
-            transition: transform 0.3s ease;
-            display: flex;
-            flex-direction: column;
-            pointer-events: all;
-            font-family: 'Courier New', monospace;
-            font-size: 11px;
-        }
-        #debug-panel.open {
-            transform: translateX(0);
-        }
-        
-        #debug-header {
-            padding: 12px 16px;
-            background: rgba(74, 222, 128, 0.1);
-            border-bottom: 1px solid rgba(74, 222, 128, 0.3);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-shrink: 0;
-        }
-        #debug-header h3 {
-            color: #4ade80;
-            font-size: 14px;
-            font-weight: normal;
-            letter-spacing: 1px;
-        }
-        #debug-header .close {
-            color: #ef4444;
-            cursor: pointer;
-            font-size: 18px;
-            padding: 0 8px;
-        }
-        #debug-header .close:hover {
-            color: #ff6b6b;
-        }
-        
-        #debug-controls {
-            padding: 8px 16px;
-            border-bottom: 1px solid rgba(74, 222, 128, 0.1);
-            display: flex;
-            gap: 8px;
-            flex-shrink: 0;
-            flex-wrap: wrap;
-        }
-        #debug-controls button {
-            background: rgba(74, 222, 128, 0.15);
-            color: #4ade80;
-            border: 1px solid rgba(74, 222, 128, 0.3);
-            padding: 4px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 10px;
-            font-family: monospace;
-            transition: all 0.2s;
-        }
-        #debug-controls button:hover {
-            background: rgba(74, 222, 128, 0.3);
-        }
-        #debug-controls .clear-btn:hover {
-            border-color: #ef4444;
-            color: #ef4444;
-        }
-        
-        #debug-logs {
-            flex: 1;
-            overflow-y: auto;
-            padding: 8px 16px;
-            color: #a0aec0;
-            line-height: 1.6;
-            font-size: 11px;
-        }
-        #debug-logs::-webkit-scrollbar {
-            width: 4px;
-        }
-        #debug-logs::-webkit-scrollbar-track {
-            background: rgba(0,0,0,0.3);
-        }
-        #debug-logs::-webkit-scrollbar-thumb {
-            background: #4ade80;
-            border-radius: 2px;
-        }
-        
-        .log-entry {
-            padding: 2px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.03);
-            display: flex;
-            gap: 8px;
-        }
-        .log-time {
-            color: #4a5568;
-            flex-shrink: 0;
-            min-width: 70px;
-        }
-        .log-level {
-            flex-shrink: 0;
-            min-width: 50px;
-            font-weight: bold;
-        }
-        .log-level.info { color: #63b3ed; }
-        .log-level.success { color: #4ade80; }
-        .log-level.warn { color: #fbbf24; }
-        .log-level.error { color: #ef4444; }
-        .log-level.debug { color: #a78bfa; }
-        .log-message {
-            word-break: break-word;
-            color: #e2e8f0;
-        }
-        
-        .log-entry.highlight {
-            background: rgba(74, 222, 128, 0.05);
-            border-left: 2px solid #4ade80;
-        }
-        
-        @media (max-width: 600px) {
-            .slot { width: 80px; height: 80px; }
-            #result { width: 200px; height: 200px; }
-            #debug-panel { width: 100vw; max-width: 100vw; }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MediaPipe Object Detection</title>
+<style>
+    * { box-sizing: border-box; }
+    html, body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        width: 100%;
+        height: 100%;
+        background: #000;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    /* Видео и канвас на весь экран */
+    #video, #canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        object-fit: cover;
+    }
+
+    /* Зеркалим ТОЛЬКО видео (селфи-режим). Канвас НЕ зеркалируем! */
+    #video {
+        transform: scaleX(-1);
+    }
+
+    /* Канвас поверх видео */
+    #canvas {
+        z-index: 1;
+        pointer-events: none;
+    }
+
+    /* Стартовое сообщение */
+    #overlay {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #fff;
+        font-size: 22px;
+        text-align: center;
+        z-index: 5;
+        text-shadow: 0 0 10px rgba(0,0,0,0.8);
+    }
+    #overlay.hidden { display: none; }
+
+    /* Панель лога */
+    #logPanel {
+        position: absolute;
+        bottom: 15px;
+        left: 15px;
+        width: 360px;
+        max-height: 45vh;
+        background: rgba(20, 20, 20, 0.85);
+        color: #e0e0e0;
+        border-radius: 10px;
+        z-index: 10;
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(255,255,255,0.1);
+        display: flex;
+        flex-direction: column;
+        font-size: 13px;
+        overflow: hidden;
+    }
+    #logHeader {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 12px;
+        background: rgba(255,255,255,0.05);
+        cursor: pointer;
+        user-select: none;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    #logHeader .title { font-weight: 600; }
+    #logHeader .close {
+        cursor: pointer;
+        opacity: 0.7;
+        padding: 0 4px;
+    }
+    #logHeader .close:hover { opacity: 1; }
+    #logContent {
+        padding: 8px 12px;
+        overflow-y: auto;
+        flex: 1;
+        font-family: "SF Mono", Consolas, monospace;
+        line-height: 1.5;
+    }
+    #logContent.collapsed { display: none; }
+    .log-entry { margin: 2px 0; word-break: break-word; }
+    .log-entry.info    { color: #7ec8ff; }
+    .log-entry.success { color: #7eff9e; }
+    .log-entry.warn    { color: #ffd57e; }
+    .log-entry.error   { color: #ff7e7e; }
+    .log-entry.detect  { color: #c8a0ff; }
+
+    /* Счётчик детекций */
+    #detectCount {
+        display: inline-block;
+        background: #4a90e2;
+        color: #fff;
+        border-radius: 10px;
+        padding: 0 6px;
+        font-size: 11px;
+        margin-left: 6px;
+        min-width: 18px;
+        text-align: center;
+    }
+
+    /* Кнопка полноэкранного режима */
+    #fsBtn {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        z-index: 10;
+        background: rgba(20,20,20,0.7);
+        color: #fff;
+        border: 1px solid rgba(255,255,255,0.2);
+        padding: 8px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 13px;
+        backdrop-filter: blur(8px);
+    }
+    #fsBtn:hover { background: rgba(40,40,40,0.9); }
+</style>
 </head>
 <body>
-    <div id="ui-overlay">
-        <div id="slot-left" class="slot">
-            <div class="placeholder">
-                <div style="font-size:28px;">📷</div>
-                <div class="label">Слот 1</div>
-            </div>
-            <img id="img-left" alt="slot1">
-        </div>
-        
-        <div id="slot-right" class="slot">
-            <div class="placeholder">
-                <div style="font-size:28px;">📷</div>
-                <div class="label">Слот 2</div>
-            </div>
-            <img id="img-right" alt="slot2">
-        </div>
-        
-        <div id="hint">🔍 Наведите на животное</div>
-        <div id="status">⏳ Инициализация...</div>
-        <div id="result">
-            <img id="result-img" alt="mutation">
-            <div class="label">🧬 МУТАНТ</div>
-        </div>
+
+<video id="video" autoplay playsinline muted></video>
+<canvas id="canvas"></canvas>
+
+<div id="overlay">
+    <div>⏳ Инициализация...</div>
+    <div style="font-size:16px;opacity:0.8;margin-top:8px;">Загрузка модели...</div>
+</div>
+
+<button id="fsBtn" title="Полный экран">⛶ Полный экран</button>
+
+<div id="logPanel">
+    <div id="logHeader">
+        <span><span id="detectCount">0</span>📋 Лог событий</span>
+        <span class="close" id="logClose" title="Свернуть">✕</span>
     </div>
-    
-    <button id="debug-toggle">🐞 DEBUG</button>
-    <div id="debug-panel">
-        <div id="debug-header">
-            <h3>🐞 DEBUG LOG</h3>
-            <span class="close" id="debug-close">✕</span>
-        </div>
-        <div id="debug-controls">
-            <button id="debug-clear" class="clear-btn">✕ Очистить</button>
-            <button id="debug-scroll">📌 Авто-скролл</button>
-            <button id="debug-test">🧪 Тест</button>
-        </div>
-        <div id="debug-logs"></div>
-    </div>
-    
-    <script type="importmap">
-    {
-        "imports": {
-            "three": "https://unpkg.com/three/build/three.module.js",
-            "three/addons/": "https://unpkg.com/three/examples/jsm/"
+    <div id="logContent"></div>
+</div>
+
+<!-- MediaPipe Tasks Vision -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js"
+        crossorigin="anonymous"></script>
+
+<script>
+(function () {
+    'use strict';
+
+    const video      = document.getElementById('video');
+    const canvas     = document.getElementById('canvas');
+    const ctx        = canvas.getContext('2d');
+    const overlay    = document.getElementById('overlay');
+    const logContent = document.getElementById('logContent');
+    const logHeader  = document.getElementById('logHeader');
+    const logClose   = document.getElementById('logClose');
+    const detectCount= document.getElementById('detectCount');
+    const fsBtn      = document.getElementById('fsBtn');
+
+    let objectDetector = null;
+    let running = false;
+    let detectionCounter = 0;
+
+    // ---------- Логгер ----------
+    function log(msg, type = 'info') {
+        const t = new Date().toLocaleTimeString('ru-RU');
+        const entry = document.createElement('div');
+        entry.className = 'log-entry ' + type;
+        entry.textContent = `[${t}] ${msg}`;
+        logContent.appendChild(entry);
+        logContent.scrollTop = logContent.scrollHeight;
+        console.log(`[${type}] ${msg}`);
+    }
+
+    logHeader.addEventListener('click', (e) => {
+        if (e.target === logClose) {
+            document.getElementById('logPanel').style.display = 'none';
+        } else {
+            logContent.classList.toggle('collapsed');
+        }
+    });
+
+    // ---------- Полный экран ----------
+    fsBtn.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                log('Не удалось войти в полноэкранный режим: ' + err.message, 'warn');
+            });
+        } else {
+            document.exitFullscreen();
+        }
+    });
+
+    // Подгоняем canvas под реальные размеры видео (для точных координат)
+    function resizeCanvasToVideo() {
+        const w = video.videoWidth  || window.innerWidth;
+        const h = video.videoHeight || window.innerHeight;
+        if (canvas.width !== w || canvas.height !== h) {
+            canvas.width  = w;
+            canvas.height = h;
+            log(`Canvas: ${w}×${h}`, 'info');
         }
     }
-    </script>
-    <script type="module" src="main.js"></script>
+
+    // ---------- Инициализация камеры ----------
+    async function startCamera() {
+        log('Запрос доступа к камере...', 'info');
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+                audio: false
+            });
+            video.srcObject = stream;
+            await new Promise(resolve => {
+                if (video.readyState >= 2) resolve();
+                else video.onloadedmetadata = () => resolve();
+            });
+            await video.play();
+            resizeCanvasToVideo();
+            log('Камера активна: ' + video.videoWidth + '×' + video.videoHeight, 'success');
+            return true;
+        } catch (err) {
+            log('Ошибка камеры: ' + err.message, 'error');
+            overlay.innerHTML = '<div style="color:#ff7e7e">❌ Ошибка камеры</div><div style="font-size:14px">' + err.message + '</div>';
+            return false;
+        }
+    }
+
+    // ---------- Инициализация MediaPipe ----------
+    async function initDetector() {
+        log('Загрузка модели EfficientDet Lite0...', 'info');
+        try {
+            const { ObjectDetector, FilesetResolver } = await self.createMediaPipeTasks();
+            const vision = await FilesetResolver.forVisionTasks(
+                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+            );
+            objectDetector = await ObjectDetector.createFromOptions(vision, {
+                baseOptions: {
+                    modelAssetPath: "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite",
+                    delegate: "GPU"
+                },
+                scoreThreshold: 0.5,
+                maxResults: 10,
+                runningMode: "VIDEO"
+            });
+            log('Модель загружена ✓', 'success');
+            return true;
+        } catch (err) {
+            log('Ошибка загрузки модели: ' + err.message, 'error');
+            overlay.innerHTML = '<div style="color:#ff7e7e">❌ Ошибка модели</div><div style="font-size:14px">' + err.message + '</div>';
+            return false;
+        }
+    }
+
+    // ---------- Отрисовка ----------
+    // Цвета для разных категорий
+    const COLORS = ['#00ff88', '#ffcc00', '#ff66cc', '#66ccff', '#ff9933', '#cc66ff'];
+    function colorFor(label) {
+        let h = 0;
+        for (let i = 0; i < label.length; i++) h = (h * 31 + label.charCodeAt(i)) & 0xffffffff;
+        return COLORS[Math.abs(h) % COLORS.length];
+    }
+
+    function drawDetections(results) {
+        const W = canvas.width;
+        const H = canvas.height;
+        ctx.clearRect(0, 0, W, H);
+
+        if (!results || !results.detections || results.detections.length === 0) return;
+
+        let frameDetected = 0;
+
+        results.detections.forEach(det => {
+            const bbox = det.boundingBox;
+            // Нормализованные координаты -> пиксели (в системе координат видео)
+            const originX = bbox.originX * W;
+            const originY = bbox.originY * H;
+            const bw      = bbox.width   * W;
+            const bh      = bbox.height  * H;
+
+            // Ключевой момент: видео отзеркалено через CSS (scaleX(-1)),
+            // поэтому инвертируем X для рамок и текста, чтобы они совпадали с объектами.
+            // Текст при этом рисуется обычным шрифтом и читается правильно.
+            const mirroredX = W - originX - bw;
+
+            const topCategory = det.categories[0];
+            const label = topCategory.categoryName || 'object';
+            const score = (topCategory.score * 100).toFixed(0);
+            const color = colorFor(label);
+
+            // Рамка
+            ctx.strokeStyle = color;
+            ctx.lineWidth   = Math.max(2, Math.round(W / 500));
+            ctx.strokeRect(mirroredX, originY, bw, bh);
+
+            // Подпись (фон + текст)
+            const text = `${label} ${score}%`;
+            ctx.font = `${Math.max(14, Math.round(W / 70))}px Arial`;
+            const textMetrics = ctx.measureText(text);
+            const textHeight  = parseInt(ctx.font, 10) + 6;
+            const textWidth   = textMetrics.width + 10;
+
+            // Фон подписи — чуть выше рамки
+            const labelY = originY - textHeight - 2;
+            ctx.fillStyle = color;
+            ctx.fillRect(mirroredX, labelY, textWidth, textHeight);
+
+            // Сам текст — обычным (не зеркальным) начертанием
+            ctx.fillStyle = '#000';
+            ctx.fillText(text, mirroredX + 5, labelY + textHeight - 6);
+
+            frameDetected++;
+        });
+
+        if (frameDetected > 0) {
+            detectionCounter += frameDetected;
+            detectCount.textContent = detectionCounter;
+        }
+    }
+
+    // ---------- Главный цикл ----------
+    let lastVideoTime = -1;
+    async function loop() {
+        if (!running) return;
+        if (video.readyState >= 2 && video.currentTime !== lastVideoTime) {
+            lastVideoTime = video.currentTime;
+            resizeCanvasToVideo();
+            try {
+                const results = objectDetector.detectForVideo(video, performance.now());
+                drawDetections(results);
+            } catch (err) {
+                log('Ошибка детекции: ' + err.message, 'error');
+            }
+        }
+        requestAnimationFrame(loop);
+    }
+
+    // ---------- Старт ----------
+    async function start() {
+        log('Запуск приложения...', 'info');
+        const camOk = await startCamera();
+        if (!camOk) return;
+
+        const modelOk = await initDetector();
+        if (!modelOk) return;
+
+        overlay.classList.add('hidden');
+        running = true;
+        log('Детекция запущена ▶', 'success');
+        requestAnimationFrame(loop);
+    }
+
+    start();
+})();
+</script>
+
 </body>
 </html>
