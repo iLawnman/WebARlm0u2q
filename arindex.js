@@ -1,331 +1,223 @@
 // arindex.js
 import * as THREE from 'three';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
-import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
-import { checkAssetFiles } from './convertor.js';
+import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+import { UIPanel, UIButton, UIText } from 'three-mesh-ui';
 
-const webglContainer = document.getElementById('webgl-container');
-const hint = document.getElementById('hint');
-const unsupportedEl = document.getElementById('unsupported');
-const arOverlay = document.getElementById('ar-overlay');
-const placeHint = document.getElementById('place-hint');
-const arButtonContainer = document.getElementById('ar-button-container');
-const convertorTriggerBtn = document.getElementById('convertor-trigger-btn');
-const convertorPanelsContainer = document.getElementById('convertor-panels-container');
-const cssContainer = document.getElementById('css-container');
-
-const anchorPanel = document.getElementById('anchor-panel');
-const debugBtn = document.getElementById('debug-btn');
-const debugLog = document.getElementById('debug-log');
-const secondPanel = document.getElementById('second-panel');
-
-// МАСШТАБ: 0.0015 означает, что 1000px HTML = 1.5 метра в AR мире.
-// Это делает панель 460px шириной примерно 0.69 метра, что идеально для AR.
-const PANEL_SCALE = 0.00015;
-
-let debugClickCount = 0;
-function logToOverlay(message) {
-  debugClickCount += 1;
-  const time = new Date().toLocaleTimeString('ru-RU', { hour12: false });
-  const line = document.createElement('div');
-  line.className = 'log-line';
-  line.textContent = `[${time}] #${debugClickCount} ${message}`;
-  if (debugLog.querySelector('.log-empty')) debugLog.innerHTML = '';
-  debugLog.prepend(line);
-  console.log('[AR DOM Overlay]', message);
-}
-
-debugBtn.addEventListener('click', () => {
-  logToOverlay('Клик по кнопке в WebXR DOM Overlay сработал ✅');
-});
-
-const anchoredPanels = new Map();
-const anchoredPanelObjects = new Map();
-
-function addAnchoredPanel(panelElement, anchorPosition) {
-  const id = `panel-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
-  panelElement.classList.add('ar-anchored-panel');
-  convertorPanelsContainer.appendChild(panelElement);
-  
-  const cssObj = new CSS3DObject(panelElement);
-  cssObj.position.copy(anchorPosition);
-  cssObj.scale.setScalar(PANEL_SCALE); // ПРИМЕНЯЕМ МАСШТАБ
-  scene.add(cssObj);
-  
-  const panelData = {
-    element: panelElement,
-    cssObject: cssObj,
-    anchorPosition: anchorPosition.clone(),
-    visible: true
-  };
-  anchoredPanels.set(id, panelData);
-  anchoredPanelObjects.set(id, cssObj);
-  return id;
-}
-
-function removeAnchoredPanel(id) {
-  const data = anchoredPanels.get(id);
-  if (data) {
-    data.element.remove();
-    scene.remove(data.cssObject);
-    anchoredPanels.delete(id);
-    anchoredPanelObjects.delete(id);
-  }
-}
-
-let interacting = false;
-function setupPanelInteraction(panelElement) {
-  panelElement.addEventListener('pointerdown', () => { interacting = true; });
-  panelElement.addEventListener('touchstart', () => { interacting = true; }, { passive: true });
-  panelElement.addEventListener('pointerup', () => { interacting = false; });
-  panelElement.addEventListener('pointercancel', () => { interacting = false; });
-  panelElement.addEventListener('touchend', () => { interacting = false; }, { passive: true });
-  panelElement.addEventListener('touchcancel', () => { interacting = false; }, { passive: true });
-}
-
-setupPanelInteraction(anchorPanel);
-setupPanelInteraction(secondPanel);
-
-const panelIframe = anchorPanel.querySelector('iframe');
-panelIframe.addEventListener('load', () => {
-  try {
-    const doc = panelIframe.contentDocument;
-    doc.addEventListener('touchstart', () => { interacting = true; }, { passive: true });
-    doc.addEventListener('touchend', () => { interacting = false; }, { passive: true });
-    doc.addEventListener('touchcancel', () => { interacting = false; }, { passive: true });
-    doc.addEventListener('pointerdown', () => { interacting = true; });
-    doc.addEventListener('pointerup', () => { interacting = false; });
-  } catch (err) {
-    console.warn('Could not attach listeners inside iframe (cross-origin?)', err);
-  }
-});
-
-if (!('xr' in navigator)) {
-  unsupportedEl.style.display = 'flex';
-} else {
-  navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-    if (!supported) unsupportedEl.style.display = 'flex';
-  }).catch(() => { unsupportedEl.style.display = 'flex'; });
-}
-
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-renderer.setPixelRatio(window.devicePixelRatio);
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.xr.enabled = true;
-webglContainer.appendChild(renderer.domElement);
-
-const cssRenderer = new CSS3DRenderer();
-cssRenderer.setSize(window.innerWidth, window.innerHeight);
-cssRenderer.domElement.style.position = 'absolute';
-cssRenderer.domElement.style.top = '0';
-cssRenderer.domElement.style.left = '0';
-cssRenderer.domElement.style.pointerEvents = 'none';
-cssContainer.appendChild(cssRenderer.domElement);
-
-const arButton = ARButton.createButton(renderer, {
-  requiredFeatures: ['hit-test'],
-  optionalFeatures: ['local-floor', 'dom-overlay'],
-  domOverlay: { root: arOverlay }
-});
-arButtonContainer.appendChild(arButton);
-
-scene.add(new THREE.HemisphereLight(0xffffff, 0x333344, 1.2));
-const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-dirLight.position.set(2, 4, 2);
-scene.add(dirLight);
-
-const reticleGeometry = new THREE.RingGeometry(0.08, 0.1, 32).rotateX(-Math.PI / 2);
-const reticleMaterial = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
-const reticle = new THREE.Mesh(reticleGeometry, reticleMaterial);
-reticle.matrixAutoUpdate = false;
-reticle.visible = false;
-scene.add(reticle);
-
-const cubeSize = 0.18;
-const cube = new THREE.Mesh(
-  new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize),
-  new THREE.MeshStandardMaterial({
-    color: 0x6366f1,
-    metalness: 0.3,
-    roughness: 0.35,
-    emissive: 0x1e1b4b,
-    emissiveIntensity: 0.4,
-  })
-);
-cube.visible = false;
-scene.add(cube);
-
-const edges = new THREE.LineSegments(
-  new THREE.EdgesGeometry(cube.geometry),
-  new THREE.LineBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.7 })
-);
-edges.visible = false;
-scene.add(edges);
-
-// Создаем CSS3DObject для основных панелей
-const anchorPanelObj = new CSS3DObject(anchorPanel);
-const secondPanelObj = new CSS3DObject(secondPanel);
-
-// ПРИМЕНЯЕМ МАСШТАБ СРАЗУ
-anchorPanelObj.scale.setScalar(PANEL_SCALE);
-secondPanelObj.scale.setScalar(PANEL_SCALE);
-
-scene.add(anchorPanelObj);
-scene.add(secondPanelObj);
-
-//import { CSS3DObject } from 'three/examples/jsm/renderers/CSS3DRenderer.js';
-
-// 1. Создаем обычный HTML-элемент
-const element = document.createElement('div');
-element.className = 'my-panel';
-element.textContent = 'Фиксированная панель';
-
-// 2. Оборачиваем в CSS3DObject (а не CSS3DSprite!)
-const cssObjectA = new CSS3DObject(element);
-
-// 3. Ставим жесткую позицию и нужный угол поворота в мире
-cssObjectA.position.set(0, 0, 0); // Координаты в сцене
-cssObjectA.rotation.x = 0;              // Фиксированный наклон по X
-cssObjectA.rotation.y = Math.PI / 4;    // Поворот на 45 градусов
-cssObjectA.rotation.z = 0;
-
-// 4. Добавляем в сцену Three.js
-scene.add(cssObject);
-
-const panelAnchor = new THREE.Vector3();
-const secondPanelAnchor = new THREE.Vector3();
-const PANEL_HEIGHT_OFFSET = 0.28;
-
+// --- Глобальные переменные ---
+let scene, camera, renderer, cssRenderer;
+let cube, edges, reticle;
+let mainPanel, fixedPanel;
+let placed = false;
 let hitTestSource = null;
 let hitTestSourceRequested = false;
-let placed = false;
+let font = null;
 
-renderer.xr.addEventListener('sessionstart', () => {
-  placed = false;
-  cube.visible = false;
-  edges.visible = false;
-  anchorPanel.classList.remove('visible');
-  secondPanel.classList.remove('visible');
-  reticle.visible = false;
-  hitTestSourceRequested = false;
-  hitTestSource = null;
-  placeHint.style.display = 'block';
-  
-  for (const [id, data] of anchoredPanels) {
-    data.element.remove();
-    scene.remove(data.cssObject);
-  }
-  anchoredPanels.clear();
-  anchoredPanelObjects.clear();
-});
+// Raycaster для обработки кликов по UI в WebXR
+const raycaster = new THREE.Raycaster();
+const tempMatrix = new THREE.Matrix4();
 
-renderer.xr.addEventListener('sessionend', () => {
-  hitTestSource = null;
-  hitTestSourceRequested = false;
-});
+init();
 
-convertorTriggerBtn.addEventListener('click', async () => {
-  if (!placed) {
-    console.warn('Сначала разместите куб на полу');
+async function init() {
+  const webglContainer = document.getElementById('webgl-container');
+  const hint = document.getElementById('hint');
+  const unsupportedEl = document.getElementById('unsupported');
+  const arButtonContainer = document.getElementById('ar-button-container');
+
+  // 1. Проверка WebXR
+  if (!('xr' in navigator)) {
+    unsupportedEl.style.display = 'flex';
     return;
   }
-  
-  convertorTriggerBtn.disabled = true;
-  const originalLabel = convertorTriggerBtn.textContent;
-  convertorTriggerBtn.textContent = '⏳ Проверяю…';
-
-  try {
-    const { results, allExist } = await checkAssetFiles();
-    const panel = document.createElement('div');
-    panel.className = 'convertor-panel';
-    
-    const rowsHtml = results.map(r => `
-      <div class="convertor-row ${r.exists ? 'ok' : 'missing'}">
-        <span>${r.exists ? '✅' : '❌'}</span>
-        <code>${r.path}</code>
-      </div>
-    `).join('');
-    
-    const title = allExist ? '✅ Assets найдены' : '❌ Не хватает файлов';
-    const message = allExist 
-      ? '<p>Все файлы конвертера на месте!</p>'
-      : `<p>Не все файлы найдены в <code>./assets/</code>:</p>`;
-    
-    panel.innerHTML = `
-      <div class="convertor-panel-header">
-        <span>${title}</span>
-        <button type="button" class="convertor-panel-close" aria-label="Закрыть">×</button>
-      </div>
-      <div class="convertor-panel-body">
-        ${message}
-        ${rowsHtml}
-      </div>
-    `;
-    
-    const offsetPosition = panelAnchor.clone();
-    offsetPosition.x += 0.30;
-    offsetPosition.y += 0.05;
-    
-    const panelId = addAnchoredPanel(panel, offsetPosition);
-    setupPanelInteraction(panel);
-    
-    panel.querySelector('.convertor-panel-close').addEventListener('click', () => {
-      removeAnchoredPanel(panelId);
-    });
-  } catch (err) {
-    console.error('Ошибка при проверке assets:', err);
-  } finally {
-    convertorTriggerBtn.disabled = false;
-    convertorTriggerBtn.textContent = originalLabel;
+  const supported = await navigator.xr.isSessionSupported('immersive-ar');
+  if (!supported) {
+    unsupportedEl.style.display = 'flex';
+    return;
   }
-});
+
+  // 2. Загрузка шрифта для three-mesh-ui (обязательно!)
+  const loader = new FontLoader();
+  font = await loader.loadAsync('https://unpkg.com/three-mesh-ui@6.5.2/examples/assets/Roboto-msdf.json');
+
+  // 3. Сцена и Камера
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+
+  // 4. WebGL Renderer
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.xr.enabled = true;
+  webglContainer.appendChild(renderer.domElement);
+
+  // 5. Кнопка AR
+  const arButton = ARButton.createButton(renderer, {
+    requiredFeatures: ['hit-test'],
+    optionalFeatures: ['local-floor']
+  });
+  arButtonContainer.appendChild(arButton);
+
+  // 6. Свет
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x333344, 1.2));
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+  dirLight.position.set(2, 4, 2);
+  scene.add(dirLight);
+
+  // 7. Ретикул (маркер на полу)
+  const reticleGeometry = new THREE.RingGeometry(0.08, 0.1, 32).rotateX(-Math.PI / 2);
+  const reticleMaterial = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
+  reticle = new THREE.Mesh(reticleGeometry, reticleMaterial);
+  reticle.matrixAutoUpdate = false;
+  reticle.visible = false;
+  scene.add(reticle);
+
+  // 8. Куб
+  const cubeSize = 0.18;
+  cube = new THREE.Mesh(
+    new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize),
+    new THREE.MeshStandardMaterial({ color: 0x6366f1, metalness: 0.3, roughness: 0.35, emissive: 0x1e1b4b, emissiveIntensity: 0.4 })
+  );
+  cube.visible = false;
+  scene.add(cube);
+
+  edges = new THREE.LineSegments(
+    new THREE.EdgesGeometry(cube.geometry),
+    new THREE.LineBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.7 })
+  );
+  edges.visible = false;
+  scene.add(edges);
+
+  // 9. Создание UI Панелей (изначально скрыты)
+  createUIPanels();
+
+  // 10. Обработчики событий сессии
+  renderer.xr.addEventListener('sessionstart', () => {
+    placed = false;
+    cube.visible = false;
+    edges.visible = false;
+    reticle.visible = false;
+    mainPanel.visible = false;
+    fixedPanel.visible = false;
+    hitTestSourceRequested = false;
+    hitTestSource = null;
+    hint.style.display = 'block';
+  });
+
+  renderer.xr.addEventListener('sessionend', () => {
+    hitTestSource = null;
+    hitTestSourceRequested = false;
+  });
+
+  // 11. Размещение по тапу
+  const controller = renderer.xr.getController(0);
+  controller.addEventListener('select', onSelect);
+  scene.add(controller);
+
+  // 12. Ресайз
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // 13. Запуск цикла анимации
+  renderer.setAnimationLoop(animate);
+}
+
+function createUIPanels() {
+  // --- ПАНЕЛЬ 1: Основная (будет поворачиваться к камере) ---
+  mainPanel = new UIPanel({
+    width: 0.5,       // 50 см
+    height: 0.35,     // 35 см
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundOpacity: 0.85,
+    backgroundColor: new THREE.Color(0x0b1120),
+    borderRadius: 0.02,
+    fontFamily: font,
+    fontSize: 0.025,
+    fontColor: new THREE.Color(0xe2e8f0),
+    padding: 0.02
+  });
+  mainPanel.visible = false;
+  scene.add(mainPanel);
+
+  // Кнопка внутри основной панели
+  const testBtn = new UIButton({
+    width: 0.4,
+    height: 0.08,
+    backgroundColor: new THREE.Color(0x6366f1),
+    borderRadius: 0.01,
+    fontFamily: font,
+    fontSize: 0.022
+  });
+  testBtn.add(new UIText({ content: '🧪 Тест клика по UI' }));
+  
+  // Обработка клика по кнопке
+  testBtn.addEventListener('click', () => {
+    console.log('✅ Клик по three-mesh-ui кнопке сработал!');
+    // Визуальный фидбек (можно добавить изменение текста)
+  });
+  
+  mainPanel.add(testBtn);
+
+  // --- ПАНЕЛЬ 2: Фиксированная (НЕ поворачивается к камере) ---
+  fixedPanel = new UIPanel({
+    width: 0.35,      // 35 см
+    height: 0.25,     // 25 см
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundOpacity: 0.85,
+    backgroundColor: new THREE.Color(0x0f172a),
+    borderColor: new THREE.Color(0x06b6d4),
+    borderWidth: 0.005,
+    borderRadius: 0.02,
+    fontFamily: font,
+    fontSize: 0.022,
+    fontColor: new THREE.Color(0x67e8f9),
+    padding: 0.02,
+    textAlign: 'center'
+  });
+  fixedPanel.visible = false;
+  
+  fixedPanel.add(new UIText({ 
+    content: '📌 Фиксированная панель\n\nМой поворот в пространстве\nжестко задан и не меняется\nпри движении камеры.' 
+  }));
+  
+  scene.add(fixedPanel);
+}
 
 function onSelect() {
   if (!reticle.visible) return;
 
+  // Размещаем куб
   cube.position.setFromMatrixPosition(reticle.matrix);
-  cube.position.y += cubeSize / 2;
+  cube.position.y += 0.09; // половина высоты куба
   edges.position.copy(cube.position);
   cube.visible = true;
   edges.visible = true;
 
-  // --- ПАНЕЛЬ 1: Основная ---
-  panelAnchor.set(cube.position.x, cube.position.y + PANEL_HEIGHT_OFFSET, cube.position.z);
-  anchorPanelObj.position.copy(panelAnchor);
+  // Размещаем Панель 1 (чуть выше куба)
+  mainPanel.position.set(cube.position.x, cube.position.y + 0.28, cube.position.z);
+  mainPanel.visible = true;
 
-  // --- ПАНЕЛЬ 2: Фиксированная ---
-  secondPanelAnchor.set(cube.position.x + 0.4, cube.position.y + 0.15, cube.position.z);
-  secondPanelObj.position.copy(secondPanelAnchor);
+  // Размещаем Панель 2 (со смещением вправо)
+  fixedPanel.position.set(cube.position.x + 0.4, cube.position.y + 0.15, cube.position.z);
   
   // ЖЕСТКАЯ ФИКСАЦИЯ ПОВОРОТА ВТОРОЙ ПАНЕЛИ
-  // Мы НЕ вызываем lookAt(). Мы явно задаем rotation.
-  secondPanelObj.rotation.set(0, 0, 0); 
+  // Мы явно задаем rotation и НИКОГДА не вызываем для неё lookAt()
+  fixedPanel.rotation.set(0, 0, 0); 
+  fixedPanel.visible = true;
 
   placed = true;
-  placeHint.style.display = 'none';
+  document.getElementById('hint').style.display = 'none';
 }
 
-const controller = renderer.xr.getController(0);
-controller.addEventListener('select', onSelect);
-scene.add(controller);
-
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  cssRenderer.setSize(window.innerWidth, window.innerHeight);
-});
-
-renderer.setAnimationLoop((timestamp, frame) => {
+function animate(timestamp, frame) {
   if (frame) {
     const session = renderer.xr.getSession();
     const referenceSpace = renderer.xr.getReferenceSpace();
-
-    hint.style.display = 'none';
-    arOverlay.style.display = 'block';
 
     if (!hitTestSourceRequested) {
       session.requestReferenceSpace('viewer').then((viewerSpace) => {
@@ -351,38 +243,25 @@ renderer.setAnimationLoop((timestamp, frame) => {
         reticle.visible = false;
       }
     }
-  } else {
-    arOverlay.style.display = 'none';
   }
 
   if (placed) {
-    // 1. Первая панель ПОВОРАЧИВАЕТСЯ к камере
-    anchorPanelObj.lookAt(camera.position);
-    
-    // 2. Вторая панель НЕ ПОВОРАЧИВАЕТСЯ (мы не вызываем для неё lookAt)
+    // 1. ПАНЕЛЬ 1: Поворачивается к камере (Billboard эффект)
+    mainPanel.lookAt(camera.position);
 
-    // Управление видимостью
-    const dist1 = camera.position.distanceTo(panelAnchor);
-    anchorPanelObj.visible = (dist1 < 8);
-    if (dist1 < 8) anchorPanel.classList.add('visible');
-    else anchorPanel.classList.remove('visible');
+    // 2. ПАНЕЛЬ 2: НЕ поворачивается. Её rotation остался тем, что мы задали при размещении (0, 0, 0).
 
-    const dist2 = camera.position.distanceTo(secondPanelAnchor);
-    secondPanelObj.visible = (dist2 < 8);
-    if (dist2 < 8) secondPanel.classList.add('visible');
-    else secondPanel.classList.remove('visible');
+    // 3. Обновляем Raycaster для WebXR контроллера (чтобы работали клики по кнопкам)
+    const controller = renderer.xr.getController(0);
+    controller.updateMatrixWorld();
+    tempMatrix.identity().extractRotation(controller.matrixWorld);
+    raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+    raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
 
-    for (const [id, data] of anchoredPanels) {
-      const dist = camera.position.distanceTo(data.anchorPosition);
-      data.cssObject.visible = (dist < 8);
-      if (dist < 8) data.element.classList.add('visible');
-      else data.element.classList.remove('visible');
-    }
-
-    // Рендерим CSS3D сцену
-    cssRenderer.render(scene, camera);
+    // 4. Обновляем состояние UI (анимации кнопок, hover, клики)
+    mainPanel.update(timestamp, raycaster);
+    fixedPanel.update(timestamp, raycaster);
   }
 
-  // Рендерим WebGL сцену
   renderer.render(scene, camera);
-});
+}
