@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>add light WebXR AR — Куб на полу + DOM Overlay панель</title>
+  <title>fix three panel WebXR AR — Куб на полу + DOM Overlay панель</title>
   <style>
     html, body {
       margin: 0;
@@ -430,14 +430,7 @@
     hitTestSourceRequested = false;
   });
 
-  function createscene() {
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-    scene.add(ambientLight);
-  }
-
   function placeThreeUIPanel(position) {
-    
-    createscene();
     makeUI();
   }
 
