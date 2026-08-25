@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>roll panel WebXR AR — Куб на полу + DOM Overlay панель</title>
+  <title>add update panel WebXR AR — Куб на полу + DOM Overlay панель</title>
   <style>
     html, body {
       margin: 0;
@@ -472,10 +472,10 @@
 
     //
 
-    // const loader = new THREE.TextureLoader();
-    // loader.load('./assets/asset.png', (texture) => {
-    //   imageBlock.set({ backgroundTexture: texture });
-    // });
+    const loader = new THREE.TextureLoader();
+    loader.load('./assets/asset.png', (texture) => {
+      imageBlock.set({ backgroundTexture: texture });
+    });
 
     //
 
@@ -583,6 +583,7 @@
       cube.rotation.y = t * 0.6;
     }
 
+    ThreeMeshUI.update();
     renderer.render(scene, camera);
   });
 </script>
