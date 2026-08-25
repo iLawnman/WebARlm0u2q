@@ -12,6 +12,7 @@ let font = null;
 
 const raycaster = new THREE.Raycaster();
 const tempMatrix = new THREE.Matrix4();
+const clock = new THREE.Clock();
 
 init();
 
@@ -44,32 +45,20 @@ async function init() {
     return;
   }
 
-  // Загрузка шрифта с проверкой
+  // Загрузка шрифта
   const loader = new FontLoader();
   try {
     font = await new Promise((resolve, reject) => {
       loader.load(
         'https://unpkg.com/three-mesh-ui@6.5.4/examples/assets/Roboto-msdf.json',
-        (loadedFont) => {
-          console.log('Шрифт загружен, тип:', typeof loadedFont);
-          console.log('Шрифт:', loadedFont);
-          if (!loadedFont) {
-            reject(new Error('Font is null or undefined'));
-          } else {
-            resolve(loadedFont);
-          }
-        },
+        resolve,
         undefined,
-        (err) => {
-          console.error('Ошибка загрузки шрифта:', err);
-          reject(err);
-        }
+        reject
       );
     });
-    console.log('✅ Шрифт загружен успешно');
+    console.log('✅ Шрифт загружен');
   } catch (err) {
     console.error('❌ Ошибка загрузки шрифта:', err);
-    alert('Не удалось загрузить шрифт: ' + err.message);
     return;
   }
 
@@ -124,18 +113,12 @@ async function init() {
   edges.visible = false;
   scene.add(edges);
 
-  // UI панели - с try-catch
-  try {
-    createUIPanels();
-  } catch (err) {
-    console.error('❌ Ошибка создания UI панелей:', err);
-    console.error('Stack:', err.stack);
-  }
+  // UI панели
+  createUIPanels();
 
   // События сессии
   renderer.xr.addEventListener('sessionstart', () => {
     console.log('✅ AR сессия запущена');
-    document.body.classList.add('ar-active');
     placed = false;
     cube.visible = false;
     edges.visible = false;
@@ -144,11 +127,11 @@ async function init() {
     if (fixedPanel) fixedPanel.visible = false;
     hitTestSourceRequested = false;
     hitTestSource = null;
+    hint.style.display = 'block';
   });
 
   renderer.xr.addEventListener('sessionend', () => {
     console.log('🔚 AR сессия завершена');
-    document.body.classList.remove('ar-active');
     hitTestSource = null;
     hitTestSourceRequested = false;
     startBtn.disabled = false;
@@ -197,124 +180,103 @@ async function startARSession() {
 
 function createUIPanels() {
   console.log('🎨 Создание UI панелей...');
-  console.log('font:', font);
-  console.log('font type:', typeof font);
 
-  // Проверяем что шрифт валиден
-  if (!font) {
-    throw new Error('Font is not loaded');
-  }
+  // Панель 1
+  mainPanel = new ThreeMeshUI.Block({
+    fontFamily: font,
+    fontSize: 0.05,
+    width: 0.5,
+    height: 0.35,
+    backgroundColor: new THREE.Color(0x0b1120),
+    backgroundOpacity: 0.9,
+    borderRadius: 0.02,
+    padding: 0.02,
+    justifyContent: 'center',
+    alignItems: 'center'
+  });
+  mainPanel.visible = false;
+  scene.add(mainPanel);
 
-  try {
-    // === ПАНЕЛЬ 1: Основная ===
-    mainPanel = new ThreeMeshUI.Block({
-      fontFamily: font,
-      fontSize: 0.05,
-      width: 0.5,
-      height: 0.35,
-      backgroundColor: new THREE.Color(0x0b1120),
-      backgroundOpacity: 0.9,
-      borderRadius: 0.02,
-      padding: 0.02,
-      justifyContent: 'center',
-      alignItems: 'center'
-    });
-    mainPanel.visible = false;
-    scene.add(mainPanel);
-    console.log('✅ Основная панель создана');
+  const title = new ThreeMeshUI.Inline({
+    content: 'Main Panel',
+    fontColor: new THREE.Color(0xe2e8f0),
+    fontSize: 0.06,
+    textAlign: 'center'
+  });
+  mainPanel.add(title);
 
-    const title = new ThreeMeshUI.Inline({
-      content: 'Main Panel',
-      fontColor: new THREE.Color(0xe2e8f0),
-      fontSize: 0.06,
-      textAlign: 'center'
-    });
-    mainPanel.add(title);
+  // Кнопка
+  testButton = new ThreeMeshUI.Block({
+    width: 0.4,
+    height: 0.08,
+    backgroundColor: new THREE.Color(0x6366f1),
+    borderRadius: 0.01,
+    marginTop: 0.03,
+    justifyContent: 'center',
+    alignItems: 'center',
+    cursor: 'pointer'
+  });
 
-    // Кнопка
-    testButton = new ThreeMeshUI.Block({
-      width: 0.4,
-      height: 0.08,
-      backgroundColor: new THREE.Color(0x6366f1),
-      borderRadius: 0.01,
-      marginTop: 0.03,
-      justifyContent: 'center',
-      alignItems: 'center',
-      cursor: 'pointer'
-    });
+  const btnText = new ThreeMeshUI.Inline({
+    content: 'Test Click',
+    fontColor: new THREE.Color(0xffffff),
+    fontSize: 0.045
+  });
+  testButton.add(btnText);
 
-    const btnText = new ThreeMeshUI.Inline({
-      content: 'Test Click',
-      fontColor: new THREE.Color(0xffffff),
-      fontSize: 0.045
-    });
-    testButton.add(btnText);
+  testButton.onClick = () => {
+    console.log('✅ Клик по UI кнопке!');
+    testButton.backgroundColor = new THREE.Color(0x4f46e5);
+    setTimeout(() => {
+      testButton.backgroundColor = new THREE.Color(0x6366f1);
+    }, 150);
+  };
 
-    testButton.onClick = () => {
-      console.log('✅ Клик по UI кнопке!');
-      testButton.backgroundColor = new THREE.Color(0x4f46e5);
-      setTimeout(() => {
-        testButton.backgroundColor = new THREE.Color(0x6366f1);
-      }, 150);
-    };
+  testButton.onHover = (isHovered) => {
+    testButton.backgroundColor = isHovered ? 
+      new THREE.Color(0x5558e8) : 
+      new THREE.Color(0x6366f1);
+  };
 
-    testButton.onHover = (isHovered) => {
-      if (isHovered) {
-        testButton.backgroundColor = new THREE.Color(0x5558e8);
-      } else {
-        testButton.backgroundColor = new THREE.Color(0x6366f1);
-      }
-    };
+  mainPanel.add(testButton);
 
-    mainPanel.add(testButton);
-    console.log('✅ Кнопка создана');
+  // Панель 2
+  fixedPanel = new ThreeMeshUI.Block({
+    fontFamily: font,
+    fontSize: 0.05,
+    width: 0.35,
+    height: 0.22,
+    backgroundColor: new THREE.Color(0x0f172a),
+    backgroundOpacity: 0.9,
+    borderColor: new THREE.Color(0x06b6d4),
+    borderWidth: 0.004,
+    borderRadius: 0.02,
+    padding: 0.02,
+    justifyContent: 'center',
+    alignItems: 'center'
+  });
+  fixedPanel.visible = false;
 
-    // === ПАНЕЛЬ 2: Фиксированная ===
-    fixedPanel = new ThreeMeshUI.Block({
-      fontFamily: font,
-      fontSize: 0.05,
-      width: 0.35,
-      height: 0.22,
-      backgroundColor: new THREE.Color(0x0f172a),
-      backgroundOpacity: 0.9,
-      borderColor: new THREE.Color(0x06b6d4),
-      borderWidth: 0.004,
-      borderRadius: 0.02,
-      padding: 0.02,
-      justifyContent: 'center',
-      alignItems: 'center'
-    });
-    fixedPanel.visible = false;
+  fixedPanel.add(new ThreeMeshUI.Inline({
+    content: 'Fixed Panel',
+    fontColor: new THREE.Color(0x67e8f9),
+    fontSize: 0.055,
+    textAlign: 'center'
+  }));
 
-    const fixedTitle = new ThreeMeshUI.Inline({
-      content: 'Fixed Panel',
-      fontColor: new THREE.Color(0x67e8f9),
-      fontSize: 0.055,
-      textAlign: 'center'
-    });
-    fixedPanel.add(fixedTitle);
+  fixedPanel.add(new ThreeMeshUI.Inline({
+    content: 'Rotation locked',
+    fontColor: new THREE.Color(0x94a3b8),
+    fontSize: 0.035,
+    textAlign: 'center',
+    marginTop: 0.02
+  }));
 
-    const fixedText = new ThreeMeshUI.Inline({
-      content: 'Rotation locked',
-      fontColor: new THREE.Color(0x94a3b8),
-      fontSize: 0.035,
-      textAlign: 'center',
-      marginTop: 0.02
-    });
-    fixedPanel.add(fixedText);
-
-    scene.add(fixedPanel);
-    console.log('✅ Фиксированная панель создана');
-
-  } catch (err) {
-    console.error('❌ Ошибка при создании панелей:', err);
-    console.error('Stack:', err.stack);
-    throw err;
-  }
+  scene.add(fixedPanel);
+  console.log('✅ Панели созданы');
 }
 
 function onSelect() {
-  console.log('👆 Tap, reticle visible:', reticle.visible);
   if (!reticle.visible) return;
 
   cube.position.setFromMatrixPosition(reticle.matrix);
@@ -343,47 +305,47 @@ function animate(timestamp, frame) {
     const session = renderer.xr.getSession();
     const referenceSpace = renderer.xr.getReferenceSpace();
 
-    // Запрашиваем hit-test source только один раз
-    if (!hitTestSourceRequested && session) {
-      hitTestSourceRequested = true;
-
+    if (!hitTestSourceRequested) {
       session.requestReferenceSpace('viewer').then((viewerSpace) => {
-        return session.requestHitTestSource({ space: viewerSpace });
-      }).then((source) => {
-        hitTestSource = source;
-        console.log('✅ Hit-test source получен:', hitTestSource);
-      }).catch((err) => {
-        console.error('❌ Ошибка создания hit-test source:', err);
-        hitTestSourceRequested = false;
+        session.requestHitTestSource({ space: viewerSpace }).then((source) => {
+          hitTestSource = source;
+        });
       });
+      session.addEventListener('end', () => {
+        hitTestSourceRequested = false;
+        hitTestSource = null;
+      });
+      hitTestSourceRequested = true;
     }
 
-    // Проверяем что hitTestSource существует перед использованием
     if (hitTestSource) {
-      try {
-        // Правильный метод для получения результатов
-        const hitTestResults = frame.getHitTestResults(hitTestSource);
-
-        if (hitTestResults && hitTestResults.length > 0 && !placed) {
-          const hit = hitTestResults[0];
-          const pose = hit.getPose(referenceSpace);
-
-          if (pose) {
-            reticle.visible = true;
-            reticle.matrix.fromArray(pose.transform.matrix);
-          }
-        } else if (!placed) {
-          reticle.visible = false;
-        }
-      } catch (err) {
-        console.error('❌ Ошибка getHitTestResults:', err);
+      const hitTestResults = frame.getHitTestResults(hitTestSource);
+      if (hitTestResults.length > 0 && !placed) {
+        const hit = hitTestResults[0];
+        const pose = hit.getPose(referenceSpace);
+        reticle.visible = true;
+        reticle.matrix.fromArray(pose.transform.matrix);
+      } else if (!placed) {
+        reticle.visible = false;
+      } else {
+        reticle.visible = false;
       }
     }
   }
 
   if (placed) {
-    if (mainPanel) mainPanel.lookAt(camera.position);
+    const t = clock.getElapsedTime();
+    cube.rotation.y = t * 0.6;
+    edges.rotation.copy(cube.rotation);
 
+    // Панель 1: поворачивается к камере
+    if (mainPanel) {
+      mainPanel.lookAt(camera.position);
+    }
+
+    // Панель 2: НЕ поворачивается (фиксированный поворот)
+
+    // Обновляем raycaster для XR контроллера
     const controller = renderer.xr.getController(0);
     if (controller) {
       controller.updateMatrixWorld();
@@ -391,6 +353,7 @@ function animate(timestamp, frame) {
       raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
       raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
 
+      // Обновляем UI панели (необходимо для работы onClick/onHover)
       if (mainPanel) mainPanel.update(timestamp, raycaster);
       if (fixedPanel) fixedPanel.update(timestamp, raycaster);
     }
