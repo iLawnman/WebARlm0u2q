@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>add button panel WebXR AR — Куб на полу + DOM Overlay панель</title>
+  <title>refactor WebXR AR — Куб на полу + DOM Overlay панель</title>
   <style>
     html, body {
       margin: 0;
@@ -336,9 +336,9 @@
     console.log('[AR DOM Overlay]', message);
   }
 
-  debugBtn.addEventListener('click', () => {
-    logToOverlay('Клик по кнопке в WebXR DOM Overlay сработал ✅');
-  });
+  if (debugBtn) {
+    debugBtn.addEventListener('click', () => logToOverlay('Клик по кнопке в DOM Overlay'));
+  }
 
   // ---------- Basic WebXR support check ----------
   if (!('xr' in navigator)) {
@@ -411,13 +411,16 @@
   edges.visible = false;
   scene.add(edges);
 
-  const panelAnchor = new THREE.Vector3();
-  const PANEL_HEIGHT_OFFSET = 0.28;
-
   // ---------- Hit-test state ----------
   let hitTestSource = null;
   let hitTestSourceRequested = false;
   let placed = false;
+
+  // ---------- ThreeMeshUI Elements & Raycasting ----------
+  let uiContainer = null;
+  let uiButton = null;
+  const raycaster = new THREE.Raycaster();
+  const raycastTargets = [];
 
   renderer.xr.addEventListener('sessionstart', () => {
     placed = false;
@@ -429,10 +432,12 @@
     hitTestSource = null;
     placeHint.style.display = 'block';
 
-    for (const [id, data] of anchoredPanels) {
-      data.element.remove();
+    if (uiContainer) {
+      scene.remove(uiContainer);
+      uiContainer = null;
+      uiButton = null;
+      raycastTargets.length = 0;
     }
-    anchoredPanels.clear();
   });
 
   renderer.xr.addEventListener('sessionend', () => {
@@ -441,147 +446,135 @@
   });
 
   function placeThreeUIPanel(position) {
-    makeUI();
+    if (uiContainer) {
+      scene.remove(uiContainer);
+      raycastTargets.length = 0;
+    }
+    makeUI(position);
   }
 
-  function makeUI() {
-    const container = new ThreeMeshUI.Block({
-      height: 1.5,
-      width: 1,
-      backgroundOpacity: 0,
+  function makeUI(position) {
+    uiContainer = new ThreeMeshUI.Block({
+      height: 0.6,
+      width: 0.8,
+      backgroundOpacity: 0.8,
+      backgroundColor: new THREE.Color(0x0b1120),
+      borderRadius: 0.04
     });
 
-    container.position.set(0, 0, 0);
-    container.rotation.x = 0;
-    scene.add(container);
-
-    //
+    // Размещаем UI рядом с кубом
+    uiContainer.position.copy(position);
+    uiContainer.position.y += 0.35;
+    uiContainer.rotation.y = camera.rotation.y;
+    scene.add(uiContainer);
 
     const imageBlock = new ThreeMeshUI.Block({
-      height: 1,
-      width: 1,
+      height: 0.25,
+      width: 0.7,
+      margin: 0.02
     });
 
     const textBlock = new ThreeMeshUI.Block({
-      height: 0.4,
-      width: 0.8,
-      margin: 0.05,
+      height: 0.15,
+      width: 0.7,
+      margin: 0.02
     });
 
-    container.add(imageBlock, textBlock);
+    uiContainer.add(imageBlock, textBlock);
 
-    //
-
+    // Безопасная загрузка текстуры
     const loader = new THREE.TextureLoader();
-    loader.load('./assets/asset.png', (texture) => {
-      imageBlock.set({ backgroundTexture: texture });
-    });
+    loader.load(
+            './assets/asset.png',
+            (texture) => { imageBlock.set({ backgroundTexture: texture }); },
+            undefined,
+            (err) => console.warn('[ThreeMeshUI] Ошибка загрузки текстуры:', err)
+    );
 
-    //
-
-    container.set({
-      fontFamily: './assets/Roboto-msdf.json',
-      fontTexture: './assets/Roboto-msdf.png',
-    });
+    // Безопасная установка шрифтов
+    try {
+      uiContainer.set({
+        fontFamily: './assets/Roboto-msdf.json',
+        fontTexture: './assets/Roboto-msdf.png',
+      });
+    } catch (e) {
+      console.warn('[ThreeMeshUI] Не удалось загрузить файлы шрифта', e);
+    }
 
     const text = new ThreeMeshUI.Text({
-      content:
-              "The spiny bush viper is known for its extremely keeled dorsal scales.",
+      content: "3D UI Панель в AR",
+      fontSize: 0.04,
+      fontColor: new THREE.Color(0xd2ffbd)
     });
 
     textBlock.add(text);
 
-    //
-
-    text.set({
-      fontColor: new THREE.Color(0xd2ffbd),
-      fontSize: 0.06,
-    });
-
-    textBlock.set({
-      textAlign: "right",
-      justifyContent: "end",
-      padding: 0.03,
-    });
-
-    //
-
-    textBlock.add(
-            new ThreeMeshUI.Text({
-              content: " Mind your fingers.",
-              fontSize: 0.07,
-              fontColor: new THREE.Color(0xefffe8),
-            })
-    );
-
-    // Создаем кнопку (Block)
-    const button = new ThreeMeshUI.Block({
-      width: 1.2,
-      height: 0.4,
+    // Кнопка (Block)
+    uiButton = new ThreeMeshUI.Block({
+      width: 0.4,
+      height: 0.1,
       justifyContent: 'center',
       alignContent: 'center',
       backgroundOpacity: 1,
-      backgroundColor: new THREE.Color(0x007bff), // Синий цвет по умолчанию
-      borderRadius: 0.08
+      backgroundColor: new THREE.Color(0x007bff),
+      borderRadius: 0.02,
+      margin: 0.02
     });
 
-// Добавляем текст внутрь кнопки
     const buttonText = new ThreeMeshUI.Text({
       content: 'Кликни меня',
-      fontSize: 0.08
+      fontSize: 0.035
     });
 
-    button.add(buttonText);
-    container.add(button);
+    uiButton.add(buttonText);
+    uiContainer.add(uiButton);
+
+    // Регистрируем кнопку для перехвата лучей
+    raycastTargets.push(uiButton);
   }
 
-  const raycaster = new THREE.Raycaster();
-  const mouse = new THREE.Vector2();
+  // ---------- WebXR Controller setup & Selection ----------
+  const controller = renderer.xr.getController(0);
 
-  // Массив объектов, на которые можно нажать
-  const targets = [button];
+  controller.addEventListener('select', () => {
+    // 1. Если объект еще не установлен — устанавливаем его по попаданию hit-test
+    if (!placed) {
+      if (!reticle.visible) return;
 
-  window.addEventListener('pointermove', (event) => {
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-  });
+      cube.position.setFromMatrixPosition(reticle.matrix);
+      cube.position.y += cubeSize / 2;
+      cube.visible = true;
+      edges.position.copy(cube.position);
+      edges.visible = true;
 
-  // Обработка клика
-  window.addEventListener('pointerdown', () => {
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObjects(targets);
+      placed = true;
+      placeHint.style.display = 'none';
 
-    if (intersects.length > 0) {
-      // Переводим кнопку в состояние клика
-      button.setState('selected');
+      placeThreeUIPanel(cube.position);
+      return;
+    }
+
+    // 2. Если объект установлен — проверяем нажатие по 3D UI элементам лучем контроллера
+    if (raycastTargets.length > 0) {
+      const tempMatrix = new THREE.Matrix4();
+      tempMatrix.identity().extractRotation(controller.matrixWorld);
+
+      raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+      raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+
+      const intersects = raycaster.intersectObjects(raycastTargets, true);
+
+      if (intersects.length > 0 && uiButton) {
+        logToOverlay('Нажата 3D WebXR кнопка!');
+        uiButton.setState('selected');
+        setTimeout(() => {
+          if (uiButton) uiButton.setState('idle');
+        }, 300);
+      }
     }
   });
 
-  window.addEventListener('pointerup', () => {
-    // Возвращаем в обычное состояние, когда отпустили мышь
-    button.setState('idle');
-  });
-  
-  // ---------- Tap on screen -> place cube ----------
-  function onSelect() {
-    if (!reticle.visible) return;
-
-    cube.position.setFromMatrixPosition(reticle.matrix);
-    cube.position.y += cubeSize / 2;
-    cube.visible = true;
-
-    placed = true;
-    placeHint.style.display = 'none';
-
-    placeThreeUIPanel(cube.position);
-  }
-
-  const controller = renderer.xr.getController(0);
-  controller.addEventListener('select', onSelect);
   scene.add(controller);
-
-  // ---------- Project 3D anchors to screen space with 3D-like rotation ----------
-  const projected = new THREE.Vector3();
 
   // ---------- Animation loop ----------
   const clock = new THREE.Clock();
@@ -614,14 +607,10 @@
           const pose = hit.getPose(referenceSpace);
           reticle.visible = true;
           reticle.matrix.fromArray(pose.transform.matrix);
-        } else if (!placed) {
-          reticle.visible = false;
         } else {
           reticle.visible = false;
         }
       }
-    } else {
-      // arOverlay.style.display = 'none';
     }
 
     if (placed) {
