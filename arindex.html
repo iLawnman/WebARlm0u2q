@@ -1,264 +1,294 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>2panel no rotate WebXR AR — Куб на полу + DOM Overlay панель</title>
-<style>
-  html, body {
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    background: #05070d;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>2.1panel no rotate WebXR AR — Куб на полу + DOM Overlay панель</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #05070d;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
 
-  #webgl-container {
-    position: absolute;
-    inset: 0;
-  }
+    #webgl-container {
+      position: absolute;
+      inset: 0;
+    }
 
-  #hint {
-    position: absolute;
-    z-index: 3;
-    top: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    color: #e2e8f0;
-    font-size: 13px;
-    background: rgba(11, 17, 32, 0.65);
-    padding: 8px 16px;
-    border-radius: 999px;
-    border: 1px solid rgba(148, 163, 184, 0.25);
-    pointer-events: none;
-    text-align: center;
-    max-width: 90%;
-  }
+    #hint {
+      position: absolute;
+      z-index: 3;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #e2e8f0;
+      font-size: 13px;
+      background: rgba(11, 17, 32, 0.65);
+      padding: 8px 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      pointer-events: none;
+      text-align: center;
+      max-width: 90%;
+    }
 
-  #unsupported {
-    position: absolute;
-    inset: 0;
-    z-index: 5;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    color: #94a3b8;
-    padding: 32px;
-  }
+    #unsupported {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #94a3b8;
+      padding: 32px;
+    }
 
-  #unsupported h2 { color: #f8fafc; margin-bottom: 12px; }
+    #unsupported h2 { color: #f8fafc; margin-bottom: 12px; }
 
-  /* ---------- WebXR DOM Overlay root ---------- */
-  #ar-overlay {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    display: none;
-  }
+    /* ---------- WebXR DOM Overlay root ---------- */
+    #ar-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      display: none;
+    }
 
-  #place-hint {
-    position: absolute;
-    top: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    pointer-events: none;
-    color: #f8fafc;
-    background: rgba(11, 17, 32, 0.65);
-    padding: 8px 16px;
-    border-radius: 999px;
-    font-size: 13px;
-    border: 1px solid rgba(148, 163, 184, 0.25);
-  }
+    #place-hint {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      pointer-events: none;
+      color: #f8fafc;
+      background: rgba(11, 17, 32, 0.65);
+      padding: 8px 16px;
+      border-radius: 999px;
+      font-size: 13px;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+    }
 
-  /* ---------- Базовый стиль для всех привязанных панелей ---------- */
-  .ar-anchored-panel {
-    position: absolute;
-    top: 0;
-    left: 0;
-    transform-origin: 50% 100%;
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-    display: flex;
-    flex-direction: column;
-    border-radius: 16px;
-    overflow: hidden;
-    border: 1px solid rgba(148, 163, 184, 0.3);
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
-    background: #0b1120;
-    transition: opacity 0.15s linear;
-    will-change: transform, opacity;
-  }
+    /* ---------- Базовый стиль для всех привязанных панелей ---------- */
+    .ar-anchored-panel {
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform-origin: 50% 100%;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+      background: #0b1120;
+      transition: opacity 0.15s linear;
+      will-change: transform, opacity;
+    }
 
-  .ar-anchored-panel.visible {
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
-  }
+    .ar-anchored-panel.visible {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
 
-  #anchor-panel {
-    width: 460px;
-  }
+    /* ---------- Основная панель ---------- */
+    #anchor-panel {
+      width: 460px;
+    }
 
-  #anchor-panel .panel-frame {
-    width: 100%;
-    height: 560px;
-    background: #0b1120;
-  }
+    #anchor-panel .panel-frame {
+      width: 100%;
+      height: 560px;
+      background: #0b1120;
+    }
 
-  #anchor-panel iframe {
-    width: 100%;
-    height: 100%;
-    border: 0;
-    display: block;
-  }
+    #anchor-panel iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+    }
 
-  #anchor-panel .panel-debug {
-    flex-shrink: 0;
-    padding: 10px 12px;
-    background: #0f172a;
-    border-top: 1px solid rgba(148, 163, 184, 0.2);
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
+    #anchor-panel .panel-debug {
+      flex-shrink: 0;
+      padding: 10px 12px;
+      background: #0f172a;
+      border-top: 1px solid rgba(148, 163, 184, 0.2);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
 
-  #debug-btn {
-    pointer-events: auto;
-    padding: 10px 14px;
-    border-radius: 10px;
-    border: 1px solid rgba(129, 140, 248, 0.4);
-    background: rgba(99, 102, 241, 0.18);
-    color: #e0e7ff;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-  }
+    #debug-btn {
+      pointer-events: auto;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(129, 140, 248, 0.4);
+      background: rgba(99, 102, 241, 0.18);
+      color: #e0e7ff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
 
-  #debug-btn:active {
-    background: rgba(99, 102, 241, 0.35);
-  }
+    #debug-btn:active {
+      background: rgba(99, 102, 241, 0.35);
+    }
 
-  #debug-log {
-    max-height: 96px;
-    overflow-y: auto;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 11px;
-    line-height: 1.5;
-    color: #94a3b8;
-    background: rgba(0, 0, 0, 0.25);
-    border-radius: 8px;
-    padding: 6px 8px;
-  }
+    #debug-log {
+      max-height: 96px;
+      overflow-y: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      line-height: 1.5;
+      color: #94a3b8;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 8px;
+      padding: 6px 8px;
+    }
 
-  #debug-log .log-empty { color: #475569; }
-  #debug-log .log-line { color: #67e8f9; }
+    #debug-log .log-empty { color: #475569; }
+    #debug-log .log-line { color: #67e8f9; }
 
-  /* ---------- Стили для панелей конвертора ---------- */
-  .convertor-panel {
-    width: min(88vw, 320px);
-    font-size: 13px;
-    color: #e2e8f0;
-  }
+    /* ---------- Вторая панель (фиксированный поворот) ---------- */
+    #second-panel {
+      width: 260px;
+      border: 1px solid rgba(6, 182, 212, 0.5);
+      background: #0f172a;
+    }
 
-  .convertor-panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 12px;
-    background: rgba(99, 102, 241, 0.18);
-    font-weight: 600;
-  }
+    #second-panel .panel-frame {
+      width: 100%;
+      height: 160px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #67e8f9;
+      font-weight: 600;
+      text-align: center;
+      padding: 16px;
+      font-size: 14px;
+      background: rgba(6, 182, 212, 0.08);
+    }
 
-  .convertor-panel-close {
-    background: none;
-    border: 0;
-    color: #94a3b8;
-    font-size: 18px;
-    line-height: 1;
-    padding: 0 4px;
-    cursor: pointer;
-  }
+    #second-panel .panel-subtext {
+      font-size: 11px;
+      font-weight: 400;
+      color: #94a3b8;
+      margin-top: 8px;
+    }
 
-  .convertor-panel-body {
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
+    /* ---------- Стили для панелей конвертора ---------- */
+    .convertor-panel {
+      width: min(88vw, 320px);
+      font-size: 13px;
+      color: #e2e8f0;
+    }
 
-  .convertor-row {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 12px;
-  }
+    .convertor-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      background: rgba(99, 102, 241, 0.18);
+      font-weight: 600;
+    }
 
-  .convertor-row.ok { color: #86efac; }
-  .convertor-row.missing { color: #fca5a5; }
+    .convertor-panel-close {
+      background: none;
+      border: 0;
+      color: #94a3b8;
+      font-size: 18px;
+      line-height: 1;
+      padding: 0 4px;
+      cursor: pointer;
+    }
 
-  /* ---------- Кнопка AR ---------- */
-  #ar-button-container {
-    position: absolute;
-    bottom: 40px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 10;
-    pointer-events: auto;
-  }
+    .convertor-panel-body {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
 
-  #ar-button-container button {
-    padding: 14px 32px;
-    border-radius: 12px;
-    border: none;
-    background: #6366f1;
-    color: white;
-    font-size: 18px;
-    font-weight: 600;
-    cursor: pointer;
-    box-shadow: 0 8px 30px rgba(99, 102, 241, 0.4);
-    transition: all 0.2s;
-  }
+    .convertor-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+    }
 
-  #ar-button-container button:hover {
-    background: #4f46e5;
-    transform: scale(1.02);
-  }
+    .convertor-row.ok { color: #86efac; }
+    .convertor-row.missing { color: #fca5a5; }
 
-  #ar-button-container button:active {
-    transform: scale(0.95);
-  }
+    /* ---------- Кнопка AR ---------- */
+    #ar-button-container {
+      position: absolute;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      pointer-events: auto;
+    }
 
-  #ar-button-container button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
+    #ar-button-container button {
+      padding: 14px 32px;
+      border-radius: 12px;
+      border: none;
+      background: #6366f1;
+      color: white;
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 8px 30px rgba(99, 102, 241, 0.4);
+      transition: all 0.2s;
+    }
 
-  /* ---------- Кнопка-триггер конвертора ---------- */
-  .convertor-trigger {
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    pointer-events: auto;
-    z-index: 10;
-    padding: 10px 14px;
-    border-radius: 10px;
-    border: 1px solid rgba(6, 182, 212, 0.4);
-    background: rgba(6, 182, 212, 0.15);
-    color: #cffafe;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-  }
+    #ar-button-container button:hover {
+      background: #4f46e5;
+      transform: scale(1.02);
+    }
 
-  .convertor-trigger:disabled { opacity: 0.6; }
-  .convertor-trigger:active { background: rgba(6, 182, 212, 0.3); }
-</style>
+    #ar-button-container button:active {
+      transform: scale(0.95);
+    }
+
+    #ar-button-container button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* ---------- Кнопка-триггер конвертора ---------- */
+    .convertor-trigger {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      pointer-events: auto;
+      z-index: 10;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(6, 182, 212, 0.4);
+      background: rgba(6, 182, 212, 0.15);
+      color: #cffafe;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .convertor-trigger:disabled { opacity: 0.6; }
+    .convertor-trigger:active { background: rgba(6, 182, 212, 0.3); }
+  </style>
 </head>
 <body>
 
@@ -269,7 +299,7 @@
   <div>
     <h2>WebXR AR недоступен</h2>
     <p>Откройте страницу на Android-устройстве в Chrome (ARCore) по HTTPS,<br>
-       или на устройстве с поддержкой WebXR immersive-ar.</p>
+      или на устройстве с поддержкой WebXR immersive-ar.</p>
   </div>
 </div>
 
@@ -279,7 +309,7 @@
 <!-- WebXR DOM Overlay root -->
 <div id="ar-overlay">
   <div id="place-hint">Коснитесь пола, чтобы поставить куб и панель</div>
-  
+
   <!-- Основная панель -->
   <div id="anchor-panel" class="ar-anchored-panel">
     <div class="panel-frame">
@@ -291,6 +321,14 @@
     </div>
   </div>
 
+  <!-- ВТОРАЯ ПАНЕЛЬ (Сохраняет стартовый поворот) -->
+  <div id="second-panel" class="ar-anchored-panel">
+    <div class="panel-frame">
+      📌 Вторая панель
+      <div class="panel-subtext">Мой поворот зафиксирован.<br>Я не поворачиваюсь к камере.</div>
+    </div>
+  </div>
+
   <!-- Контейнер для динамических панелей конвертора -->
   <div id="convertor-panels-container"></div>
 
@@ -299,239 +337,242 @@
 </div>
 
 <script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
   }
-}
 </script>
 
 <script type="module">
-import * as THREE from 'three';
-import { ARButton } from 'three/addons/webxr/ARButton.js';
-import { checkAssetFiles } from './convertor.js';
+  import * as THREE from 'three';
+  import { ARButton } from 'three/addons/webxr/ARButton.js';
+  import { checkAssetFiles } from './convertor.js';
 
-const webglContainer = document.getElementById('webgl-container');
-const hint = document.getElementById('hint');
-const unsupportedEl = document.getElementById('unsupported');
-const arOverlay = document.getElementById('ar-overlay');
-const placeHint = document.getElementById('place-hint');
-const arButtonContainer = document.getElementById('ar-button-container');
-const convertorTriggerBtn = document.getElementById('convertor-trigger-btn');
-const convertorPanelsContainer = document.getElementById('convertor-panels-container');
+  const webglContainer = document.getElementById('webgl-container');
+  const hint = document.getElementById('hint');
+  const unsupportedEl = document.getElementById('unsupported');
+  const arOverlay = document.getElementById('ar-overlay');
+  const placeHint = document.getElementById('place-hint');
+  const arButtonContainer = document.getElementById('ar-button-container');
+  const convertorTriggerBtn = document.getElementById('convertor-trigger-btn');
+  const convertorPanelsContainer = document.getElementById('convertor-panels-container');
 
-const anchorPanel = document.getElementById('anchor-panel');
-const debugBtn = document.getElementById('debug-btn');
-const debugLog = document.getElementById('debug-log');
+  const anchorPanel = document.getElementById('anchor-panel');
+  const debugBtn = document.getElementById('debug-btn');
+  const debugLog = document.getElementById('debug-log');
 
-const secondPanel = document.getElementById('second-panel');
-const secondPanelAnchor = new THREE.Vector3(5, 2, -5); // Задайте свои координаты
-const secondPanelProjected = new THREE.Vector3();
+  // Вторая панель
+  const secondPanel = document.getElementById('second-panel');
+  const secondPanelAnchor = new THREE.Vector3(); // Будет задана динамически при размещении
+  const secondPanelProjected = new THREE.Vector3();
 
-let debugClickCount = 0;
-function logToOverlay(message) {
-  debugClickCount += 1;
-  const time = new Date().toLocaleTimeString('ru-RU', { hour12: false });
-  const line = document.createElement('div');
-  line.className = 'log-line';
-  line.textContent = `[${time}] #${debugClickCount} ${message}`;
-  if (debugLog.querySelector('.log-empty')) debugLog.innerHTML = '';
-  debugLog.prepend(line);
-  console.log('[AR DOM Overlay]', message);
-}
-
-debugBtn.addEventListener('click', () => {
-  logToOverlay('Клик по кнопке в WebXR DOM Overlay сработал ✅');
-});
-
-// ---------- Хранилище всех панелей, привязанных к 3D-точкам ----------
-const anchoredPanels = new Map();
-
-// ---------- Функция для добавления панели, привязанной к 3D-позиции ----------
-function addAnchoredPanel(panelElement, anchorPosition) {
-  const id = `panel-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
-  
-  panelElement.classList.add('ar-anchored-panel');
-  convertorPanelsContainer.appendChild(panelElement);
-  
-  const panelData = {
-    element: panelElement,
-    anchorPosition: anchorPosition.clone(),
-    visible: true
-  };
-  
-  anchoredPanels.set(id, panelData);
-  return id;
-}
-
-// ---------- Функция удаления панели ----------
-function removeAnchoredPanel(id) {
-  const data = anchoredPanels.get(id);
-  if (data) {
-    data.element.remove();
-    anchoredPanels.delete(id);
+  let debugClickCount = 0;
+  function logToOverlay(message) {
+    debugClickCount += 1;
+    const time = new Date().toLocaleTimeString('ru-RU', { hour12: false });
+    const line = document.createElement('div');
+    line.className = 'log-line';
+    line.textContent = `[${time}] #${debugClickCount} ${message}`;
+    if (debugLog.querySelector('.log-empty')) debugLog.innerHTML = '';
+    debugLog.prepend(line);
+    console.log('[AR DOM Overlay]', message);
   }
-}
 
-// ---------- Freeze panel tracking while the user is actively touching it ----------
-let interacting = false;
+  debugBtn.addEventListener('click', () => {
+    logToOverlay('Клик по кнопке в WebXR DOM Overlay сработал ✅');
+  });
 
-function setupPanelInteraction(panelElement) {
-  panelElement.addEventListener('pointerdown', () => { interacting = true; });
-  panelElement.addEventListener('touchstart', () => { interacting = true; }, { passive: true });
-  panelElement.addEventListener('pointerup', () => { interacting = false; });
-  panelElement.addEventListener('pointercancel', () => { interacting = false; });
-  panelElement.addEventListener('touchend', () => { interacting = false; }, { passive: true });
-  panelElement.addEventListener('touchcancel', () => { interacting = false; }, { passive: true });
-}
+  // ---------- Хранилище всех панелей, привязанных к 3D-точкам ----------
+  const anchoredPanels = new Map();
 
-setupPanelInteraction(anchorPanel);
+  // ---------- Функция для добавления панели, привязанной к 3D-позиции ----------
+  function addAnchoredPanel(panelElement, anchorPosition) {
+    const id = `panel-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
 
-const panelIframe = anchorPanel.querySelector('iframe');
-panelIframe.addEventListener('load', () => {
-  try {
-    const doc = panelIframe.contentDocument;
-    doc.addEventListener('touchstart', () => { interacting = true; }, { passive: true });
-    doc.addEventListener('touchend', () => { interacting = false; }, { passive: true });
-    doc.addEventListener('touchcancel', () => { interacting = false; }, { passive: true });
-    doc.addEventListener('pointerdown', () => { interacting = true; });
-    doc.addEventListener('pointerup', () => { interacting = false; });
-  } catch (err) {
-    console.warn('Could not attach listeners inside iframe (cross-origin?)', err);
+    panelElement.classList.add('ar-anchored-panel');
+    convertorPanelsContainer.appendChild(panelElement);
+
+    const panelData = {
+      element: panelElement,
+      anchorPosition: anchorPosition.clone(),
+      visible: true
+    };
+
+    anchoredPanels.set(id, panelData);
+    return id;
   }
-});
 
-// ---------- Basic WebXR support check ----------
-if (!('xr' in navigator)) {
-  unsupportedEl.style.display = 'flex';
-} else {
-  navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-    if (!supported) unsupportedEl.style.display = 'flex';
-  }).catch(() => { unsupportedEl.style.display = 'flex'; });
-}
+  // ---------- Функция удаления панели ----------
+  function removeAnchoredPanel(id) {
+    const data = anchoredPanels.get(id);
+    if (data) {
+      data.element.remove();
+      anchoredPanels.delete(id);
+    }
+  }
 
-// ---------- Scene / Camera ----------
-const scene = new THREE.Scene();
+  // ---------- Freeze panel tracking while the user is actively touching it ----------
+  let interacting = false;
 
-const camera = new THREE.PerspectiveCamera(
-  70,
-  window.innerWidth / window.innerHeight,
-  0.01,
-  20
-);
+  function setupPanelInteraction(panelElement) {
+    panelElement.addEventListener('pointerdown', () => { interacting = true; });
+    panelElement.addEventListener('touchstart', () => { interacting = true; }, { passive: true });
+    panelElement.addEventListener('pointerup', () => { interacting = false; });
+    panelElement.addEventListener('pointercancel', () => { interacting = false; });
+    panelElement.addEventListener('touchend', () => { interacting = false; }, { passive: true });
+    panelElement.addEventListener('touchcancel', () => { interacting = false; }, { passive: true });
+  }
 
-// ---------- Renderer ----------
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-renderer.setPixelRatio(window.devicePixelRatio);
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.xr.enabled = true;
-webglContainer.appendChild(renderer.domElement);
+  setupPanelInteraction(anchorPanel);
+  setupPanelInteraction(secondPanel); // Добавляем обработку взаимодействий и для второй панели
 
-// ---------- AR entry button ----------
-const arButton = ARButton.createButton(renderer, {
-  requiredFeatures: ['hit-test'],
-  optionalFeatures: ['local-floor', 'dom-overlay'],
-  domOverlay: { root: arOverlay }
-});
-arButtonContainer.appendChild(arButton);
+  const panelIframe = anchorPanel.querySelector('iframe');
+  panelIframe.addEventListener('load', () => {
+    try {
+      const doc = panelIframe.contentDocument;
+      doc.addEventListener('touchstart', () => { interacting = true; }, { passive: true });
+      doc.addEventListener('touchend', () => { interacting = false; }, { passive: true });
+      doc.addEventListener('touchcancel', () => { interacting = false; }, { passive: true });
+      doc.addEventListener('pointerdown', () => { interacting = true; });
+      doc.addEventListener('pointerup', () => { interacting = false; });
+    } catch (err) {
+      console.warn('Could not attach listeners inside iframe (cross-origin?)', err);
+    }
+  });
 
-// ---------- Lights ----------
-scene.add(new THREE.HemisphereLight(0xffffff, 0x333344, 1.2));
+  // ---------- Basic WebXR support check ----------
+  if (!('xr' in navigator)) {
+    unsupportedEl.style.display = 'flex';
+  } else {
+    navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+      if (!supported) unsupportedEl.style.display = 'flex';
+    }).catch(() => { unsupportedEl.style.display = 'flex'; });
+  }
 
-const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-dirLight.position.set(2, 4, 2);
-scene.add(dirLight);
+  // ---------- Scene / Camera ----------
+  const scene = new THREE.Scene();
 
-// ---------- Reticle (floor marker) ----------
-const reticleGeometry = new THREE.RingGeometry(0.08, 0.1, 32).rotateX(-Math.PI / 2);
-const reticleMaterial = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
-const reticle = new THREE.Mesh(reticleGeometry, reticleMaterial);
-reticle.matrixAutoUpdate = false;
-reticle.visible = false;
-scene.add(reticle);
+  const camera = new THREE.PerspectiveCamera(
+          70,
+          window.innerWidth / window.innerHeight,
+          0.01,
+          20
+  );
 
-// ---------- Cube ----------
-const cubeSize = 0.18;
-const cube = new THREE.Mesh(
-  new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize),
-  new THREE.MeshStandardMaterial({
-    color: 0x6366f1,
-    metalness: 0.3,
-    roughness: 0.35,
-    emissive: 0x1e1b4b,
-    emissiveIntensity: 0.4,
-  })
-);
-cube.visible = false;
-scene.add(cube);
+  // ---------- Renderer ----------
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.xr.enabled = true;
+  webglContainer.appendChild(renderer.domElement);
 
-const edges = new THREE.LineSegments(
-  new THREE.EdgesGeometry(cube.geometry),
-  new THREE.LineBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.7 })
-);
-edges.visible = false;
-scene.add(edges);
+  // ---------- AR entry button ----------
+  const arButton = ARButton.createButton(renderer, {
+    requiredFeatures: ['hit-test'],
+    optionalFeatures: ['local-floor', 'dom-overlay'],
+    domOverlay: { root: arOverlay }
+  });
+  arButtonContainer.appendChild(arButton);
 
-const panelAnchor = new THREE.Vector3();
-const PANEL_HEIGHT_OFFSET = 0.28;
+  // ---------- Lights ----------
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x333344, 1.2));
 
-// ---------- Hit-test state ----------
-let hitTestSource = null;
-let hitTestSourceRequested = false;
-let placed = false;
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+  dirLight.position.set(2, 4, 2);
+  scene.add(dirLight);
 
-renderer.xr.addEventListener('sessionstart', () => {
-  placed = false;
-  cube.visible = false;
-  edges.visible = false;
-  anchorPanel.classList.remove('visible');
+  // ---------- Reticle (floor marker) ----------
+  const reticleGeometry = new THREE.RingGeometry(0.08, 0.1, 32).rotateX(-Math.PI / 2);
+  const reticleMaterial = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
+  const reticle = new THREE.Mesh(reticleGeometry, reticleMaterial);
+  reticle.matrixAutoUpdate = false;
   reticle.visible = false;
-  hitTestSourceRequested = false;
-  hitTestSource = null;
-  placeHint.style.display = 'block';
-  
-  for (const [id, data] of anchoredPanels) {
-    data.element.remove();
-  }
-  anchoredPanels.clear();
-});
+  scene.add(reticle);
 
-renderer.xr.addEventListener('sessionend', () => {
-  hitTestSource = null;
-  hitTestSourceRequested = false;
-});
+  // ---------- Cube ----------
+  const cubeSize = 0.18;
+  const cube = new THREE.Mesh(
+          new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize),
+          new THREE.MeshStandardMaterial({
+            color: 0x6366f1,
+            metalness: 0.3,
+            roughness: 0.35,
+            emissive: 0x1e1b4b,
+            emissiveIntensity: 0.4,
+          })
+  );
+  cube.visible = false;
+  scene.add(cube);
 
-// ---------- Обработчик для кнопки конвертора ----------
-convertorTriggerBtn.addEventListener('click', async () => {
-  if (!placed) {
-    console.warn('Сначала разместите куб на полу');
-    return;
-  }
-  
-  convertorTriggerBtn.disabled = true;
-  const originalLabel = convertorTriggerBtn.textContent;
-  convertorTriggerBtn.textContent = '⏳ Проверяю…';
+  const edges = new THREE.LineSegments(
+          new THREE.EdgesGeometry(cube.geometry),
+          new THREE.LineBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.7 })
+  );
+  edges.visible = false;
+  scene.add(edges);
 
-  try {
-    const { results, allExist } = await checkAssetFiles();
-    
-    const panel = document.createElement('div');
-    panel.className = 'convertor-panel';
-    
-    const rowsHtml = results.map(r => `
+  const panelAnchor = new THREE.Vector3();
+  const PANEL_HEIGHT_OFFSET = 0.28;
+
+  // ---------- Hit-test state ----------
+  let hitTestSource = null;
+  let hitTestSourceRequested = false;
+  let placed = false;
+
+  renderer.xr.addEventListener('sessionstart', () => {
+    placed = false;
+    cube.visible = false;
+    edges.visible = false;
+    anchorPanel.classList.remove('visible');
+    secondPanel.classList.remove('visible'); // Скрываем вторую панель при перезапуске
+    reticle.visible = false;
+    hitTestSourceRequested = false;
+    hitTestSource = null;
+    placeHint.style.display = 'block';
+
+    for (const [id, data] of anchoredPanels) {
+      data.element.remove();
+    }
+    anchoredPanels.clear();
+  });
+
+  renderer.xr.addEventListener('sessionend', () => {
+    hitTestSource = null;
+    hitTestSourceRequested = false;
+  });
+
+  // ---------- Обработчик для кнопки конвертора ----------
+  convertorTriggerBtn.addEventListener('click', async () => {
+    if (!placed) {
+      console.warn('Сначала разместите куб на полу');
+      return;
+    }
+
+    convertorTriggerBtn.disabled = true;
+    const originalLabel = convertorTriggerBtn.textContent;
+    convertorTriggerBtn.textContent = '⏳ Проверяю…';
+
+    try {
+      const { results, allExist } = await checkAssetFiles();
+
+      const panel = document.createElement('div');
+      panel.className = 'convertor-panel';
+
+      const rowsHtml = results.map(r => `
       <div class="convertor-row ${r.exists ? 'ok' : 'missing'}">
         <span>${r.exists ? '✅' : '❌'}</span>
         <code>${r.path}</code>
       </div>
     `).join('');
-    
-    const title = allExist ? '✅ Assets найдены' : '❌ Не хватает файлов';
-    const message = allExist 
-      ? '<p>Все файлы конвертера на месте!</p>'
-      : `<p>Не все файлы найдены в <code>./assets/</code>:</p>`;
-    
-    panel.innerHTML = `
+
+      const title = allExist ? '✅ Assets найдены' : '❌ Не хватает файлов';
+      const message = allExist
+              ? '<p>Все файлы конвертера на месте!</p>'
+              : `<p>Не все файлы найдены в <code>./assets/</code>:</p>`;
+
+      panel.innerHTML = `
       <div class="convertor-panel-header">
         <span>${title}</span>
         <button type="button" class="convertor-panel-close" aria-label="Закрыть">×</button>
@@ -541,278 +582,210 @@ convertorTriggerBtn.addEventListener('click', async () => {
         ${rowsHtml}
       </div>
     `;
-    
-    // Смещаем панель конвертора вправо от основной
-    const offsetPosition = panelAnchor.clone();
-    offsetPosition.x += 0.30;
-    offsetPosition.y += 0.05;
-    
-    const panelId = addAnchoredPanel(panel, offsetPosition);
-    setupPanelInteraction(panel);
-    
-    panel.querySelector('.convertor-panel-close').addEventListener('click', () => {
-      removeAnchoredPanel(panelId);
-    });
-    
-  } catch (err) {
-    console.error('Ошибка при проверке assets:', err);
-  } finally {
-    convertorTriggerBtn.disabled = false;
-    convertorTriggerBtn.textContent = originalLabel;
-  }
-});
 
-// ---------- Tap on screen -> place cube ----------
-function onSelect() {
-  if (!reticle.visible) return;
+      // Смещаем панель конвертора вправо от основной
+      const offsetPosition = panelAnchor.clone();
+      offsetPosition.x += 0.30;
+      offsetPosition.y += 0.05;
 
-  cube.position.setFromMatrixPosition(reticle.matrix);
-  cube.position.y += cubeSize / 2;
-  edges.position.copy(cube.position);
-  cube.visible = true;
-  edges.visible = true;
+      const panelId = addAnchoredPanel(panel, offsetPosition);
+      setupPanelInteraction(panel);
 
-  panelAnchor.set(cube.position.x, cube.position.y + PANEL_HEIGHT_OFFSET, cube.position.z);
+      panel.querySelector('.convertor-panel-close').addEventListener('click', () => {
+        removeAnchoredPanel(panelId);
+      });
 
-  placed = true;
-  placeHint.style.display = 'none';
-}
-
-const controller = renderer.xr.getController(0);
-controller.addEventListener('select', onSelect);
-scene.add(controller);
-
-// ---------- Resize ----------
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
-
-// ---------- Project 3D anchors to screen space with 3D-like rotation ----------
-const projected = new THREE.Vector3();
-const camWorldPos = new THREE.Vector3();
-const directionToPanel = new THREE.Vector3();
-const cameraForward = new THREE.Vector3();
-
-// function updateAnchoredPanels() {
-//   if (!placed) return;
-//   if (interacting) return;
-//
-//   camera.getWorldPosition(camWorldPos);
-//   camera.getWorldDirection(cameraForward);
-//
-//   // Основная панель
-//   const distance = camWorldPos.distanceTo(panelAnchor);
-//   projected.copy(panelAnchor).project(camera);
-//
-//   if (projected.z > 1 || distance > 8) {
-//     anchorPanel.classList.remove('visible');
-//   } else {
-//     const w = window.innerWidth;
-//     const h = window.innerHeight;
-//     const screenX = (projected.x * 0.5 + 0.5) * w;
-//     const screenY = (1 - (projected.y * 0.5 + 0.5)) * h;
-//
-//     const margin = -40;
-//     if (screenX < -margin || screenX > w + margin || screenY < -margin || screenY > h + margin) {
-//       anchorPanel.classList.remove('visible');
-//     } else {
-//       const scale = THREE.MathUtils.clamp(0.9 / distance, 0.35, 1.15);
-//
-//       // Убраны rotateY и rotateX, чтобы панель сохраняла свой исходный поворот
-//       anchorPanel.style.transform =
-//               `translate(${screenX}px, ${screenY}px) translate(-50%, -100%) ` +
-//               `scale(${scale})`;
-//
-//       anchorPanel.classList.add('visible');
-//     }
-//   }
-//
-//   // Дополнительные панели
-//   for (const [id, data] of anchoredPanels) {
-//     if (!data.visible) continue;
-//
-//     const anchorPos = data.anchorPosition;
-//     const dist = camWorldPos.distanceTo(anchorPos);
-//     projected.copy(anchorPos).project(camera);
-//
-//     if (projected.z > 1 || dist > 8) {
-//       data.element.classList.remove('visible');
-//       continue;
-//     }
-//
-//     const w = window.innerWidth;
-//     const h = window.innerHeight;
-//     const screenX = (projected.x * 0.5 + 0.5) * w;
-//     const screenY = (1 - (projected.y * 0.5 + 0.5)) * h;
-//
-//     const margin = 40;
-//     if (screenX < -margin || screenX > w + margin || screenY < -margin || screenY > h + margin) {
-//       data.element.classList.remove('visible');
-//     } else {
-//       const scale = THREE.MathUtils.clamp(0.9 / dist, 0.35, 1.15);
-//
-//       // Убраны rotateY и rotateX для сохранения исходного поворота
-//       data.element.style.transform =
-//               `translate(${screenX}px, ${screenY}px) translate(-50%, -100%) ` +
-//               `scale(${scale})`;
-//
-//       data.element.classList.add('visible');
-//     }
-//   }
-// }
-
-function updateAnchoredPanels() {
-  if (!placed) return;
-  if (interacting) return;
-
-  camera.getWorldPosition(camWorldPos);
-  camera.getWorldDirection(cameraForward);
-
-  // ==========================================
-  // 1. Основная панель
-  // ==========================================
-  const distance = camWorldPos.distanceTo(panelAnchor);
-  projected.copy(panelAnchor).project(camera);
-
-  if (projected.z > 1 || distance > 8) {
-    anchorPanel.classList.remove('visible');
-  } else {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    const screenX = (projected.x * 0.5 + 0.5) * w;
-    const screenY = (1 - (projected.y * 0.5 + 0.5)) * h;
-
-    const margin = 40; // Сделал 40 для консистентности (позволяет панели чуть уйти за край перед скрытием)
-    if (screenX < -margin || screenX > w + margin || screenY < -margin || screenY > h + margin) {
-      anchorPanel.classList.remove('visible');
-    } else {
-      const scale = THREE.MathUtils.clamp(0.9 / distance, 0.35, 1.15);
-      // Без rotateX/Y панель сохраняет свой изначальный CSS-поворот
-      anchorPanel.style.transform =
-              `translate(${screenX}px, ${screenY}px) translate(-50%, -100%) ` +
-              `scale(${scale})`;
-      anchorPanel.classList.add('visible');
+    } catch (err) {
+      console.error('Ошибка при проверке assets:', err);
+    } finally {
+      convertorTriggerBtn.disabled = false;
+      convertorTriggerBtn.textContent = originalLabel;
     }
+  });
+
+  // ---------- Tap on screen -> place cube ----------
+  function onSelect() {
+    if (!reticle.visible) return;
+
+    cube.position.setFromMatrixPosition(reticle.matrix);
+    cube.position.y += cubeSize / 2;
+    edges.position.copy(cube.position);
+    cube.visible = true;
+    edges.visible = true;
+
+    // Позиция основной панели
+    panelAnchor.set(cube.position.x, cube.position.y + PANEL_HEIGHT_OFFSET, cube.position.z);
+
+    // Позиция второй панели (со смещением вправо и чуть ниже основной)
+    secondPanelAnchor.set(cube.position.x + 0.35, cube.position.y + 0.15, cube.position.z);
+
+    placed = true;
+    placeHint.style.display = 'none';
   }
 
-  // ==========================================
-  // 2. Вторая панель (сохраняет стартовое вращение)
-  // ==========================================
-  if (secondPanel && secondPanelAnchor) {
-    const dist2 = camWorldPos.distanceTo(secondPanelAnchor);
-    secondPanelProjected.copy(secondPanelAnchor).project(camera);
+  const controller = renderer.xr.getController(0);
+  controller.addEventListener('select', onSelect);
+  scene.add(controller);
 
-    if (secondPanelProjected.z > 1 || dist2 > 8) {
-      secondPanel.classList.remove('visible');
+  // ---------- Resize ----------
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // ---------- Project 3D anchors to screen space ----------
+  const projected = new THREE.Vector3();
+  const camWorldPos = new THREE.Vector3();
+  const cameraForward = new THREE.Vector3();
+
+  function updateAnchoredPanels() {
+    if (!placed) return;
+    if (interacting) return;
+
+    camera.getWorldPosition(camWorldPos);
+    camera.getWorldDirection(cameraForward);
+
+    // ==========================================
+    // 1. Основная панель
+    // ==========================================
+    const distance = camWorldPos.distanceTo(panelAnchor);
+    projected.copy(panelAnchor).project(camera);
+
+    if (projected.z > 1 || distance > 8) {
+      anchorPanel.classList.remove('visible');
     } else {
       const w = window.innerWidth;
       const h = window.innerHeight;
-      const screenX2 = (secondPanelProjected.x * 0.5 + 0.5) * w;
-      const screenY2 = (1 - (secondPanelProjected.y * 0.5 + 0.5)) * h;
+      const screenX = (projected.x * 0.5 + 0.5) * w;
+      const screenY = (1 - (projected.y * 0.5 + 0.5)) * h;
 
-      const margin2 = 40;
-      if (screenX2 < -margin2 || screenX2 > w + margin2 || screenY2 < -margin2 || screenY2 > h + margin2) {
+      const margin = 40;
+      if (screenX < -margin || screenX > w + margin || screenY < -margin || screenY > h + margin) {
+        anchorPanel.classList.remove('visible');
+      } else {
+        const scale = THREE.MathUtils.clamp(0.9 / distance, 0.35, 1.15);
+        // Без rotateX/Y панель сохраняет свой изначальный CSS-поворот
+        anchorPanel.style.transform =
+                `translate(${screenX}px, ${screenY}px) translate(-50%, -100%) ` +
+                `scale(${scale})`;
+        anchorPanel.classList.add('visible');
+      }
+    }
+
+    // ==========================================
+    // 2. Вторая панель (строго сохраняет стартовое вращение)
+    // ==========================================
+    if (secondPanel) {
+      const dist2 = camWorldPos.distanceTo(secondPanelAnchor);
+      secondPanelProjected.copy(secondPanelAnchor).project(camera);
+
+      if (secondPanelProjected.z > 1 || dist2 > 8) {
         secondPanel.classList.remove('visible');
       } else {
-        const scale2 = THREE.MathUtils.clamp(0.9 / dist2, 0.35, 1.15);
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        const screenX2 = (secondPanelProjected.x * 0.5 + 0.5) * w;
+        const screenY2 = (1 - (secondPanelProjected.y * 0.5 + 0.5)) * h;
 
-        // Намеренно НЕ добавляем rotateY и rotateX.
-        // Панель будет только перемещаться (translate) и менять размер (scale),
-        // сохраняя свой исходный поворот, заданный в CSS.
-        secondPanel.style.transform =
-                `translate(${screenX2}px, ${screenY2}px) translate(-50%, -100%) ` +
-                `scale(${scale2})`;
+        const margin2 = 40;
+        if (screenX2 < -margin2 || screenX2 > w + margin2 || screenY2 < -margin2 || screenY2 > h + margin2) {
+          secondPanel.classList.remove('visible');
+        } else {
+          const scale2 = THREE.MathUtils.clamp(0.9 / dist2, 0.35, 1.15);
 
-        secondPanel.classList.add('visible');
+          // Намеренно НЕ добавляем rotateY и rotateX.
+          // Панель будет только перемещаться (translate) и менять размер (scale),
+          // сохраняя свой исходный поворот, заданный в CSS.
+          secondPanel.style.transform =
+                  `translate(${screenX2}px, ${screenY2}px) translate(-50%, -100%) ` +
+                  `scale(${scale2})`;
+
+          secondPanel.classList.add('visible');
+        }
       }
     }
-  }
 
-  // ==========================================
-  // 3. Дополнительные панели (цикл)
-  // ==========================================
-  for (const [id, data] of anchoredPanels) {
-    if (!data.visible) continue;
+    // ==========================================
+    // 3. Дополнительные панели (цикл)
+    // ==========================================
+    for (const [id, data] of anchoredPanels) {
+      if (!data.visible) continue;
 
-    const anchorPos = data.anchorPosition;
-    const dist = camWorldPos.distanceTo(anchorPos);
-    projected.copy(anchorPos).project(camera);
+      const anchorPos = data.anchorPosition;
+      const dist = camWorldPos.distanceTo(anchorPos);
+      projected.copy(anchorPos).project(camera);
 
-    if (projected.z > 1 || dist > 8) {
-      data.element.classList.remove('visible');
-      continue;
-    }
+      if (projected.z > 1 || dist > 8) {
+        data.element.classList.remove('visible');
+        continue;
+      }
 
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    const screenX = (projected.x * 0.5 + 0.5) * w;
-    const screenY = (1 - (projected.y * 0.5 + 0.5)) * h;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const screenX = (projected.x * 0.5 + 0.5) * w;
+      const screenY = (1 - (projected.y * 0.5 + 0.5)) * h;
 
-    const margin = 40;
-    if (screenX < -margin || screenX > w + margin || screenY < -margin || screenY > h + margin) {
-      data.element.classList.remove('visible');
-    } else {
-      const scale = THREE.MathUtils.clamp(0.9 / dist, 0.35, 1.15);
-      data.element.style.transform =
-              `translate(${screenX}px, ${screenY}px) translate(-50%, -100%) ` +
-              `scale(${scale})`;
-      data.element.classList.add('visible');
-    }
-  }
-}
-
-// ---------- Animation loop ----------
-const clock = new THREE.Clock();
-
-renderer.setAnimationLoop((timestamp, frame) => {
-  if (frame) {
-    const session = renderer.xr.getSession();
-    const referenceSpace = renderer.xr.getReferenceSpace();
-
-    hint.style.display = 'none';
-    arOverlay.style.display = 'block';
-
-    if (!hitTestSourceRequested) {
-      session.requestReferenceSpace('viewer').then((viewerSpace) => {
-        session.requestHitTestSource({ space: viewerSpace }).then((source) => {
-          hitTestSource = source;
-        });
-      });
-      session.addEventListener('end', () => {
-        hitTestSourceRequested = false;
-        hitTestSource = null;
-      });
-      hitTestSourceRequested = true;
-    }
-
-    if (hitTestSource) {
-      const hitTestResults = frame.getHitTestResults(hitTestSource);
-      if (hitTestResults.length > 0 && !placed) {
-        const hit = hitTestResults[0];
-        const pose = hit.getPose(referenceSpace);
-        reticle.visible = true;
-        reticle.matrix.fromArray(pose.transform.matrix);
-      } else if (!placed) {
-        reticle.visible = false;
+      const margin = 40;
+      if (screenX < -margin || screenX > w + margin || screenY < -margin || screenY > h + margin) {
+        data.element.classList.remove('visible');
       } else {
-        reticle.visible = false;
+        const scale = THREE.MathUtils.clamp(0.9 / dist, 0.35, 1.15);
+        data.element.style.transform =
+                `translate(${screenX}px, ${screenY}px) translate(-50%, -100%) ` +
+                `scale(${scale})`;
+        data.element.classList.add('visible');
       }
     }
-  } else {
-    arOverlay.style.display = 'none';
   }
 
-  if (placed) {
-    const t = clock.getElapsedTime();
-    //cube.rotation.y = t * 0.6;
-    //edges.rotation.copy(cube.rotation);
-    updateAnchoredPanels();
-  }
+  // ---------- Animation loop ----------
+  const clock = new THREE.Clock();
 
-  renderer.render(scene, camera);
-});
+  renderer.setAnimationLoop((timestamp, frame) => {
+    if (frame) {
+      const session = renderer.xr.getSession();
+      const referenceSpace = renderer.xr.getReferenceSpace();
+
+      hint.style.display = 'none';
+      arOverlay.style.display = 'block';
+
+      if (!hitTestSourceRequested) {
+        session.requestReferenceSpace('viewer').then((viewerSpace) => {
+          session.requestHitTestSource({ space: viewerSpace }).then((source) => {
+            hitTestSource = source;
+          });
+        });
+        session.addEventListener('end', () => {
+          hitTestSourceRequested = false;
+          hitTestSource = null;
+        });
+        hitTestSourceRequested = true;
+      }
+
+      if (hitTestSource) {
+        const hitTestResults = frame.getHitTestResults(hitTestSource);
+        if (hitTestResults.length > 0 && !placed) {
+          const hit = hitTestResults[0];
+          const pose = hit.getPose(referenceSpace);
+          reticle.visible = true;
+          reticle.matrix.fromArray(pose.transform.matrix);
+        } else if (!placed) {
+          reticle.visible = false;
+        } else {
+          reticle.visible = false;
+        }
+      }
+    } else {
+      arOverlay.style.display = 'none';
+    }
+
+    if (placed) {
+      updateAnchoredPanels();
+    }
+
+    renderer.render(scene, camera);
+  });
 </script>
 </body>
 </html>
