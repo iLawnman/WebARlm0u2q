@@ -1,10 +1,10 @@
 import * as THREE from 'three';
+import * as ThreeMeshUI from 'three-mesh-ui';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
-import { Block, Inline } from 'three-mesh-ui';
 
 let scene, camera, renderer;
 let cube, edges, reticle;
-let mainPanel, fixedPanel, testBtn;
+let mainPanel, fixedPanel, testButton;
 let placed = false;
 let hitTestSource = null;
 let hitTestSourceRequested = false;
@@ -27,7 +27,6 @@ async function init() {
     console.error('❌ WebXR не поддерживается');
     unsupportedEl.style.display = 'flex';
     startBtn.disabled = true;
-    startBtn.textContent = 'WebXR не поддерживается';
     return;
   }
 
@@ -42,7 +41,6 @@ async function init() {
   if (!supported) {
     unsupportedEl.style.display = 'flex';
     startBtn.disabled = true;
-    startBtn.textContent = 'AR не поддерживается';
     return;
   }
 
@@ -51,10 +49,10 @@ async function init() {
   try {
     font = await new Promise((resolve, reject) => {
       loader.load(
-          'https://unpkg.com/three-mesh-ui@6.5.4/examples/assets/Roboto-msdf.json',
-          resolve,
-          undefined,
-          reject
+        'https://unpkg.com/three-mesh-ui@6.5.4/examples/assets/Roboto-msdf.json',
+        resolve,
+        undefined,
+        reject
       );
     });
     console.log('✅ Шрифт загружен');
@@ -63,7 +61,7 @@ async function init() {
     return;
   }
 
-  // Сцена
+  // Сцена и камера
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
@@ -95,21 +93,21 @@ async function init() {
   // Куб
   const cubeSize = 0.18;
   cube = new THREE.Mesh(
-      new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize),
-      new THREE.MeshStandardMaterial({
-        color: 0x6366f1,
-        metalness: 0.3,
-        roughness: 0.35,
-        emissive: 0x1e1b4b,
-        emissiveIntensity: 0.4
-      })
+    new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize),
+    new THREE.MeshStandardMaterial({
+      color: 0x6366f1,
+      metalness: 0.3,
+      roughness: 0.35,
+      emissive: 0x1e1b4b,
+      emissiveIntensity: 0.4
+    })
   );
   cube.visible = false;
   scene.add(cube);
 
   edges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(cube.geometry),
-      new THREE.LineBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.7 })
+    new THREE.EdgesGeometry(cube.geometry),
+    new THREE.LineBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.7 })
   );
   edges.visible = false;
   scene.add(edges);
@@ -132,7 +130,7 @@ async function init() {
   });
 
   renderer.xr.addEventListener('sessionend', () => {
-    console.log(' AR сессия завершена');
+    console.log('🔚 AR сессия завершена');
     document.body.classList.remove('ar-active');
     hitTestSource = null;
     hitTestSourceRequested = false;
@@ -183,100 +181,104 @@ async function startARSession() {
 function createUIPanels() {
   console.log('🎨 Создание UI панелей...');
 
-  // Панель 1 (billboard) - используем Block
-  mainPanel = new Block({
+  // === ПАНЕЛЬ 1: Основная ===
+  mainPanel = new ThreeMeshUI.Block({
+    fontFamily: font,
+    fontSize: 0.05,
     width: 0.5,
     height: 0.35,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundOpacity: 0.9,
     backgroundColor: new THREE.Color(0x0b1120),
+    backgroundOpacity: 0.9,
     borderRadius: 0.02,
-    fontFamily: font,
-    fontSize: 0.025,
-    fontColor: new THREE.Color(0xe2e8f0),
-    padding: 0.02
+    padding: 0.02,
+    justifyContent: 'center',
+    alignItems: 'center'
   });
   mainPanel.visible = false;
   scene.add(mainPanel);
 
-  // Кнопка - тоже Block
-  testBtn = new Block({
+  const title = new ThreeMeshUI.Inline({
+    content: 'Main Panel',
+    fontColor: new THREE.Color(0xe2e8f0),
+    fontSize: 0.06,
+    textAlign: 'center'
+  });
+  mainPanel.add(title);
+
+  // Кнопка
+  testButton = new ThreeMeshUI.Block({
     width: 0.4,
     height: 0.08,
     backgroundColor: new THREE.Color(0x6366f1),
     borderRadius: 0.01,
-    fontFamily: font,
-    fontSize: 0.022,
-    fontColor: new THREE.Color(0xffffff),
+    marginTop: 0.03,
     justifyContent: 'center',
     alignItems: 'center',
     cursor: 'pointer'
   });
 
-  // Текст внутри кнопки - используем Inline
-  const btnText = new Inline({
-    content: 'Test click',
-    fontFamily: font,
-    fontSize: 0.022
+  const btnText = new ThreeMeshUI.Inline({
+    content: 'Test Click',
+    fontColor: new THREE.Color(0xffffff),
+    fontSize: 0.045
   });
-  testBtn.add(btnText);
+  testButton.add(btnText);
 
-  // Обработчик клика
-  testBtn.onClick = () => {
+  testButton.onClick = () => {
     console.log('✅ Клик по UI кнопке!');
-    testBtn.backgroundColor = new THREE.Color(0x4f46e5);
+    testButton.backgroundColor = new THREE.Color(0x4f46e5);
     setTimeout(() => {
-      testBtn.backgroundColor = new THREE.Color(0x6366f1);
+      testButton.backgroundColor = new THREE.Color(0x6366f1);
     }, 150);
   };
 
-  // Hover эффект
-  testBtn.onHover = (isHovered) => {
+  testButton.onHover = (isHovered) => {
     if (isHovered) {
-      testBtn.backgroundColor = new THREE.Color(0x5558e8);
+      testButton.backgroundColor = new THREE.Color(0x5558e8);
     } else {
-      testBtn.backgroundColor = new THREE.Color(0x6366f1);
+      testButton.backgroundColor = new THREE.Color(0x6366f1);
     }
   };
 
-  mainPanel.add(testBtn);
+  mainPanel.add(testButton);
 
-  // Панель 2 (фиксированная)
-  fixedPanel = new Block({
+  // === ПАНЕЛЬ 2: Фиксированная ===
+  fixedPanel = new ThreeMeshUI.Block({
+    fontFamily: font,
+    fontSize: 0.05,
     width: 0.35,
     height: 0.22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundOpacity: 0.9,
     backgroundColor: new THREE.Color(0x0f172a),
+    backgroundOpacity: 0.9,
     borderColor: new THREE.Color(0x06b6d4),
     borderWidth: 0.004,
     borderRadius: 0.02,
-    fontFamily: font,
-    fontSize: 0.02,
-    fontColor: new THREE.Color(0x67e8f9),
     padding: 0.02,
-    textAlign: 'center'
+    justifyContent: 'center',
+    alignItems: 'center'
   });
   fixedPanel.visible = false;
 
-  fixedPanel.add(new Inline({
-    content: 'Fixed panel',
-    fontFamily: font,
-    fontSize: 0.02
-  }));
+  const fixedTitle = new ThreeMeshUI.Inline({
+    content: 'Fixed Panel',
+    fontColor: new THREE.Color(0x67e8f9),
+    fontSize: 0.055,
+    textAlign: 'center'
+  });
+  fixedPanel.add(fixedTitle);
 
-  fixedPanel.add(new Inline({
-    content: 'Rotation is locked',
-    fontFamily: font,
-    fontSize: 0.015,
-    fontColor: new THREE.Color(0x94a3b8)
-  }));
+  const fixedText = new ThreeMeshUI.Inline({
+    content: 'Rotation locked',
+    fontColor: new THREE.Color(0x94a3b8),
+    fontSize: 0.035,
+    textAlign: 'center',
+    marginTop: 0.02
+  });
+  fixedPanel.add(fixedText);
 
   scene.add(fixedPanel);
 
-  console.log('✅ Панели созданы (Block + Inline)');
+  console.log('✅ Панели созданы');
 }
 
 function onSelect() {
