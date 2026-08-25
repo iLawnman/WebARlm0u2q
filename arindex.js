@@ -21,7 +21,7 @@ const secondPanel = document.getElementById('second-panel');
 
 // МАСШТАБ: 0.0015 означает, что 1000px HTML = 1.5 метра в AR мире.
 // Это делает панель 460px шириной примерно 0.69 метра, что идеально для AR.
-const PANEL_SCALE = 0.0015;
+const PANEL_SCALE = 0.00015;
 
 let debugClickCount = 0;
 function logToOverlay(message) {
@@ -175,6 +175,25 @@ secondPanelObj.scale.setScalar(PANEL_SCALE);
 
 scene.add(anchorPanelObj);
 scene.add(secondPanelObj);
+
+//import { CSS3DObject } from 'three/examples/jsm/renderers/CSS3DRenderer.js';
+
+// 1. Создаем обычный HTML-элемент
+const element = document.createElement('div');
+element.className = 'my-panel';
+element.textContent = 'Фиксированная панель';
+
+// 2. Оборачиваем в CSS3DObject (а не CSS3DSprite!)
+const cssObjectA = new CSS3DObject(element);
+
+// 3. Ставим жесткую позицию и нужный угол поворота в мире
+cssObjectA.position.set(0, 0, 0); // Координаты в сцене
+cssObjectA.rotation.x = 0;              // Фиксированный наклон по X
+cssObjectA.rotation.y = Math.PI / 4;    // Поворот на 45 градусов
+cssObjectA.rotation.z = 0;
+
+// 4. Добавляем в сцену Three.js
+scene.add(cssObject);
 
 const panelAnchor = new THREE.Vector3();
 const secondPanelAnchor = new THREE.Vector3();
