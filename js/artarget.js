@@ -21,6 +21,21 @@ export function getArTargetDesignPrefab() {
   return defaultFactory.getDesignPrefab();
 }
 
+/**
+ * Связывает singleton ModelFactory с реальными renderer/scene/camera
+ * WebXR-сцены. Без этого вызова panelCreator.renderer/scene/camera
+ * остаются null, и если createArTarget(Sync) вызовут без явного arInput,
+ * ARPanelCreator/arobjects.js создадут fallback ARInput с camera=null,
+ * из-за чего raycaster.setFromCamera() будет падать при каждом клике
+ * (клики по AR-таргету не будут работать).
+ * Вызывать один раз при старте приложения, сразу после создания ARScene.
+ */
+export function setArTargetContext(renderer, scene, camera) {
+  defaultFactory.setRenderer(renderer);
+  defaultFactory.setScene(scene);
+  defaultFactory.setCamera(camera);
+}
+
 export async function preloadArTargetPrefab(url, ui = null) {
   const prefabUrl = url || defaultFactory.prefabUrl;
   console.log('[ModelFactory] preloadArTargetPrefab: preloading', prefabUrl);

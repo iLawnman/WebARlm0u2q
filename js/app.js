@@ -6,6 +6,7 @@ import { Settings } from './settings.js';
 import { ARSettings } from './arsettings.js';
 import { ARInput } from './arinput.js';
 import { UIInput } from './uiinput.js';
+import { setArTargetContext } from './artarget.js';
 
 export class App {
   constructor() {
@@ -23,6 +24,13 @@ export class App {
       this.arScene.camera
     );
     this.arInput.init();
+
+    // Единственный ARInput приложения также должен быть известен фабрике
+    // AR-таргетов (artarget.js / arobjects.js) на случай, если где-то
+    // createArTarget(Sync) вызовут без явного arInput - иначе там создастся
+    // "мертвый" fallback ARInput с camera=null, и клики по таргету перестанут
+    // работать (raycaster.setFromCamera падает на null-камере).
+    setArTargetContext(this.arScene.renderer, this.arScene.scene, this.arScene.camera);
 
     this.uiInput = new UIInput(this.ui);
 
@@ -66,7 +74,7 @@ export class App {
     }
 
     // 2. Recognition
-    this.recognition = new Recognition(this.ui, this.settings);
+    this.recognition = new Recognition(this.ui, this.settings, this.arInput);
     await this.recognition.init();
 
     this.ui.onStartAR(() => this.startAR());

@@ -86,6 +86,15 @@ export class ARInput {
   _onCanvasEvent(e) {
     if (!this._isInitialized || !this.renderer || !this.renderer.domElement) return;
 
+    if (!this.camera) {
+      // Без камеры raycaster.setFromCamera() кидает исключение молча
+      // внутри обработчика клика - таргет становится "нерабочим" без
+      // видимой причины. Логируем явно, чтобы сразу было видно источник.
+      console.error('[ARInput] _onCanvasEvent: camera is missing, cannot raycast clicks');
+      if (this.ui) this.ui.log('[ARInput] Нет камеры для рейкаста клика - проверьте передачу arInput', 'err');
+      return;
+    }
+
     // В клике интересуют фазы окончания тапа/клика
     if (e.type !== 'click' && e.type !== 'touchend' && e.type !== 'pointerup') {
       return;

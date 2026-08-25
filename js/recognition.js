@@ -7,9 +7,15 @@ import { MediaPipeReco } from './mediapipe.js';
 import { ImageReco } from './imagereco.js';
 
 export class Recognition {
-  constructor(ui, settings) {
+  constructor(ui, settings, arInput = null) {
     this.ui = ui;
     this.settings = settings;
+
+    // Единственный ARInput приложения (реальные renderer/scene/camera из
+    // WebXR-сессии). Должен передаваться в каждый createArTargetSync(),
+    // иначе arobjects.js создаст свой fallback ARInput с camera=null,
+    // и рейкастинг кликов по AR-таргету будет молча падать.
+    this.arInput = arInput;
 
     this.questManager = new QuestManager();
     this.policies = new Policies(settings, this.questManager);
@@ -262,6 +268,7 @@ export class Recognition {
           // Создаем AR Target
           const arTarget = createArTargetSync(targetInfoData, {
             ui: this.ui,
+            arInput: this.arInput,
             onAnswer: (value) => {
               const e = this.imageReco.trackedMarkers.get(idx);
               if (e) this._onQuestionAnswered(e, value);
