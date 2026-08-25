@@ -739,8 +739,8 @@
     if (placed) {
       const t = clock.getElapsedTime();
       cube.rotation.y = t * 0.6;
-      edges.rotation.copy(cube.rotation);
-      updateAnchoredPanels();
+      // edges.rotation.copy(cube.rotation);
+      // updateAnchoredPanels();
     }
 
     renderer.render(scene, camera);
