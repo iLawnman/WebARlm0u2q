@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>fix2 new panel WebXR AR — Куб на полу + DOM Overlay панель</title>
+  <title>roll panel WebXR AR — Куб на полу + DOM Overlay панель</title>
   <style>
     html, body {
       margin: 0;
@@ -276,6 +276,28 @@
 <!-- Кнопка запуска AR -->
 <div id="ar-button-container"></div>
 
+<!-- WebXR DOM Overlay root -->
+<div id="ar-overlay">
+  <div id="place-hint">Коснитесь пола, чтобы поставить куб и панель</div>
+
+  <!-- Основная панель -->
+  <div id="anchor-panel" class="ar-anchored-panel">
+    <div class="panel-frame">
+      <iframe src="about.html" scrolling="yes"></iframe>
+    </div>
+    <div class="panel-debug">
+      <button id="debug-btn" type="button">🧪 Тест клика — вывести в лог</button>
+      <div id="debug-log"><span class="log-empty">лог пуст…</span></div>
+    </div>
+  </div>
+
+  <!-- Контейнер для динамических панелей конвертора -->
+  <div id="convertor-panels-container"></div>
+
+  <!-- Кнопка-триггер конвертора -->
+  <button id="convertor-trigger-btn" type="button" class="convertor-trigger">📦 Проверить assets</button>
+</div>
+
 <script type="importmap">
   {
     "imports": {
@@ -313,6 +335,10 @@
     debugLog.prepend(line);
     console.log('[AR DOM Overlay]', message);
   }
+
+  debugBtn.addEventListener('click', () => {
+    logToOverlay('Клик по кнопке в WebXR DOM Overlay сработал ✅');
+  });
 
   // ---------- Basic WebXR support check ----------
   if (!('xr' in navigator)) {
@@ -385,6 +411,9 @@
   edges.visible = false;
   scene.add(edges);
 
+  const panelAnchor = new THREE.Vector3();
+  const PANEL_HEIGHT_OFFSET = 0.28;
+
   // ---------- Hit-test state ----------
   let hitTestSource = null;
   let hitTestSourceRequested = false;
@@ -393,10 +422,17 @@
   renderer.xr.addEventListener('sessionstart', () => {
     placed = false;
     cube.visible = false;
+    edges.visible = false;
+    anchorPanel.classList.remove('visible');
     reticle.visible = false;
     hitTestSourceRequested = false;
     hitTestSource = null;
     placeHint.style.display = 'block';
+
+    for (const [id, data] of anchoredPanels) {
+      data.element.remove();
+    }
+    anchoredPanels.clear();
   });
 
   renderer.xr.addEventListener('sessionend', () => {
@@ -404,77 +440,82 @@
     hitTestSourceRequested = false;
   });
 
-  function createscene() {
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-    scene.add(ambientLight);
-  }
-
   function placeThreeUIPanel(position) {
     makeUI();
   }
 
-  const loader = new THREE.TextureLoader();
-  
   function makeUI() {
-
     const container = new ThreeMeshUI.Block({
       height: 1.5,
-      width: 1
+      width: 1,
+      backgroundOpacity: 0,
     });
 
-    container.position.set( 0, 0, 0 );
+    container.position.set(0, 0, 0);
     container.rotation.x = 0;
-    scene.add( container );
+    scene.add(container);
+
+    //
 
     const imageBlock = new ThreeMeshUI.Block({
       height: 1,
       width: 1,
-      offset: 0.1 // distance separating the inner block from its parent
     });
 
     const textBlock = new ThreeMeshUI.Block({
       height: 0.4,
       width: 0.8,
-      margin: 0.05, // like in CSS, horizontal and vertical distance from neighbour
-      offset: 0.1 // distance separating the inner block from its parent
+      margin: 0.05,
     });
 
-    loader.load( './assets/asset.png', (texture)=> {
+    container.add(imageBlock, textBlock);
 
-      imageBlock.set({ backgroundTexture: texture });
+    //
 
-    });
+    // const loader = new THREE.TextureLoader();
+    // loader.load('./assets/asset.png', (texture) => {
+    //   imageBlock.set({ backgroundTexture: texture });
+    // });
+
+    //
+
     container.set({
       fontFamily: './assets/Roboto-msdf.json',
       fontTexture: './assets/Roboto-msdf.png',
     });
+
     const text = new ThreeMeshUI.Text({
-      content: 'The spiny bush viper is known for its extremely keeled dorsal scales.'
+      content:
+              "The spiny bush viper is known for its extremely keeled dorsal scales.",
     });
 
-    textBlock.add( text );
+    textBlock.add(text);
+
+    //
+
     text.set({
-      fontColor: new THREE.Color( 0xd2ffbd ),
-      fontSize: 0.04
+      fontColor: new THREE.Color(0xd2ffbd),
+      fontSize: 0.06,
     });
+
     textBlock.set({
-      // alignContent: 'right', // could be 'center' or 'left'
-      // alignContent has been deprecated, rely on alignItems or textAlign
-      textAlign: 'right',
-      justifyContent: 'end', // could be 'start', 'center', 'end', 'space-between', 'space-around', 'space-evenly'  
-      padding: 0.03
+      textAlign: "right",
+      justifyContent: "end",
+      padding: 0.03,
     });
+
+    //
+
     textBlock.add(
             new ThreeMeshUI.Text({
-              content: ' Mind your fingers.',
+              content: " Mind your fingers.",
               fontSize: 0.07,
-              fontColor: new THREE.Color( 0xefffe8 )
+              fontColor: new THREE.Color(0xefffe8),
             })
     );
   }
 
-  ThreeMeshUI.update();
-  
+
   // ---------- Tap on screen -> place cube ----------
   function onSelect() {
     if (!reticle.visible) return;
@@ -485,7 +526,7 @@
 
     placed = true;
     placeHint.style.display = 'none';
-    
+
     placeThreeUIPanel(cube.position);
   }
 
