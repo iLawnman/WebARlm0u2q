@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>2 no rotate WebXR AR — Куб на полу + DOM Overlay панель</title>
+<title>2panel no rotate WebXR AR — Куб на полу + DOM Overlay панель</title>
 <style>
   html, body {
     margin: 0;
@@ -325,6 +325,10 @@ const anchorPanel = document.getElementById('anchor-panel');
 const debugBtn = document.getElementById('debug-btn');
 const debugLog = document.getElementById('debug-log');
 
+const secondPanel = document.getElementById('second-panel');
+const secondPanelAnchor = new THREE.Vector3(5, 2, -5); // Задайте свои координаты
+const secondPanelProjected = new THREE.Vector3();
+
 let debugClickCount = 0;
 function logToOverlay(message) {
   debugClickCount += 1;
@@ -591,6 +595,74 @@ const camWorldPos = new THREE.Vector3();
 const directionToPanel = new THREE.Vector3();
 const cameraForward = new THREE.Vector3();
 
+// function updateAnchoredPanels() {
+//   if (!placed) return;
+//   if (interacting) return;
+//
+//   camera.getWorldPosition(camWorldPos);
+//   camera.getWorldDirection(cameraForward);
+//
+//   // Основная панель
+//   const distance = camWorldPos.distanceTo(panelAnchor);
+//   projected.copy(panelAnchor).project(camera);
+//
+//   if (projected.z > 1 || distance > 8) {
+//     anchorPanel.classList.remove('visible');
+//   } else {
+//     const w = window.innerWidth;
+//     const h = window.innerHeight;
+//     const screenX = (projected.x * 0.5 + 0.5) * w;
+//     const screenY = (1 - (projected.y * 0.5 + 0.5)) * h;
+//
+//     const margin = -40;
+//     if (screenX < -margin || screenX > w + margin || screenY < -margin || screenY > h + margin) {
+//       anchorPanel.classList.remove('visible');
+//     } else {
+//       const scale = THREE.MathUtils.clamp(0.9 / distance, 0.35, 1.15);
+//
+//       // Убраны rotateY и rotateX, чтобы панель сохраняла свой исходный поворот
+//       anchorPanel.style.transform =
+//               `translate(${screenX}px, ${screenY}px) translate(-50%, -100%) ` +
+//               `scale(${scale})`;
+//
+//       anchorPanel.classList.add('visible');
+//     }
+//   }
+//
+//   // Дополнительные панели
+//   for (const [id, data] of anchoredPanels) {
+//     if (!data.visible) continue;
+//
+//     const anchorPos = data.anchorPosition;
+//     const dist = camWorldPos.distanceTo(anchorPos);
+//     projected.copy(anchorPos).project(camera);
+//
+//     if (projected.z > 1 || dist > 8) {
+//       data.element.classList.remove('visible');
+//       continue;
+//     }
+//
+//     const w = window.innerWidth;
+//     const h = window.innerHeight;
+//     const screenX = (projected.x * 0.5 + 0.5) * w;
+//     const screenY = (1 - (projected.y * 0.5 + 0.5)) * h;
+//
+//     const margin = 40;
+//     if (screenX < -margin || screenX > w + margin || screenY < -margin || screenY > h + margin) {
+//       data.element.classList.remove('visible');
+//     } else {
+//       const scale = THREE.MathUtils.clamp(0.9 / dist, 0.35, 1.15);
+//
+//       // Убраны rotateY и rotateX для сохранения исходного поворота
+//       data.element.style.transform =
+//               `translate(${screenX}px, ${screenY}px) translate(-50%, -100%) ` +
+//               `scale(${scale})`;
+//
+//       data.element.classList.add('visible');
+//     }
+//   }
+// }
+
 function updateAnchoredPanels() {
   if (!placed) return;
   if (interacting) return;
@@ -598,7 +670,9 @@ function updateAnchoredPanels() {
   camera.getWorldPosition(camWorldPos);
   camera.getWorldDirection(cameraForward);
 
-  // Основная панель
+  // ==========================================
+  // 1. Основная панель
+  // ==========================================
   const distance = camWorldPos.distanceTo(panelAnchor);
   projected.copy(panelAnchor).project(camera);
 
@@ -610,22 +684,55 @@ function updateAnchoredPanels() {
     const screenX = (projected.x * 0.5 + 0.5) * w;
     const screenY = (1 - (projected.y * 0.5 + 0.5)) * h;
 
-    const margin = -40;
+    const margin = 40; // Сделал 40 для консистентности (позволяет панели чуть уйти за край перед скрытием)
     if (screenX < -margin || screenX > w + margin || screenY < -margin || screenY > h + margin) {
       anchorPanel.classList.remove('visible');
     } else {
       const scale = THREE.MathUtils.clamp(0.9 / distance, 0.35, 1.15);
-
-      // Убраны rotateY и rotateX, чтобы панель сохраняла свой исходный поворот
+      // Без rotateX/Y панель сохраняет свой изначальный CSS-поворот
       anchorPanel.style.transform =
               `translate(${screenX}px, ${screenY}px) translate(-50%, -100%) ` +
               `scale(${scale})`;
-
       anchorPanel.classList.add('visible');
     }
   }
 
-  // Дополнительные панели
+  // ==========================================
+  // 2. Вторая панель (сохраняет стартовое вращение)
+  // ==========================================
+  if (secondPanel && secondPanelAnchor) {
+    const dist2 = camWorldPos.distanceTo(secondPanelAnchor);
+    secondPanelProjected.copy(secondPanelAnchor).project(camera);
+
+    if (secondPanelProjected.z > 1 || dist2 > 8) {
+      secondPanel.classList.remove('visible');
+    } else {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const screenX2 = (secondPanelProjected.x * 0.5 + 0.5) * w;
+      const screenY2 = (1 - (secondPanelProjected.y * 0.5 + 0.5)) * h;
+
+      const margin2 = 40;
+      if (screenX2 < -margin2 || screenX2 > w + margin2 || screenY2 < -margin2 || screenY2 > h + margin2) {
+        secondPanel.classList.remove('visible');
+      } else {
+        const scale2 = THREE.MathUtils.clamp(0.9 / dist2, 0.35, 1.15);
+
+        // Намеренно НЕ добавляем rotateY и rotateX.
+        // Панель будет только перемещаться (translate) и менять размер (scale),
+        // сохраняя свой исходный поворот, заданный в CSS.
+        secondPanel.style.transform =
+                `translate(${screenX2}px, ${screenY2}px) translate(-50%, -100%) ` +
+                `scale(${scale2})`;
+
+        secondPanel.classList.add('visible');
+      }
+    }
+  }
+
+  // ==========================================
+  // 3. Дополнительные панели (цикл)
+  // ==========================================
   for (const [id, data] of anchoredPanels) {
     if (!data.visible) continue;
 
@@ -648,12 +755,9 @@ function updateAnchoredPanels() {
       data.element.classList.remove('visible');
     } else {
       const scale = THREE.MathUtils.clamp(0.9 / dist, 0.35, 1.15);
-
-      // Убраны rotateY и rotateX для сохранения исходного поворота
       data.element.style.transform =
               `translate(${screenX}px, ${screenY}px) translate(-50%, -100%) ` +
               `scale(${scale})`;
-
       data.element.classList.add('visible');
     }
   }
