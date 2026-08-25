@@ -302,7 +302,8 @@
   {
     "imports": {
       "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+      "three-mesh-ui": "https://unpkg.com/three-mesh-ui@6.4.0/build/three-mesh-ui.module.js"
     }
   }
 </script>
@@ -310,7 +311,7 @@
 <script type="module">
   import * as THREE from 'three';
   import { ARButton } from 'three/addons/webxr/ARButton.js';
-  import { checkAssetFiles } from './convertor.js';
+  import * as ThreeMeshUI from "three-mesh-ui";
 
   const webglContainer = document.getElementById('webgl-container');
   const hint = document.getElementById('hint');
@@ -439,6 +440,83 @@
     hitTestSourceRequested = false;
   });
 
+  function placeThreeUIPanel(position) {
+    makeUI();
+  }
+
+  function makeUI() {
+    const container = new ThreeMeshUI.Block({
+      height: 1.5,
+      width: 1,
+      backgroundOpacity: 0,
+    });
+
+    container.position.set(0, 0, 0);
+    container.rotation.x = 0;
+    scene.add(container);
+
+    //
+
+    const imageBlock = new ThreeMeshUI.Block({
+      height: 1,
+      width: 1,
+    });
+
+    const textBlock = new ThreeMeshUI.Block({
+      height: 0.4,
+      width: 0.8,
+      margin: 0.05,
+    });
+
+    container.add(imageBlock, textBlock);
+
+    //
+
+    const loader = new THREE.TextureLoader();
+
+    loader.load(SnakeImage, (texture) => {
+      imageBlock.set({ backgroundTexture: texture });
+    });
+
+    //
+
+    container.set({
+      fontFamily: FontJSON,
+      fontTexture: FontImage,
+    });
+
+    const text = new ThreeMeshUI.Text({
+      content:
+              "The spiny bush viper is known for its extremely keeled dorsal scales.",
+    });
+
+    textBlock.add(text);
+
+    //
+
+    text.set({
+      fontColor: new THREE.Color(0xd2ffbd),
+      fontSize: 0.06,
+    });
+
+    textBlock.set({
+      textAlign: "right",
+      justifyContent: "end",
+      padding: 0.03,
+    });
+
+    //
+
+    textBlock.add(
+            new ThreeMeshUI.Text({
+              content: " Mind your fingers.",
+              fontSize: 0.07,
+              fontColor: new THREE.Color(0xefffe8),
+            })
+    );
+  }
+
+
   // ---------- Tap on screen -> place cube ----------
   function onSelect() {
     if (!reticle.visible) return;
@@ -449,24 +527,16 @@
 
     placed = true;
     placeHint.style.display = 'none';
+    
+    placeThreeUIPanel(cube.position);
   }
 
   const controller = renderer.xr.getController(0);
   controller.addEventListener('select', onSelect);
   scene.add(controller);
 
-  // ---------- Resize ----------
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  });
-
   // ---------- Project 3D anchors to screen space with 3D-like rotation ----------
   const projected = new THREE.Vector3();
-  const camWorldPos = new THREE.Vector3();
-  const directionToPanel = new THREE.Vector3();
-  const cameraForward = new THREE.Vector3();
 
   // ---------- Animation loop ----------
   const clock = new THREE.Clock();
