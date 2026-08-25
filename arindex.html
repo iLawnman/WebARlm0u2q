@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>rotate fix WebXR AR — Куб на полу + DOM Overlay панель</title>
+<title>no rotate WebXR AR — Куб на полу + DOM Overlay панель</title>
 <style>
   html, body {
     margin: 0;
@@ -610,7 +610,7 @@ function updateAnchoredPanels() {
     const screenX = (projected.x * 0.5 + 0.5) * w;
     const screenY = (1 - (projected.y * 0.5 + 0.5)) * h;
 
-    const margin = 40;
+    const margin = -40;
     if (screenX < -margin || screenX > w + margin || screenY < -margin || screenY > h + margin) {
       anchorPanel.classList.remove('visible');
     } else {
@@ -636,11 +636,11 @@ function updateAnchoredPanels() {
       const scale = THREE.MathUtils.clamp(0.9 / distance, 0.35, 1.15);
       
       // Применяем трансформацию с поворотом и перспективным наклоном
-      anchorPanel.style.transform =
-        `translate(${screenX}px, ${screenY}px) translate(-50%, -100%) ` +
-        `scale(${scale}) ` +
-        `rotateY(${-angle}rad) ` +
-        `rotateX(${-verticalAngle * 0.5}rad)`;
+      // anchorPanel.style.transform =
+      //   `translate(${screenX}px, ${screenY}px) translate(-50%, -100%) ` +
+      //   `scale(${scale}) ` +
+      //   `rotateY(${-angle}rad) ` +
+      //   `rotateX(${-verticalAngle * 0.5}rad)`;
       anchorPanel.classList.add('visible');
     }
   }
@@ -740,7 +740,7 @@ renderer.setAnimationLoop((timestamp, frame) => {
     const t = clock.getElapsedTime();
     //cube.rotation.y = t * 0.6;
     //edges.rotation.copy(cube.rotation);
-    // updateAnchoredPanels();
+    updateAnchoredPanels();
   }
 
   renderer.render(scene, camera);
