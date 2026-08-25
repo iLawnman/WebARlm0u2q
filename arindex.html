@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>new panel WebXR AR — Куб на полу + DOM Overlay панель</title>
+  <title>fix new panel WebXR AR — Куб на полу + DOM Overlay панель</title>
   <style>
     html, body {
       margin: 0;
@@ -314,10 +314,6 @@
     console.log('[AR DOM Overlay]', message);
   }
 
-  debugBtn.addEventListener('click', () => {
-    logToOverlay('Клик по кнопке в WebXR DOM Overlay сработал ✅');
-  });
-
   // ---------- Basic WebXR support check ----------
   if (!('xr' in navigator)) {
     unsupportedEl.style.display = 'flex';
@@ -540,7 +536,7 @@
         }
       }
     } else {
-      arOverlay.style.display = 'none';
+      // arOverlay.style.display = 'none';
     }
 
     if (placed) {
