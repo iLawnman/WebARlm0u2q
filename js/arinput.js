@@ -164,8 +164,17 @@ export class ARInput {
         canvas.style.pointerEvents = prevPointerEvents;
 
         if (realTarget && cssObject.element.contains(realTarget)) {
+          const panelEl = realTarget.closest('[data-ar-panel-name]');
+          const panelName = panelEl ? panelEl.dataset.arPanelName : null;
+
           console.log('[ARInput] ★ Real target hit:', realTarget.tagName, realTarget.className);
-          if (this.ui) this.ui.log(`[ARInput] Попадание в элемент: <${realTarget.tagName.toLowerCase()}> class="${realTarget.className}"`, 'ok');
+          if (this.ui) {
+            this.ui.log(
+              `[ARInput] Попадание в элемент: <${realTarget.tagName.toLowerCase()}> class="${realTarget.className}"` +
+              (panelName ? ` (панель: "${panelName}")` : ''),
+              'ok'
+            );
+          }
           
           playSound('click');
           
@@ -309,6 +318,11 @@ export class ARInput {
     element.style.pointerEvents = 'auto';
     element.style.touchAction = 'manipulation';
 
+    // Запоминаем имя панели прямо на элементе - используется здесь же
+    // для лога и в bindInteractiveEvent(), чтобы кнопка тоже знала,
+    // в какой зоне панели она находится.
+    element.dataset.arPanelName = panelName;
+
     const interactiveSelector = [
       'button', 'input', 'textarea', 'select', 'a',
       '.ar-quest-btn', '.ar-quest-submit-btn', '.ar-slide-nav',
@@ -318,7 +332,26 @@ export class ARInput {
     const captureHandler = (e) => {
       const target = e.target;
       const isInteractive = !!target.closest(interactiveSelector);
-      
+
+      // Клики по панели минуют canvas (панель лежит поверх него в DOM),
+      // поэтому ARInput._onCanvasEvent для них не срабатывает - лог о
+      // попадании в панель пишем именно здесь, на реальном пути клика.
+      // Только на завершающих фазах жеста (click/touchend), чтобы не
+      // спамить логами на pointerdown/touchstart.
+      if (this.ui && (e.type === 'click' || e.type === 'touchend')) {
+        const now = performance.now();
+        // touchend и синтетический click часто срабатывают на один и тот
+        // же тап - логируем не чаще раза в 400мс на элемент, чтобы не
+        // дублировать запись в лог.
+        if (!element._arLastPanelLogTime || now - element._arLastPanelLogTime > 400) {
+          element._arLastPanelLogTime = now;
+          this.ui.log(
+            `[ARInput] Клик по панели "${panelName}"${isInteractive ? ' (интерактивный элемент)' : ''}`,
+            'info'
+          );
+        }
+      }
+
       if (isInteractive) {
         return; // Пропускаем обработку для интерактивных элементов
       }
@@ -329,6 +362,7 @@ export class ARInput {
     element.addEventListener('pointerdown', captureHandler, true);
     element.addEventListener('click', captureHandler, true);
     element.addEventListener('touchstart', captureHandler, { passive: false, capture: true });
+    element.addEventListener('touchend', captureHandler, { passive: false, capture: true });
   }
 
   bindInteractiveEvent(element, btnName, callback) {
@@ -345,7 +379,12 @@ export class ARInput {
       e.stopImmediatePropagation();
 
       if (this.ui) {
-        this.ui.log(`[ARInput Button] '${btnName}' pressed`, 'ok');
+        const panelEl = element.closest('[data-ar-panel-name]');
+        const panelName = panelEl ? panelEl.dataset.arPanelName : null;
+        this.ui.log(
+          `[ARInput Button] '${btnName}' pressed${panelName ? ` (панель: "${panelName}")` : ''}`,
+          'ok'
+        );
       }
       playSound('click');
       callback(e);
