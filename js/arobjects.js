@@ -2,8 +2,6 @@
 import * as THREE from 'three';
 import { ARDataParser } from './arparser.js';
 import { ARPanelCreator } from './arpanel.js';
-import { ARButtonCreator } from './arbutton.js';
-import { ARModalManager } from './armodal.js';
 import { ARInput } from './arinput.js';
 import { playSound } from './audio.js';
 
@@ -14,8 +12,6 @@ export class ModelFactory {
     this.prefabUrl = defaults.prefabUrl || DEFAULT_PREFAB_URL;
     this.parser = new ARDataParser();
     this.panelCreator = new ARPanelCreator();
-    this.buttonCreator = new ARButtonCreator();
-    this.modalManager = new ARModalManager();
     this._arInputInstances = [];
     this._debugSaveBtn = null;
     this._designAutoLoadAttempted = false;

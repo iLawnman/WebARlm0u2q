@@ -249,8 +249,8 @@ export class ARPanelCreator {
     const nextBtn = el.querySelector('.next-btn');
     if (nextBtn) nextBtn.style.display = 'none';
 
-    // Инициализация модального окна
-    this.modalManager.setupModal(el, data, ui);
+    // Инициализация модального окна (только показ/скрытие - контент уже заполнен выше)
+    this.modalManager.setupModal(el, ui, arInput);
   }
 
   _applyDesignToScreen(el, p) {

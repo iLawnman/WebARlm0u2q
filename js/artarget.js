@@ -1,6 +1,5 @@
 // artarget.js - Main entry point
 import { ModelFactory } from './arobjects.js';
-import { ARModalManager } from './armodal.js';
 
 // Singleton instance for convenience functions
 const defaultFactory = new ModelFactory();
