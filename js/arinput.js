@@ -194,7 +194,7 @@ export class ARInput {
         }
       }
     } else if (this.ui) {
-      // this.ui.log('[ARInput] Мимо - ни один объект не задет', 'warn');
+      this.ui.log('[ARInput] Мимо - ни один объект не задет', 'warn');
     }
   }
 
