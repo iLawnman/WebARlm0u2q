@@ -1,4 +1,4 @@
-// armodal.js - Modal Manager for AR
+// armodal.js
 export class ARModalManager {
   constructor() {}
 
@@ -14,65 +14,52 @@ export class ARModalManager {
       modalCloseBtn = built.modalCloseBtn;
     }
 
-    // Гарантируем, что модалка стартует скрытой
-    if (!modalOverlay.classList.contains('active')) {
-      modalOverlay.classList.remove('active');
-    }
+    // Модалка стартует скрытой
+    modalOverlay.style.display = 'none';
 
     const closeModal = () => {
-      modalOverlay.classList.remove('active');
+      modalOverlay.style.display = 'none';
       if (ui) ui.log('[Modal] Closed', 'ok');
     };
 
     if (arInput) {
       arInput.bindInteractiveEvent(modalCloseBtn, 'ModalCloseButton', closeModal);
     } else {
-      modalCloseBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        closeModal();
-      }, true);
-      modalCloseBtn.addEventListener('touchend', (e) => {
-        e.stopPropagation();
-        if (e.cancelable) e.preventDefault();
-        closeModal();
-      }, { passive: false, capture: true });
+      modalCloseBtn.addEventListener('click', closeModal, true);
     }
-
-    modalOverlay.addEventListener('click', (e) => {
-      if (e.target === modalOverlay) closeModal();
-    }, true);
   }
 
   _buildModalMarkup(el) {
     const modalOverlay = document.createElement('div');
     modalOverlay.className = 'modal-overlay';
     modalOverlay.style.cssText = `
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.85);
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.9);
       z-index: 99999;
-      align-items: center; justify-content: center;
-      box-sizing: border-box;
-      pointer-events: none;
-      opacity: 0;
-      visibility: hidden;
-      transition: opacity 0.2s, visibility 0.2s;
+      display: none;
+      align-items: center;
+      justify-content: center;
     `;
 
     const modalWindow = document.createElement('div');
-    modalWindow.className = 'modal-window';
     modalWindow.style.cssText = `
-      background: linear-gradient(145deg, #1a1a2e, #16213e);
-      padding: 30px;
-      border-radius: 16px;
-      max-width: 90%;
-      max-height: 85%;
-      overflow-y: auto;
-      color: #ffffff;
       position: relative;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
-      border: 1px solid rgba(255, 215, 0, 0.3);
-      pointer-events: auto;
-      min-width: 280px;
+      max-width: 90%;
+      max-height: 90%;
+    `;
+
+    const img = document.createElement('img');
+    img.src = './assets/modal-image.jpg'; // Замените на путь к вашей картинке
+    img.alt = 'Modal Image';
+    img.style.cssText = `
+      max-width: 100%;
+      max-height: 80vh;
+      border-radius: 10px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
     `;
 
     const modalCloseBtn = document.createElement('button');
@@ -81,49 +68,28 @@ export class ARModalManager {
     modalCloseBtn.innerHTML = '&#10005;';
     modalCloseBtn.style.cssText = `
       position: absolute;
-      top: 12px;
-      right: 12px;
-      font-size: 24px;
+      top: 10px;
+      right: 10px;
+      font-size: 32px;
       font-weight: bold;
-      background: rgba(255, 255, 255, 0.1);
-      border: none;
+      background: rgba(255, 255, 255, 0.2);
+      border: 2px solid #fff;
       border-radius: 50%;
-      color: #ff6b6b;
+      color: #fff;
       cursor: pointer;
-      pointer-events: auto;
-      width: 40px;
-      height: 40px;
+      width: 50px;
+      height: 50px;
       display: flex;
       align-items: center;
       justify-content: center;
+      z-index: 100000;
     `;
 
-    const modalTitle = document.createElement('div');
-    modalTitle.className = 'modal-title';
-    modalTitle.style.cssText = `
-      font-size: 22px;
-      font-weight: bold;
-      margin-bottom: 16px;
-      color: #ffd700;
-      text-align: center;
-      padding-right: 30px;
-    `;
-
-    const modalBody = document.createElement('div');
-    modalBody.className = 'modal-body';
-    modalBody.style.cssText = `
-      font-size: 16px;
-      line-height: 1.6;
-      color: #e0e0e0;
-      margin-bottom: 10px;
-    `;
-
+    modalWindow.appendChild(img);
     modalWindow.appendChild(modalCloseBtn);
-    modalWindow.appendChild(modalTitle);
-    modalWindow.appendChild(modalBody);
     modalOverlay.appendChild(modalWindow);
     el.appendChild(modalOverlay);
 
-    return { modalOverlay, modalCloseBtn, modalTitle, modalBody };
+    return { modalOverlay, modalCloseBtn };
   }
 }
