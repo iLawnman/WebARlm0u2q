@@ -152,7 +152,7 @@ export class ARPanelCreator {
   }
 
   createCSSScreen(data, onAnswer, ui, arInput) {
-    const SCREEN_WIDTH_PX = 340;
+    const SCREEN_WIDTH_PX = 640;
     const SCREEN_HEIGHT_PX = 480;
     const SCREEN_SCALE = 0.0005;
 

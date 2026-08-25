@@ -126,9 +126,9 @@ export class ARInput {
 
     if (clientX === undefined || clientY === undefined) return;
 
-    if (this.ui) {
-      this.ui.log(`[ARInput] Событие '${e.type}' получено @ (${Math.round(clientX)}, ${Math.round(clientY)})`, 'info');
-    }
+    // if (this.ui) {
+    //   this.ui.log(`[ARInput] Событие '${e.type}' получено @ (${Math.round(clientX)}, ${Math.round(clientY)})`, 'info');
+    // }
 
     const rect = this.renderer.domElement.getBoundingClientRect();
     const x = ((clientX - rect.left) / rect.width) * 2 - 1;
@@ -146,9 +146,9 @@ export class ARInput {
 
     const intersects = this._raycaster.intersectObjects(raycastMeshes);
 
-    if (this.ui) {
-      this.ui.log(`[ARInput] Raycast: проверено ${raycastMeshes.length} объектов, попаданий: ${intersects.length}`, 'info');
-    }
+    // if (this.ui) {
+    //   this.ui.log(`[ARInput] Raycast: проверено ${raycastMeshes.length} объектов, попаданий: ${intersects.length}`, 'info');
+    // }
 
     if (intersects.length > 0) {
       const hit = intersects[0];
@@ -167,14 +167,14 @@ export class ARInput {
           const panelEl = realTarget.closest('[data-ar-panel-name]');
           const panelName = panelEl ? panelEl.dataset.arPanelName : null;
 
-          console.log('[ARInput] ★ Real target hit:', realTarget.tagName, realTarget.className);
-          if (this.ui) {
-            this.ui.log(
-              `[ARInput] Попадание в элемент: <${realTarget.tagName.toLowerCase()}> class="${realTarget.className}"` +
-              (panelName ? ` (панель: "${panelName}")` : ''),
-              'ok'
-            );
-          }
+          // console.log('[ARInput] ★ Real target hit:', realTarget.tagName, realTarget.className);
+          // if (this.ui) {
+          //   this.ui.log(
+          //     `[ARInput] Попадание в элемент: <${realTarget.tagName.toLowerCase()}> class="${realTarget.className}"` +
+          //     (panelName ? ` (панель: "${panelName}")` : ''),
+          //     'ok'
+          //   );
+          // }
           
           playSound('click');
           
@@ -185,16 +185,16 @@ export class ARInput {
           // Если клик не попал в конкретный подэлемент, ищем ближайший интерактивный
           const interactive = cssObject.element.querySelector('button, input, a, select, textarea, .modal-close-btn');
           if (interactive) {
-            if (this.ui) this.ui.log('[ARInput] Точного попадания нет, кликаем по ближайшему интерактивному элементу панели', 'ok');
+            // if (this.ui) this.ui.log('[ARInput] Точного попадания нет, кликаем по ближайшему интерактивному элементу панели', 'ok');
             playSound('click');
             interactive.click();
           } else if (this.ui) {
-            this.ui.log('[ARInput] Попадание в панель, но интерактивный элемент не найден', 'warn');
+            // this.ui.log('[ARInput] Попадание в панель, но интерактивный элемент не найден', 'warn');
           }
         }
       }
     } else if (this.ui) {
-      this.ui.log('[ARInput] Мимо - ни один объект не задет', 'warn');
+      // this.ui.log('[ARInput] Мимо - ни один объект не задет', 'warn');
     }
   }
 
