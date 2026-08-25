@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>no rotate WebXR AR — Куб на полу + DOM Overlay панель</title>
+<title>2 no rotate WebXR AR — Куб на полу + DOM Overlay панель</title>
 <style>
   html, body {
     margin: 0;
@@ -597,7 +597,7 @@ function updateAnchoredPanels() {
 
   camera.getWorldPosition(camWorldPos);
   camera.getWorldDirection(cameraForward);
-  
+
   // Основная панель
   const distance = camWorldPos.distanceTo(panelAnchor);
   projected.copy(panelAnchor).project(camera);
@@ -614,82 +614,46 @@ function updateAnchoredPanels() {
     if (screenX < -margin || screenX > w + margin || screenY < -margin || screenY > h + margin) {
       anchorPanel.classList.remove('visible');
     } else {
-      // Вычисляем угол поворота в 3D-пространстве
-      directionToPanel.copy(panelAnchor).sub(camWorldPos);
-      directionToPanel.y = 0; // Игнорируем наклон по вертикали для горизонтального поворота
-      directionToPanel.normalize();
-      
-      // Угол между направлением камеры и направлением на панель
-      const cameraDirFlat = cameraForward.clone();
-      cameraDirFlat.y = 0;
-      cameraDirFlat.normalize();
-      
-      // Вычисляем угол поворота панели в горизонтальной плоскости
-      const angle = Math.atan2(directionToPanel.x, directionToPanel.z) - 
-                    Math.atan2(cameraDirFlat.x, cameraDirFlat.z);
-      
-      // Дополнительный наклон панели в зависимости от вертикального угла обзора
-      const verticalAngle = Math.asin(
-        (panelAnchor.y - camWorldPos.y) / distance
-      );
-      
       const scale = THREE.MathUtils.clamp(0.9 / distance, 0.35, 1.15);
-      
-      // Применяем трансформацию с поворотом и перспективным наклоном
-      // anchorPanel.style.transform =
-      //   `translate(${screenX}px, ${screenY}px) translate(-50%, -100%) ` +
-      //   `scale(${scale}) ` +
-      //   `rotateY(${-angle}rad) ` +
-      //   `rotateX(${-verticalAngle * 0.5}rad)`;
+
+      // Убраны rotateY и rotateX, чтобы панель сохраняла свой исходный поворот
+      anchorPanel.style.transform =
+              `translate(${screenX}px, ${screenY}px) translate(-50%, -100%) ` +
+              `scale(${scale})`;
+
       anchorPanel.classList.add('visible');
     }
   }
-  
+
   // Дополнительные панели
   for (const [id, data] of anchoredPanels) {
     if (!data.visible) continue;
-    
+
     const anchorPos = data.anchorPosition;
     const dist = camWorldPos.distanceTo(anchorPos);
     projected.copy(anchorPos).project(camera);
-    
+
     if (projected.z > 1 || dist > 8) {
       data.element.classList.remove('visible');
       continue;
     }
-    
+
     const w = window.innerWidth;
     const h = window.innerHeight;
     const screenX = (projected.x * 0.5 + 0.5) * w;
     const screenY = (1 - (projected.y * 0.5 + 0.5)) * h;
-    
+
     const margin = 40;
     if (screenX < -margin || screenX > w + margin || screenY < -margin || screenY > h + margin) {
       data.element.classList.remove('visible');
     } else {
-      // Вычисляем угол поворота для дополнительной панели
-      directionToPanel.copy(anchorPos).sub(camWorldPos);
-      directionToPanel.y = 0;
-      directionToPanel.normalize();
-      
-      const cameraDirFlat = cameraForward.clone();
-      cameraDirFlat.y = 0;
-      cameraDirFlat.normalize();
-      
-      const angle = Math.atan2(directionToPanel.x, directionToPanel.z) - 
-                    Math.atan2(cameraDirFlat.x, cameraDirFlat.z);
-      
-      const verticalAngle = Math.asin(
-        (anchorPos.y - camWorldPos.y) / dist
-      );
-      
       const scale = THREE.MathUtils.clamp(0.9 / dist, 0.35, 1.15);
-      
+
+      // Убраны rotateY и rotateX для сохранения исходного поворота
       data.element.style.transform =
-        `translate(${screenX}px, ${screenY}px) translate(-50%, -100%) ` +
-        `scale(${scale}) ` +
-        `rotateY(${-angle}rad) ` +
-        `rotateX(${-verticalAngle * 0.5}rad)`;
+              `translate(${screenX}px, ${screenY}px) translate(-50%, -100%) ` +
+              `scale(${scale})`;
+
       data.element.classList.add('visible');
     }
   }
