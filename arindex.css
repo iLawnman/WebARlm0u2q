@@ -45,7 +45,6 @@ html, body {
 
 #unsupported h2 { color: #f8fafc; margin-bottom: 12px; }
 
-/* ---------- Кнопка Start AR ---------- */
 #ar-button-container {
   position: fixed;
   bottom: 40px;
@@ -88,7 +87,6 @@ html, body {
   background: #475569;
 }
 
-/* Скрываем кнопку после запуска AR */
 body.ar-active #ar-button-container {
   display: none;
 }
