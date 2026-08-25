@@ -343,25 +343,40 @@ function animate(timestamp, frame) {
     const session = renderer.xr.getSession();
     const referenceSpace = renderer.xr.getReferenceSpace();
 
+    // Запрашиваем hit-test source только один раз
     if (!hitTestSourceRequested && session) {
-      session.requestReferenceSpace('viewer').then((viewerSpace) => {
-        session.requestHitTestSource({ space: viewerSpace }).then((source) => {
-          hitTestSource = source;
-          console.log('✅ Hit-test source получен');
-        });
-      });
       hitTestSourceRequested = true;
+
+      session.requestReferenceSpace('viewer').then((viewerSpace) => {
+        return session.requestHitTestSource({ space: viewerSpace });
+      }).then((source) => {
+        hitTestSource = source;
+        console.log('✅ Hit-test source получен:', hitTestSource);
+      }).catch((err) => {
+        console.error('❌ Ошибка создания hit-test source:', err);
+        hitTestSourceRequested = false;
+      });
     }
 
+    // Проверяем что hitTestSource существует перед использованием
     if (hitTestSource) {
-      const hitTestResults = frame.getHitTestResults(hitTestSource);
-      if (hitTestResults.length > 0 && !placed) {
-        const hit = hitTestResults[0];
-        const pose = hit.getPose(referenceSpace);
-        reticle.visible = true;
-        reticle.matrix.fromArray(pose.transform.matrix);
-      } else if (!placed) {
-        reticle.visible = false;
+      try {
+        // Правильный метод для получения результатов
+        const hitTestResults = frame.getHitTestResults(hitTestSource);
+
+        if (hitTestResults && hitTestResults.length > 0 && !placed) {
+          const hit = hitTestResults[0];
+          const pose = hit.getPose(referenceSpace);
+
+          if (pose) {
+            reticle.visible = true;
+            reticle.matrix.fromArray(pose.transform.matrix);
+          }
+        } else if (!placed) {
+          reticle.visible = false;
+        }
+      } catch (err) {
+        console.error('❌ Ошибка getHitTestResults:', err);
       }
     }
   }
