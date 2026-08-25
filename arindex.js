@@ -44,20 +44,32 @@ async function init() {
     return;
   }
 
-  // Загрузка шрифта
+  // Загрузка шрифта с проверкой
   const loader = new FontLoader();
   try {
     font = await new Promise((resolve, reject) => {
       loader.load(
         'https://unpkg.com/three-mesh-ui@6.5.4/examples/assets/Roboto-msdf.json',
-        resolve,
+        (loadedFont) => {
+          console.log('Шрифт загружен, тип:', typeof loadedFont);
+          console.log('Шрифт:', loadedFont);
+          if (!loadedFont) {
+            reject(new Error('Font is null or undefined'));
+          } else {
+            resolve(loadedFont);
+          }
+        },
         undefined,
-        reject
+        (err) => {
+          console.error('Ошибка загрузки шрифта:', err);
+          reject(err);
+        }
       );
     });
-    console.log('✅ Шрифт загружен');
+    console.log('✅ Шрифт загружен успешно');
   } catch (err) {
     console.error('❌ Ошибка загрузки шрифта:', err);
+    alert('Не удалось загрузить шрифт: ' + err.message);
     return;
   }
 
@@ -112,8 +124,13 @@ async function init() {
   edges.visible = false;
   scene.add(edges);
 
-  // UI панели
-  createUIPanels();
+  // UI панели - с try-catch
+  try {
+    createUIPanels();
+  } catch (err) {
+    console.error('❌ Ошибка создания UI панелей:', err);
+    console.error('Stack:', err.stack);
+  }
 
   // События сессии
   renderer.xr.addEventListener('sessionstart', () => {
@@ -180,105 +197,120 @@ async function startARSession() {
 
 function createUIPanels() {
   console.log('🎨 Создание UI панелей...');
+  console.log('font:', font);
+  console.log('font type:', typeof font);
 
-  // === ПАНЕЛЬ 1: Основная ===
-  mainPanel = new ThreeMeshUI.Block({
-    fontFamily: font,
-    fontSize: 0.05,
-    width: 0.5,
-    height: 0.35,
-    backgroundColor: new THREE.Color(0x0b1120),
-    backgroundOpacity: 0.9,
-    borderRadius: 0.02,
-    padding: 0.02,
-    justifyContent: 'center',
-    alignItems: 'center'
-  });
-  mainPanel.visible = false;
-  scene.add(mainPanel);
+  // Проверяем что шрифт валиден
+  if (!font) {
+    throw new Error('Font is not loaded');
+  }
 
-  const title = new ThreeMeshUI.Inline({
-    content: 'Main Panel',
-    fontColor: new THREE.Color(0xe2e8f0),
-    fontSize: 0.06,
-    textAlign: 'center'
-  });
-  mainPanel.add(title);
+  try {
+    // === ПАНЕЛЬ 1: Основная ===
+    mainPanel = new ThreeMeshUI.Block({
+      fontFamily: font,
+      fontSize: 0.05,
+      width: 0.5,
+      height: 0.35,
+      backgroundColor: new THREE.Color(0x0b1120),
+      backgroundOpacity: 0.9,
+      borderRadius: 0.02,
+      padding: 0.02,
+      justifyContent: 'center',
+      alignItems: 'center'
+    });
+    mainPanel.visible = false;
+    scene.add(mainPanel);
+    console.log('✅ Основная панель создана');
 
-  // Кнопка
-  testButton = new ThreeMeshUI.Block({
-    width: 0.4,
-    height: 0.08,
-    backgroundColor: new THREE.Color(0x6366f1),
-    borderRadius: 0.01,
-    marginTop: 0.03,
-    justifyContent: 'center',
-    alignItems: 'center',
-    cursor: 'pointer'
-  });
+    const title = new ThreeMeshUI.Inline({
+      content: 'Main Panel',
+      fontColor: new THREE.Color(0xe2e8f0),
+      fontSize: 0.06,
+      textAlign: 'center'
+    });
+    mainPanel.add(title);
 
-  const btnText = new ThreeMeshUI.Inline({
-    content: 'Test Click',
-    fontColor: new THREE.Color(0xffffff),
-    fontSize: 0.045
-  });
-  testButton.add(btnText);
+    // Кнопка
+    testButton = new ThreeMeshUI.Block({
+      width: 0.4,
+      height: 0.08,
+      backgroundColor: new THREE.Color(0x6366f1),
+      borderRadius: 0.01,
+      marginTop: 0.03,
+      justifyContent: 'center',
+      alignItems: 'center',
+      cursor: 'pointer'
+    });
 
-  testButton.onClick = () => {
-    console.log('✅ Клик по UI кнопке!');
-    testButton.backgroundColor = new THREE.Color(0x4f46e5);
-    setTimeout(() => {
-      testButton.backgroundColor = new THREE.Color(0x6366f1);
-    }, 150);
-  };
+    const btnText = new ThreeMeshUI.Inline({
+      content: 'Test Click',
+      fontColor: new THREE.Color(0xffffff),
+      fontSize: 0.045
+    });
+    testButton.add(btnText);
 
-  testButton.onHover = (isHovered) => {
-    if (isHovered) {
-      testButton.backgroundColor = new THREE.Color(0x5558e8);
-    } else {
-      testButton.backgroundColor = new THREE.Color(0x6366f1);
-    }
-  };
+    testButton.onClick = () => {
+      console.log('✅ Клик по UI кнопке!');
+      testButton.backgroundColor = new THREE.Color(0x4f46e5);
+      setTimeout(() => {
+        testButton.backgroundColor = new THREE.Color(0x6366f1);
+      }, 150);
+    };
 
-  mainPanel.add(testButton);
+    testButton.onHover = (isHovered) => {
+      if (isHovered) {
+        testButton.backgroundColor = new THREE.Color(0x5558e8);
+      } else {
+        testButton.backgroundColor = new THREE.Color(0x6366f1);
+      }
+    };
 
-  // === ПАНЕЛЬ 2: Фиксированная ===
-  fixedPanel = new ThreeMeshUI.Block({
-    fontFamily: font,
-    fontSize: 0.05,
-    width: 0.35,
-    height: 0.22,
-    backgroundColor: new THREE.Color(0x0f172a),
-    backgroundOpacity: 0.9,
-    borderColor: new THREE.Color(0x06b6d4),
-    borderWidth: 0.004,
-    borderRadius: 0.02,
-    padding: 0.02,
-    justifyContent: 'center',
-    alignItems: 'center'
-  });
-  fixedPanel.visible = false;
+    mainPanel.add(testButton);
+    console.log('✅ Кнопка создана');
 
-  const fixedTitle = new ThreeMeshUI.Inline({
-    content: 'Fixed Panel',
-    fontColor: new THREE.Color(0x67e8f9),
-    fontSize: 0.055,
-    textAlign: 'center'
-  });
-  fixedPanel.add(fixedTitle);
+    // === ПАНЕЛЬ 2: Фиксированная ===
+    fixedPanel = new ThreeMeshUI.Block({
+      fontFamily: font,
+      fontSize: 0.05,
+      width: 0.35,
+      height: 0.22,
+      backgroundColor: new THREE.Color(0x0f172a),
+      backgroundOpacity: 0.9,
+      borderColor: new THREE.Color(0x06b6d4),
+      borderWidth: 0.004,
+      borderRadius: 0.02,
+      padding: 0.02,
+      justifyContent: 'center',
+      alignItems: 'center'
+    });
+    fixedPanel.visible = false;
 
-  const fixedText = new ThreeMeshUI.Inline({
-    content: 'Rotation locked',
-    fontColor: new THREE.Color(0x94a3b8),
-    fontSize: 0.035,
-    textAlign: 'center',
-    marginTop: 0.02
-  });
-  fixedPanel.add(fixedText);
+    const fixedTitle = new ThreeMeshUI.Inline({
+      content: 'Fixed Panel',
+      fontColor: new THREE.Color(0x67e8f9),
+      fontSize: 0.055,
+      textAlign: 'center'
+    });
+    fixedPanel.add(fixedTitle);
 
-  scene.add(fixedPanel);
+    const fixedText = new ThreeMeshUI.Inline({
+      content: 'Rotation locked',
+      fontColor: new THREE.Color(0x94a3b8),
+      fontSize: 0.035,
+      textAlign: 'center',
+      marginTop: 0.02
+    });
+    fixedPanel.add(fixedText);
 
-  console.log('✅ Панели созданы');
+    scene.add(fixedPanel);
+    console.log('✅ Фиксированная панель создана');
+
+  } catch (err) {
+    console.error('❌ Ошибка при создании панелей:', err);
+    console.error('Stack:', err.stack);
+    throw err;
+  }
 }
 
 function onSelect() {
