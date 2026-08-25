@@ -1,8 +1,6 @@
-// overlaylog.js
 (function() {
   'use strict';
 
-  // Создаём контейнер для лога
   const logContainer = document.createElement('div');
   logContainer.id = 'overlay-log-container';
   logContainer.innerHTML = `
@@ -16,7 +14,6 @@
     <div id="overlay-log-content"></div>
   `;
 
-  // Добавляем стили
   const styles = `
     <style>
       #overlay-log-container {
@@ -36,9 +33,7 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
-        transition: all 0.3s ease;
       }
-
       #overlay-log-header {
         display: flex;
         justify-content: space-between;
@@ -49,18 +44,8 @@
         cursor: move;
         user-select: none;
       }
-
-      #overlay-log-title {
-        color: #e2e8f0;
-        font-weight: 600;
-        font-size: 12px;
-      }
-
-      #overlay-log-controls {
-        display: flex;
-        gap: 6px;
-      }
-
+      #overlay-log-title { color: #e2e8f0; font-weight: 600; font-size: 12px; }
+      #overlay-log-controls { display: flex; gap: 6px; }
       #overlay-log-controls button {
         background: rgba(99, 102, 241, 0.2);
         border: 1px solid rgba(129, 140, 248, 0.3);
@@ -69,13 +54,8 @@
         border-radius: 6px;
         cursor: pointer;
         font-size: 14px;
-        transition: all 0.2s;
       }
-
-      #overlay-log-controls button:hover {
-        background: rgba(99, 102, 241, 0.4);
-      }
-
+      #overlay-log-controls button:hover { background: rgba(99, 102, 241, 0.4); }
       #overlay-log-content {
         flex: 1;
         overflow-y: auto;
@@ -83,13 +63,11 @@
         max-height: calc(70vh - 40px);
         transition: max-height 0.3s ease;
       }
-
       #overlay-log-content.collapsed {
         max-height: 0;
         padding: 0 8px;
         overflow: hidden;
       }
-
       .log-entry {
         padding: 4px 6px;
         margin-bottom: 4px;
@@ -97,110 +75,67 @@
         word-wrap: break-word;
         line-height: 1.4;
       }
-
-      .log-entry.log {
-        color: #e2e8f0;
-        background: rgba(30, 41, 59, 0.5);
-      }
-
+      .log-entry.log { color: #e2e8f0; background: rgba(30, 41, 59, 0.5); }
       .log-entry.warn {
         color: #fbbf24;
         background: rgba(251, 191, 36, 0.1);
         border-left: 3px solid #fbbf24;
       }
-
       .log-entry.error {
         color: #f87171;
         background: rgba(248, 113, 113, 0.1);
         border-left: 3px solid #f87171;
       }
-
       .log-entry .timestamp {
         color: #64748b;
         font-size: 9px;
         margin-right: 6px;
       }
-
-      #overlay-log-content::-webkit-scrollbar {
-        width: 6px;
-      }
-
-      #overlay-log-content::-webkit-scrollbar-track {
-        background: rgba(30, 41, 59, 0.3);
-      }
-
+      #overlay-log-content::-webkit-scrollbar { width: 6px; }
+      #overlay-log-content::-webkit-scrollbar-track { background: rgba(30, 41, 59, 0.3); }
       #overlay-log-content::-webkit-scrollbar-thumb {
         background: rgba(99, 102, 241, 0.5);
         border-radius: 3px;
       }
-
-      #overlay-log-content::-webkit-scrollbar-thumb:hover {
-        background: rgba(99, 102, 241, 0.7);
-      }
     </style>
   `;
 
-  // Вставляем стили в head
   document.head.insertAdjacentHTML('beforeend', styles);
-
-  // Добавляем контейнер в body
   document.body.appendChild(logContainer);
 
-  // Элементы
   const logContent = document.getElementById('overlay-log-content');
   const toggleBtn = document.getElementById('overlay-log-toggle');
   const clearBtn = document.getElementById('overlay-log-clear');
   const header = document.getElementById('overlay-log-header');
 
-  // Состояние
   let isCollapsed = false;
-  let maxEntries = 100; // Максимум записей
+  const maxEntries = 100;
 
-  // Функция добавления записи
   function addLogEntry(type, args) {
-    const timestamp = new Date().toLocaleTimeString('ru-RU', { 
-      hour12: false, 
-      hour: '2-digit', 
-      minute: '2-digit', 
-      second: '2-digit' 
-    });
-
+    const timestamp = new Date().toLocaleTimeString('ru-RU', { hour12: false });
     const entry = document.createElement('div');
     entry.className = `log-entry ${type}`;
-    
-    // Форматируем сообщение
+
     const message = args.map(arg => {
       if (typeof arg === 'object') {
-        try {
-          return JSON.stringify(arg, null, 2);
-        } catch (e) {
-          return String(arg);
-        }
+        try { return JSON.stringify(arg, null, 2); }
+        catch (e) { return String(arg); }
       }
       return String(arg);
     }).join(' ');
 
-    entry.innerHTML = `<span class="timestamp">[${timestamp}]</span>${escapeHtml(message)}`;
-    
+    const div = document.createElement('div');
+    div.textContent = message;
+    entry.innerHTML = `<span class="timestamp">[${timestamp}]</span>${div.innerHTML}`;
+
     logContent.appendChild(entry);
 
-    // Ограничиваем количество записей
     while (logContent.children.length > maxEntries) {
       logContent.removeChild(logContent.firstChild);
     }
-
-    // Автоматический скролл вниз
     logContent.scrollTop = logContent.scrollHeight;
   }
 
-  // Экранирование HTML
-  function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
-
-  // Переопределяем console методы
   const originalLog = console.log;
   const originalWarn = console.warn;
   const originalError = console.error;
@@ -209,89 +144,68 @@
     originalLog.apply(console, args);
     addLogEntry('log', args);
   };
-
   console.warn = function(...args) {
     originalWarn.apply(console, args);
     addLogEntry('warn', args);
   };
-
   console.error = function(...args) {
     originalError.apply(console, args);
     addLogEntry('error', args);
   };
 
-  // Перехватываем необработанные ошибки
   window.addEventListener('error', (event) => {
     addLogEntry('error', [`Uncaught: ${event.message} at ${event.filename}:${event.lineno}`]);
   });
-
   window.addEventListener('unhandledrejection', (event) => {
-    addLogEntry('error', [`Unhandled Promise Rejection: ${event.reason}`]);
+    addLogEntry('error', [`Unhandled Promise: ${event.reason}`]);
   });
 
-  // Кнопка сворачивания
   toggleBtn.addEventListener('click', () => {
     isCollapsed = !isCollapsed;
     logContent.classList.toggle('collapsed', isCollapsed);
     toggleBtn.textContent = isCollapsed ? '▶' : '▼';
   });
 
-  // Кнопка очистки
   clearBtn.addEventListener('click', () => {
     logContent.innerHTML = '';
   });
 
-  // Перетаскивание окна
+  // Перетаскивание
   let isDragging = false;
-  let currentX;
-  let currentY;
-  let initialX;
-  let initialY;
+  let offsetX = 0, offsetY = 0;
 
   header.addEventListener('mousedown', dragStart);
   header.addEventListener('touchstart', dragStart, { passive: false });
-
   document.addEventListener('mousemove', drag);
   document.addEventListener('touchmove', drag, { passive: false });
-
   document.addEventListener('mouseup', dragEnd);
   document.addEventListener('touchend', dragEnd);
 
   function dragStart(e) {
     if (e.target.tagName === 'BUTTON') return;
-    
-    if (e.type === 'touchstart') {
-      initialX = e.touches[0].clientX - currentX;
-      initialY = e.touches[0].clientY - currentY;
-    } else {
-      initialX = e.clientX - currentX;
-      initialY = e.clientY - currentY;
-    }
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const rect = logContainer.getBoundingClientRect();
+    offsetX = clientX - rect.left;
+    offsetY = clientY - rect.top;
     isDragging = true;
+    logContainer.style.transform = 'none';
+    logContainer.style.left = rect.left + 'px';
+    logContainer.style.top = rect.top + 'px';
   }
 
   function drag(e) {
     if (!isDragging) return;
     e.preventDefault();
-
-    if (e.type === 'touchmove') {
-      currentX = e.touches[0].clientX - initialX;
-      currentY = e.touches[0].clientY - initialY;
-    } else {
-      currentX = e.clientX - initialX;
-      currentY = e.clientY - initialY;
-    }
-
-    logContainer.style.transform = `translate(${currentX}px, ${currentY}px)`;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    logContainer.style.left = (clientX - offsetX) + 'px';
+    logContainer.style.top = (clientY - offsetY) + 'px';
   }
 
   function dragEnd() {
     isDragging = false;
   }
-
-  // Начальная позиция
-  currentX = 0;
-  currentY = 0;
 
   console.log('✅ Overlay Log инициализирован');
 })();

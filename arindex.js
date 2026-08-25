@@ -1,9 +1,7 @@
-// arindex.js
 import * as THREE from 'three';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { UIPanel, UIButton, UIText } from 'three-mesh-ui';
 
-// --- Глобальные переменные ---
 let scene, camera, renderer;
 let cube, edges, reticle;
 let mainPanel, fixedPanel;
@@ -12,23 +10,22 @@ let hitTestSource = null;
 let hitTestSourceRequested = false;
 let font = null;
 
-// Raycaster для обработки кликов по UI в WebXR
 const raycaster = new THREE.Raycaster();
 const tempMatrix = new THREE.Matrix4();
 
 init();
 
 async function init() {
+  console.log('🚀 Инициализация...');
+
   const webglContainer = document.getElementById('webgl-container');
   const hint = document.getElementById('hint');
   const unsupportedEl = document.getElementById('unsupported');
   const startBtn = document.getElementById('start-ar-btn');
 
-  console.log('🚀 Инициализация приложения...');
-
-  // 1. Проверка WebXR
+  // Проверка WebXR
   if (!('xr' in navigator)) {
-    console.error('❌ WebXR не поддерживается браузером');
+    console.error('❌ WebXR не поддерживается');
     unsupportedEl.style.display = 'flex';
     startBtn.disabled = true;
     startBtn.textContent = 'WebXR не поддерживается';
@@ -38,7 +35,7 @@ async function init() {
   let supported = false;
   try {
     supported = await navigator.xr.isSessionSupported('immersive-ar');
-    console.log('✅ immersive-ar поддерживается:', supported);
+    console.log('✅ immersive-ar:', supported);
   } catch (e) {
     console.error('❌ Ошибка проверки XR:', e);
   }
@@ -50,34 +47,28 @@ async function init() {
     return;
   }
 
-  // 2. Загрузка MSDF-шрифта для three-mesh-ui (ПРАВИЛЬНЫЙ ШРИФТ!)
+  // Загрузка MSDF-шрифта
   const loader = new FontLoader();
   try {
     font = await new Promise((resolve, reject) => {
       loader.load(
         'https://unpkg.com/three-mesh-ui@6.5.4/examples/assets/Roboto-msdf.json',
-        (fontData) => {
-          console.log('✅ Шрифт загружен успешно');
-          resolve(fontData);
-        },
+        resolve,
         undefined,
-        (err) => {
-          console.error('❌ Ошибка загрузки шрифта:', err);
-          reject(err);
-        }
+        reject
       );
     });
+    console.log('✅ Шрифт загружен');
   } catch (err) {
-    console.error('❌ Не удалось загрузить шрифт:', err);
-    alert('Не удалось загрузить шрифт. Проверьте подключение к интернету.');
+    console.error('❌ Ошибка загрузки шрифта:', err);
     return;
   }
 
-  // 3. Сцена и Камера
+  // Сцена
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
-  // 4. WebGL Renderer
+  // Renderer
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -85,16 +76,16 @@ async function init() {
   webglContainer.appendChild(renderer.domElement);
   console.log('✅ Renderer создан');
 
-  // 5. Кнопка Start AR
+  // Кнопка
   startBtn.addEventListener('click', startARSession);
 
-  // 6. Свет
+  // Свет
   scene.add(new THREE.HemisphereLight(0xffffff, 0x333344, 1.2));
   const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
   dirLight.position.set(2, 4, 2);
   scene.add(dirLight);
 
-  // 7. Ретикул (маркер на полу)
+  // Ретикул
   const reticleGeometry = new THREE.RingGeometry(0.08, 0.1, 32).rotateX(-Math.PI / 2);
   const reticleMaterial = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
   reticle = new THREE.Mesh(reticleGeometry, reticleMaterial);
@@ -102,7 +93,7 @@ async function init() {
   reticle.visible = false;
   scene.add(reticle);
 
-  // 8. Куб
+  // Куб
   const cubeSize = 0.18;
   cube = new THREE.Mesh(
     new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize),
@@ -124,10 +115,10 @@ async function init() {
   edges.visible = false;
   scene.add(edges);
 
-  // 9. Создание UI Панелей
+  // UI панели
   createUIPanels();
 
-  // 10. Обработчики событий сессии
+  // События сессии
   renderer.xr.addEventListener('sessionstart', () => {
     console.log('✅ AR сессия запущена');
     document.body.classList.add('ar-active');
@@ -139,7 +130,6 @@ async function init() {
     if (fixedPanel) fixedPanel.visible = false;
     hitTestSourceRequested = false;
     hitTestSource = null;
-    hint.style.display = 'block';
   });
 
   renderer.xr.addEventListener('sessionend', () => {
@@ -151,24 +141,22 @@ async function init() {
     startBtn.textContent = '▶ START AR';
   });
 
-  // 11. Размещение по тапу
+  // Контроллер для тапов
   const controller = renderer.xr.getController(0);
   controller.addEventListener('select', onSelect);
   scene.add(controller);
 
-  // 12. Ресайз
+  // Ресайз
   window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 
-  // 13. Запуск цикла анимации
   renderer.setAnimationLoop(animate);
   console.log('✅ Инициализация завершена');
 }
 
-// --- Запуск AR сессии ---
 async function startARSession() {
   const startBtn = document.getElementById('start-ar-btn');
   startBtn.disabled = true;
@@ -182,22 +170,21 @@ async function startARSession() {
       domOverlay: { root: document.body }
     });
 
-    console.log('✅ Сессия получена, настраиваем renderer...');
+    console.log('✅ Сессия получена');
     await renderer.xr.setSession(session);
-    console.log('✅ AR сессия установлена в renderer');
+    console.log('✅ Сессия установлена в renderer');
   } catch (err) {
-    console.error('❌ Не удалось запустить AR:', err);
+    console.error('❌ Ошибка запуска AR:', err);
     startBtn.disabled = false;
     startBtn.textContent = '▶ START AR';
     alert('Не удалось запустить AR: ' + err.message);
   }
 }
 
-// --- Создание UI Панелей ---
 function createUIPanels() {
   console.log('🎨 Создание UI панелей...');
 
-  // --- ПАНЕЛЬ 1: Основная (поворачивается к камере) ---
+  // Панель 1 (billboard)
   mainPanel = new UIPanel({
     width: 0.5,
     height: 0.35,
@@ -214,7 +201,6 @@ function createUIPanels() {
   mainPanel.visible = false;
   scene.add(mainPanel);
 
-  // Кнопка внутри основной панели
   const testBtn = new UIButton({
     width: 0.4,
     height: 0.08,
@@ -226,15 +212,12 @@ function createUIPanels() {
     fontColor: new THREE.Color(0xffffff)
   });
   testBtn.add(new UIText({ content: 'Test click' }));
-
   testBtn.addEventListener('click', () => {
-    console.log('✅ Клик по three-mesh-ui кнопке сработал!');
+    console.log('✅ Клик по UI кнопке!');
   });
-
   mainPanel.add(testBtn);
-  console.log('✅ Основная панель создана');
 
-  // --- ПАНЕЛЬ 2: Фиксированная (НЕ поворачивается к камере) ---
+  // Панель 2 (фиксированная)
   fixedPanel = new UIPanel({
     width: 0.35,
     height: 0.22,
@@ -252,23 +235,19 @@ function createUIPanels() {
     textAlign: 'center'
   });
   fixedPanel.visible = false;
-
-  fixedPanel.add(new UIText({
-    content: 'Fixed panel'
-  }));
+  fixedPanel.add(new UIText({ content: 'Fixed panel' }));
   fixedPanel.add(new UIText({
     content: 'Rotation is locked',
     fontSize: 0.015,
     fontColor: new THREE.Color(0x94a3b8)
   }));
-
   scene.add(fixedPanel);
-  console.log('✅ Фиксированная панель создана');
+
+  console.log('✅ Панели созданы');
 }
 
-// --- Размещение объектов по тапу ---
 function onSelect() {
-  console.log('👆 Tap detected, reticle visible:', reticle.visible);
+  console.log('👆 Tap, reticle visible:', reticle.visible);
   if (!reticle.visible) return;
 
   cube.position.setFromMatrixPosition(reticle.matrix);
@@ -276,26 +255,22 @@ function onSelect() {
   edges.position.copy(cube.position);
   cube.visible = true;
   edges.visible = true;
-  console.log('✅ Куб размещён');
 
   if (mainPanel) {
     mainPanel.position.set(cube.position.x, cube.position.y + 0.28, cube.position.z);
     mainPanel.visible = true;
-    console.log('✅ Основная панель размещена');
   }
 
   if (fixedPanel) {
     fixedPanel.position.set(cube.position.x + 0.4, cube.position.y + 0.15, cube.position.z);
     fixedPanel.rotation.set(0, 0, 0);
     fixedPanel.visible = true;
-    console.log('✅ Фиксированная панель размещена');
   }
 
   placed = true;
-  document.getElementById('hint').style.display = 'none';
+  console.log('✅ Объекты размещены');
 }
 
-// --- Цикл анимации ---
 function animate(timestamp, frame) {
   if (frame) {
     const session = renderer.xr.getSession();
@@ -307,10 +282,6 @@ function animate(timestamp, frame) {
           hitTestSource = source;
           console.log('✅ Hit-test source получен');
         });
-      });
-      session.addEventListener('end', () => {
-        hitTestSourceRequested = false;
-        hitTestSource = null;
       });
       hitTestSourceRequested = true;
     }
@@ -329,14 +300,8 @@ function animate(timestamp, frame) {
   }
 
   if (placed) {
-    // ПАНЕЛЬ 1: Поворачивается к камере (billboard)
-    if (mainPanel) {
-      mainPanel.lookAt(camera.position);
-    }
+    if (mainPanel) mainPanel.lookAt(camera.position);
 
-    // ПАНЕЛЬ 2: НЕ поворачивается
-
-    // Обновляем raycaster для XR контроллера
     const controller = renderer.xr.getController(0);
     if (controller) {
       controller.updateMatrixWorld();

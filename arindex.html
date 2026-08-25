@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WebXR AR + three-mesh-ui</title>
+  <title>log fix WebXR AR + three-mesh-ui</title>
   <link rel="stylesheet" href="arindex.css">
   
   <script type="importmap">
@@ -13,7 +13,8 @@
       "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
       "three-mesh-ui": "https://unpkg.com/three-mesh-ui@6.5.4/build/three-mesh-ui.module.js"
     }
-  }script>
+  }
+  </script>
 </head>
 <body>
 
@@ -32,9 +33,10 @@
     <button id="start-ar-btn" type="button">▶ START AR</button>
   </div>
 
-  <!-- Подключаем overlay log ПЕРЕД основным скриптом -->
+  <!-- Overlay log подключается первым (обычный скрипт) -->
   <script src="overlaylog.js"></script>
   
+  <!-- Основной модуль -->
   <script type="module" src="arindex.js"></script>
 </body>
 </html>
