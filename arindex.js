@@ -35,20 +35,28 @@ debugBtn.addEventListener('click', () => {
   logToOverlay('Клик по кнопке в WebXR DOM Overlay сработал ✅');
 });
 
-// ---------- Хранилище всех динамических панелей ----------
+// ---------- Хранилище динамических панелей ----------
 const anchoredPanels = new Map();
+const anchoredPanelObjects = new Map(); // Храним соответствующие CSS3DObject
 
 function addAnchoredPanel(panelElement, anchorPosition) {
   const id = `panel-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
   panelElement.classList.add('ar-anchored-panel');
   convertorPanelsContainer.appendChild(panelElement);
   
+  // 1. Создаем CSS3DObject для новой панели
+  const cssObj = new CSS3DObject(panelElement);
+  cssObj.position.copy(anchorPosition);
+  scene.add(cssObj);
+  
   const panelData = {
     element: panelElement,
+    cssObject: cssObj,
     anchorPosition: anchorPosition.clone(),
     visible: true
   };
   anchoredPanels.set(id, panelData);
+  anchoredPanelObjects.set(id, cssObj);
   return id;
 }
 
@@ -56,7 +64,9 @@ function removeAnchoredPanel(id) {
   const data = anchoredPanels.get(id);
   if (data) {
     data.element.remove();
+    scene.remove(data.cssObject);
     anchoredPanels.delete(id);
+    anchoredPanelObjects.delete(id);
   }
 }
 
@@ -87,7 +97,7 @@ panelIframe.addEventListener('load', () => {
   }
 });
 
-// ---------- Basic WebXR support check ----------
+// ---------- WebXR support check ----------
 if (!('xr' in navigator)) {
   unsupportedEl.style.display = 'flex';
 } else {
@@ -130,7 +140,7 @@ const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
 dirLight.position.set(2, 4, 2);
 scene.add(dirLight);
 
-// ---------- Reticle (floor marker) ----------
+// ---------- Reticle ----------
 const reticleGeometry = new THREE.RingGeometry(0.08, 0.1, 32).rotateX(-Math.PI / 2);
 const reticleMaterial = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
 const reticle = new THREE.Mesh(reticleGeometry, reticleMaterial);
@@ -160,12 +170,14 @@ const edges = new THREE.LineSegments(
 edges.visible = false;
 scene.add(edges);
 
-// ---------- CSS3D Objects для панелей ----------
-const anchorPanelObject = new CSS3DObject(anchorPanel);
-const secondPanelObject = new CSS3DObject(secondPanel);
+// ---------- CSS3D Objects для основных панелей ----------
+// 1. Создаем CSS3DObject из существующих HTML-элементов
+const anchorPanelObj = new CSS3DObject(anchorPanel);
+const secondPanelObj = new CSS3DObject(secondPanel);
 
-scene.add(anchorPanelObject);
-scene.add(secondPanelObject);
+// Добавляем их в сцену (позиции будут заданы при размещении)
+scene.add(anchorPanelObj);
+scene.add(secondPanelObj);
 
 const panelAnchor = new THREE.Vector3();
 const secondPanelAnchor = new THREE.Vector3();
@@ -189,8 +201,10 @@ renderer.xr.addEventListener('sessionstart', () => {
   
   for (const [id, data] of anchoredPanels) {
     data.element.remove();
+    scene.remove(data.cssObject);
   }
   anchoredPanels.clear();
+  anchoredPanelObjects.clear();
 });
 
 renderer.xr.addEventListener('sessionend', () => {
@@ -198,7 +212,7 @@ renderer.xr.addEventListener('sessionend', () => {
   hitTestSourceRequested = false;
 });
 
-// ---------- Обработчик для кнопки конвертора ----------
+// ---------- Конвертор ----------
 convertorTriggerBtn.addEventListener('click', async () => {
   if (!placed) {
     console.warn('Сначала разместите куб на полу');
@@ -257,7 +271,7 @@ convertorTriggerBtn.addEventListener('click', async () => {
   }
 });
 
-// ---------- Tap on screen -> place cube ----------
+// ---------- Tap to place ----------
 function onSelect() {
   if (!reticle.visible) return;
 
@@ -267,13 +281,22 @@ function onSelect() {
   cube.visible = true;
   edges.visible = true;
 
-  // Позиция основной панели
+  // --- ПАНЕЛЬ 1: Основная ---
   panelAnchor.set(cube.position.x, cube.position.y + PANEL_HEIGHT_OFFSET, cube.position.z);
-  anchorPanelObject.position.copy(panelAnchor);
+  anchorPanelObj.position.copy(panelAnchor);
+  // Если нужно, чтобы первая панель смотрела на камеру, раскомментируйте строку ниже:
+  // anchorPanelObj.lookAt(camera.position); 
 
-  // Позиция второй панели (со смещением вправо и чуть ниже основной)
+  // --- ПАНЕЛЬ 2: Фиксированная ---
   secondPanelAnchor.set(cube.position.x + 0.4, cube.position.y + 0.15, cube.position.z);
-  secondPanelObject.position.copy(secondPanelAnchor);
+  secondPanelObj.position.copy(secondPanelAnchor);
+  
+  // ЖЕСТКАЯ ФИКСАЦИЯ ПОВОРОТА ВТОРОЙ ПАНЕЛИ
+  // Мы НЕ вызываем lookAt(). Мы явно задаем rotation (или оставляем 0, 0, 0).
+  // Например, небольшой наклон, чтобы было видно, что он не меняется:
+  secondPanelObj.rotation.x = 0;
+  secondPanelObj.rotation.y = 0; 
+  secondPanelObj.rotation.z = 0;
 
   placed = true;
   placeHint.style.display = 'none';
@@ -292,8 +315,6 @@ window.addEventListener('resize', () => {
 });
 
 // ---------- Animation loop ----------
-const clock = new THREE.Clock();
-
 renderer.setAnimationLoop((timestamp, frame) => {
   if (frame) {
     const session = renderer.xr.getSession();
@@ -322,8 +343,6 @@ renderer.setAnimationLoop((timestamp, frame) => {
         const pose = hit.getPose(referenceSpace);
         reticle.visible = true;
         reticle.matrix.fromArray(pose.transform.matrix);
-      } else if (!placed) {
-        reticle.visible = false;
       } else {
         reticle.visible = false;
       }
@@ -333,23 +352,25 @@ renderer.setAnimationLoop((timestamp, frame) => {
   }
 
   if (placed) {
-    // 1. Первая панель: поворачивается к камере (billboard)
-    anchorPanelObject.lookAt(camera.position);
-    
-    // 2. Вторая панель: НЕ вызывает lookAt, поэтому сохраняет свой изначальный поворот в мировом пространстве!
-    
-    // 3. Управление видимостью по дистанции
+    // Управление видимостью на основе дистанции (CSS3DRenderer сам обработает масштаб и перспективу)
     const dist1 = camera.position.distanceTo(panelAnchor);
-    anchorPanelObject.visible = (dist1 < 8);
+    anchorPanelObj.visible = (dist1 < 8);
     if (dist1 < 8) anchorPanel.classList.add('visible');
     else anchorPanel.classList.remove('visible');
 
     const dist2 = camera.position.distanceTo(secondPanelAnchor);
-    secondPanelObject.visible = (dist2 < 8);
+    secondPanelObj.visible = (dist2 < 8);
     if (dist2 < 8) secondPanel.classList.add('visible');
     else secondPanel.classList.remove('visible');
 
-    // 4. Рендерим CSS3D сцену
+    for (const [id, data] of anchoredPanels) {
+      const dist = camera.position.distanceTo(data.anchorPosition);
+      data.cssObject.visible = (dist < 8);
+      if (dist < 8) data.element.classList.add('visible');
+      else data.element.classList.remove('visible');
+    }
+
+    // Рендерим CSS3D сцену (это автоматически применит правильные transform ко всем CSS3DObject)
     cssRenderer.render(scene, camera);
   }
 

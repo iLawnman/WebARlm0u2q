@@ -3,12 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>css3d modules WebXR AR — Куб на полу + DOM Overlay панель</title>
-  
-  <!-- Подключение стилей -->
+  <title>2.2panel WebXR AR — Куб на полу + DOM Overlay панель</title>
   <link rel="stylesheet" href="arindex.css">
-  
-  <!-- Import map для модулей Three.js -->
   <script type="importmap">
   {
     "imports": {
@@ -31,16 +27,14 @@
     </div>
   </div>
 
-  <!-- Кнопка запуска AR -->
   <div id="ar-button-container"></div>
 
-  <!-- WebXR DOM Overlay root -->
   <div id="ar-overlay">
     <div id="place-hint">Коснитесь пола, чтобы поставить куб и панель</div>
-    
-    <!-- Контейнер для CSS3DRenderer -->
+
+    <!-- Контейнер, куда CSS3DRenderer будет выводить свои элементы -->
     <div id="css-container">
-      <!-- Основная панель (будет поворачиваться к камере) -->
+      <!-- Основная панель -->
       <div id="anchor-panel" class="ar-anchored-panel">
         <div class="panel-frame">
           <iframe src="about.html" scrolling="yes"></iframe>
@@ -51,7 +45,7 @@
         </div>
       </div>
 
-      <!-- Вторая панель (НЕ будет поворачиваться к камере, сохраняет стартовый поворот) -->
+      <!-- Вторая панель (её поворот зафиксирован в JS) -->
       <div id="second-panel" class="ar-anchored-panel">
         <div class="panel-frame">
           📌 Вторая панель
@@ -60,14 +54,11 @@
       </div>
     </div>
 
-    <!-- Контейнер для динамических панелей конвертора -->
     <div id="convertor-panels-container"></div>
 
-    <!-- Кнопка-триггер конвертора -->
     <button id="convertor-trigger-btn" type="button" class="convertor-trigger">📦 Проверить assets</button>
   </div>
 
-  <!-- Подключение основного скрипта как модуля -->
   <script type="module" src="arindex.js"></script>
 </body>
 </html>
