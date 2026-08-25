@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>add light WebXR AR — Куб на полу + DOM Overlay панель</title>
+  <title>new panel WebXR AR — Куб на полу + DOM Overlay панель</title>
   <style>
     html, body {
       margin: 0;
@@ -276,28 +276,6 @@
 <!-- Кнопка запуска AR -->
 <div id="ar-button-container"></div>
 
-<!-- WebXR DOM Overlay root -->
-<div id="ar-overlay">
-  <div id="place-hint">Коснитесь пола, чтобы поставить куб и панель</div>
-
-  <!-- Основная панель -->
-  <div id="anchor-panel" class="ar-anchored-panel">
-    <div class="panel-frame">
-      <iframe src="about.html" scrolling="yes"></iframe>
-    </div>
-    <div class="panel-debug">
-      <button id="debug-btn" type="button">🧪 Тест клика — вывести в лог</button>
-      <div id="debug-log"><span class="log-empty">лог пуст…</span></div>
-    </div>
-  </div>
-
-  <!-- Контейнер для динамических панелей конвертора -->
-  <div id="convertor-panels-container"></div>
-
-  <!-- Кнопка-триггер конвертора -->
-  <button id="convertor-trigger-btn" type="button" class="convertor-trigger">📦 Проверить assets</button>
-</div>
-
 <script type="importmap">
   {
     "imports": {
@@ -441,79 +419,68 @@
     makeUI();
   }
 
+  const loader = new THREE.TextureLoader();
+  
   function makeUI() {
+
     const container = new ThreeMeshUI.Block({
       height: 1.5,
-      width: 1,
-      backgroundOpacity: 0,
+      width: 1
     });
 
-    container.position.set(0, 0, 0);
-    container.rotation.x = 0;
-    scene.add(container);
-
-    //
+    container.position.set( 0, 1, -1.8 );
+    container.rotation.x = -0.55;
+    scene.add( container );
 
     const imageBlock = new ThreeMeshUI.Block({
       height: 1,
       width: 1,
+      offset: 0.1 // distance separating the inner block from its parent
     });
 
     const textBlock = new ThreeMeshUI.Block({
       height: 0.4,
       width: 0.8,
-      margin: 0.05,
+      margin: 0.05, // like in CSS, horizontal and vertical distance from neighbour
+      offset: 0.1 // distance separating the inner block from its parent
     });
 
-    container.add(imageBlock, textBlock);
+    loader.load( '../assets/asset.png', (texture)=> {
 
-    //
-
-    const loader = new THREE.TextureLoader();
-
-    loader.load(SnakeImage, (texture) => {
       imageBlock.set({ backgroundTexture: texture });
+
     });
-
-    //
-
     container.set({
-      fontFamily: FontJSON,
-      fontTexture: FontImage,
+      fontFamily: './assets/Roboto-msdf.json',
+      fontTexture: './assets/Roboto-msdf.png',
     });
-
     const text = new ThreeMeshUI.Text({
-      content:
-              "The spiny bush viper is known for its extremely keeled dorsal scales.",
+      content: 'The spiny bush viper is known for its extremely keeled dorsal scales.'
     });
 
-    textBlock.add(text);
-
-    //
-
+    textBlock.add( text );
     text.set({
-      fontColor: new THREE.Color(0xd2ffbd),
-      fontSize: 0.06,
+      fontColor: new THREE.Color( 0xd2ffbd ),
+      fontSize: 0.04
     });
-
     textBlock.set({
-      textAlign: "right",
-      justifyContent: "end",
-      padding: 0.03,
+      // alignContent: 'right', // could be 'center' or 'left'
+      // alignContent has been deprecated, rely on alignItems or textAlign
+      textAlign: 'right',
+      justifyContent: 'end', // could be 'start', 'center', 'end', 'space-between', 'space-around', 'space-evenly'  
+      padding: 0.03
     });
-
-    //
-
     textBlock.add(
             new ThreeMeshUI.Text({
-              content: " Mind your fingers.",
+              content: ' Mind your fingers.',
               fontSize: 0.07,
-              fontColor: new THREE.Color(0xefffe8),
+              fontColor: new THREE.Color( 0xefffe8 )
             })
     );
   }
 
-
+  ThreeMeshUI.update();
+  
   // ---------- Tap on screen -> place cube ----------
   function onSelect() {
     if (!reticle.visible) return;
