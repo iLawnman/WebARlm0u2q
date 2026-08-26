@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>simple WebXR Image Tracking</title>
+  <title>WebXR Image Tracking</title>
   <style>
     * {
       margin: 0;
@@ -42,8 +42,8 @@
 
     #log-container {
       position: fixed;
-      bottom: 100px;
-      left: 50%;
+      top: 100px;
+      left: 10px;
       transform: translateX(-50%);
       z-index: 10;
       width: 90%;
@@ -245,8 +245,8 @@
   }
 
   // ---------- Параметры ----------
-  const IMAGE_URL = "https://raw.githubusercontent.com/immersive-web/webxr-samples/main/media/pinball.jpg";
-  const IMAGE_WIDTH = 0.2;
+  const IMAGE_URL = "./assets/recoimages/";
+  const IMAGE_WIDTH = 0.1;
 
   let session = null;
   let referenceSpace = null;
