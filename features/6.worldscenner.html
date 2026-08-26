@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Modules WebXR Spatial Scanner</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="debug">
+    <div class="debug-header">
+      <div class="title">WEBXR SPATIAL SCANNER</div>
+      <button id="debugToggle" type="button" title="Свернуть лог" aria-label="Свернуть лог">◀</button>
+    </div>
+    <div id="debugContent">Checking WebXR...</div>
+    <button id="debugEar" type="button" title="Развернуть лог" aria-label="Развернуть лог">▶</button>
+  </div>
+
+  <div id="buttons">
+    <button id="exportButton">EXPORT SPATIAL MAP</button>
+    <button id="clearButton">CLEAR POINT CLOUD</button>
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.179.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.179.1/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module" src="app.js"></script>
+
+</body>
+</html>
