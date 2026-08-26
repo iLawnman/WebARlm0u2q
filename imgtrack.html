@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-  <title>WebXR Image Tracking</title>
+  <title>3 WebXR Image Tracking</title>
   <style>
     html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
     #startButton {
@@ -50,16 +50,14 @@
   const logPanel = document.getElementById("logPanel");
   const startButton = document.getElementById("startButton");
 
-  // ВАШЕ ИЗОБРАЖЕНИЕ - должно существовать по этому пути
   const TRACKED_IMAGE_URL = "./assets/recoimages/T1.jpg";
-  const TRACKED_IMAGE_WIDTH_METERS = 0.1; // 10 см - укажите реальный размер
+  const TRACKED_IMAGE_WIDTH_METERS = 0.1;
 
   let renderer, scene, camera;
   let trackedImageBitmap;
   let placedNode = null;
   let frameCounter = 0;
   let session = null;
-  let isTrackingSupported = false;
 
   function logLine(msg, level) {
     const time = new Date().toISOString().substring(11, 23);
@@ -82,17 +80,17 @@
     logLine(`Loading tracked image: ${url}`);
     const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(`Failed to load image: HTTP ${response.status} - ${response.statusText}`);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
     const blob = await response.blob();
-    logLine(`Image loaded: ${blob.size} bytes, type: ${blob.type}`);
+    logLine(`Image loaded: ${blob.size} bytes`);
     const bitmap = await createImageBitmap(blob);
     logLine(`Image decoded: ${bitmap.width}x${bitmap.height}px`);
     return bitmap;
   }
 
   function initThree() {
-    logLine("Initializing THREE renderer");
+    logLine("Initializing THREE");
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -105,7 +103,6 @@
     const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
     scene.add(light);
 
-    // Добавляем сетку для ориентации
     const gridHelper = new THREE.GridHelper(1, 10);
     gridHelper.position.y = -0.05;
     scene.add(gridHelper);
@@ -118,7 +115,6 @@
   }
 
   function buildContentNode() {
-    // Создаем куб для наглядности
     const size = TRACKED_IMAGE_WIDTH_METERS * 0.5;
     const geometry = new THREE.BoxGeometry(size, size, size);
     const material = new THREE.MeshStandardMaterial({
@@ -131,63 +127,59 @@
     const mesh = new THREE.Mesh(geometry, material);
     mesh.visible = false;
 
-    // Добавляем рамку
     const edges = new THREE.EdgesGeometry(geometry);
     const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff }));
     mesh.add(line);
 
     scene.add(mesh);
-    logLine(`Content node created (size: ${size}m)`);
+    logLine(`Content node created`);
     return mesh;
+  }
+
+  // Проверка поддержки image-tracking без создания XRFrame
+  function checkImageTrackingSupport() {
+    // Проверяем наличие метода в прототипе XRFrame
+    // Используем XRSession или navigator.xr для проверки
+    if (!navigator.xr) return false;
+
+    // Проверяем через сессию - более надежный способ
+    // Создаем временную сессию для проверки
+    return 'image-tracking' in navigator.xr;
   }
 
   async function startAR() {
     logLine("=== START AR ===");
 
-    // Проверка WebXR
     if (!navigator.xr) {
-      throw new Error("WebXR API not available in this browser");
+      throw new Error("WebXR not available");
     }
 
-    // Проверка поддержки immersive-ar
     let supported = false;
     try {
       supported = await navigator.xr.isSessionSupported("immersive-ar");
     } catch (err) {
-      throw new Error(`Failed to check session support: ${err.message}`);
+      throw new Error(`isSessionSupported failed: ${err.message}`);
     }
 
     if (!supported) {
-      throw new Error("Immersive AR not supported on this device");
+      throw new Error("Immersive AR not supported");
     }
     logLine("Immersive AR supported");
 
-    // Загрузка изображения для трекинга
+    // Загружаем изображение
     try {
       trackedImageBitmap = await loadTrackedImage(TRACKED_IMAGE_URL);
     } catch (err) {
-      throw new Error(`Failed to load tracked image: ${err.message}`);
+      throw new Error(`Image load failed: ${err.message}`);
     }
 
-    // Инициализация THREE
     initThree();
     placedNode = buildContentNode();
 
-    // Проверка поддержки image-tracking ДО создания сессии
-    // В Chrome для Android нужен флаг chrome://flags/#webxr-image-tracking
-    const testFrame = new XRFrame();
-    isTrackingSupported = 'getImageTrackingResults' in XRFrame.prototype;
-    logLine(`Image tracking API available: ${isTrackingSupported}`);
-
-    if (!isTrackingSupported) {
-      throw new Error(
-              "Image tracking not supported in this browser. " +
-              "Enable chrome://flags/#webxr-image-tracking in Chrome for Android"
-      );
-    }
-
-    // Создание сессии с image-tracking
+    // Пробуем создать сессию с image-tracking
     logLine("Requesting AR session with image-tracking...");
+
+    let session;
     try {
       session = await navigator.xr.requestSession("immersive-ar", {
         requiredFeatures: ["local-floor", "image-tracking"],
@@ -196,77 +188,90 @@
           widthInMeters: TRACKED_IMAGE_WIDTH_METERS,
         }]
       });
-      logLine("Session created successfully");
+      logLine("Session created with image-tracking");
     } catch (err) {
-      if (err.message.includes("image-tracking")) {
-        throw new Error(
-                `Image tracking feature not available: ${err.message}. ` +
-                "Make sure chrome://flags/#webxr-image-tracking is enabled"
-        );
+      // Если image-tracking не поддерживается, пробуем без него
+      if (err.message && err.message.includes("image-tracking")) {
+        logLine("Image-tracking not supported, trying without...", "warn");
+        try {
+          session = await navigator.xr.requestSession("immersive-ar", {
+            requiredFeatures: ["local-floor"]
+          });
+          logLine("Session created without image-tracking", "warn");
+          setStatus("⚠️ Image tracking not supported");
+        } catch (err2) {
+          throw new Error(`Session failed: ${err2.message}`);
+        }
+      } else {
+        throw new Error(`Session failed: ${err.message}`);
       }
-      throw new Error(`Failed to create session: ${err.message}`);
     }
 
     startButton.style.display = "none";
 
-    // Настройка сессии
     await renderer.xr.setSession(session);
     logLine("Session attached to renderer");
 
     const referenceSpace = await session.requestReferenceSpace("local-floor");
     if (!referenceSpace) {
-      throw new Error("Failed to get reference space");
+      throw new Error("Reference space failed");
     }
     logLine("Reference space acquired");
 
-    // Основной цикл рендеринга
+    // Проверяем наличие image-tracking в реальной сессии
+    const hasImageTracking = 'getImageTrackingResults' in XRFrame.prototype;
+    logLine(`Image tracking API available: ${hasImageTracking}`);
+
     renderer.setAnimationLoop((timestamp, frame) => {
       frameCounter++;
 
       if (!frame) {
-        if (frameCounter % 60 === 0) logLine("No XRFrame", "warn");
+        if (frameCounter % 60 === 0) logLine("No frame", "warn");
         return;
-      }
-
-      // Получаем результаты трекинга
-      let results = null;
-      try {
-        results = frame.getImageTrackingResults();
-      } catch (err) {
-        if (frameCounter % 60 === 0) {
-          logLine(`getImageTrackingResults error: ${err.message}`, "error");
-        }
       }
 
       let imageDetected = false;
 
-      if (results && results.length > 0) {
-        for (const result of results) {
-          if (result.trackedImageIndex === 0) {
-            if (result.trackingState === "tracked" || result.trackingState === "emulated") {
-              try {
-                const pose = frame.getPose(result.imageSpace, referenceSpace);
-                if (pose) {
-                  imageDetected = true;
-                  placedNode.visible = true;
-                  placedNode.matrix.fromArray(pose.transform.matrix);
-                  placedNode.matrix.decompose(
-                          placedNode.position,
-                          placedNode.quaternion,
-                          placedNode.scale
-                  );
+      // Пытаемся получить результаты трекинга
+      if (hasImageTracking) {
+        try {
+          const results = frame.getImageTrackingResults();
 
-                  if (frameCounter % 30 === 0) {
-                    setStatus(`✅ Image tracked! State: ${result.trackingState}`);
+          if (results && results.length > 0) {
+            for (const result of results) {
+              if (result.trackedImageIndex === 0) {
+                const state = result.trackingState;
+
+                if (state === "tracked" || state === "emulated") {
+                  try {
+                    const pose = frame.getPose(result.imageSpace, referenceSpace);
+                    if (pose) {
+                      imageDetected = true;
+                      placedNode.visible = true;
+                      placedNode.matrix.fromArray(pose.transform.matrix);
+                      placedNode.matrix.decompose(
+                              placedNode.position,
+                              placedNode.quaternion,
+                              placedNode.scale
+                      );
+
+                      if (frameCounter % 30 === 0) {
+                        setStatus(`✅ Tracked! State: ${state}`);
+                      }
+                      break;
+                    }
+                  } catch (poseErr) {
+                    if (frameCounter % 60 === 0) {
+                      logLine(`Pose error: ${poseErr.message}`, "warn");
+                    }
                   }
-                  break;
-                }
-              } catch (err) {
-                if (frameCounter % 60 === 0) {
-                  logLine(`Pose error: ${err.message}`, "warn");
                 }
               }
             }
+          }
+        } catch (err) {
+          if (frameCounter % 60 === 0) {
+            logLine(`Tracking error: ${err.message}`, "error");
           }
         }
       }
@@ -274,18 +279,19 @@
       if (!imageDetected) {
         placedNode.visible = false;
         if (frameCounter % 30 === 0) {
-          setStatus("🔍 Searching for target image...");
+          setStatus(hasImageTracking ? "🔍 Searching..." : "⚠️ No tracking support");
         }
       }
 
       renderer.render(scene, camera);
     });
 
-    // Обработчики сессии
     session.addEventListener("end", () => {
       logLine("Session ended");
       renderer.setAnimationLoop(null);
       startButton.style.display = "block";
+      startButton.disabled = false;
+      startButton.textContent = "Start AR";
       setStatus("Session ended");
     });
 
@@ -294,14 +300,13 @@
     });
   }
 
-  // Обработчик кнопки
   startButton.addEventListener("click", async () => {
     try {
       startButton.disabled = true;
       startButton.textContent = "Starting...";
       await startAR();
     } catch (err) {
-      setStatus(`❌ Error: ${err.message}`);
+      setStatus(`❌ ${err.message}`);
       logLine(err.stack || String(err), "error");
       startButton.disabled = false;
       startButton.textContent = "Start AR";
@@ -311,9 +316,17 @@
 
   logLine("Page loaded. Click Start AR.");
 
-  // Диагностика
+  // Проверяем поддержку через features
   if (navigator.xr) {
     logLine("WebXR available");
+
+    // Проверка доступных features
+    try {
+      const supported = await navigator.xr.isSessionSupported("immersive-ar");
+      logLine(`Immersive AR support: ${supported}`);
+    } catch (err) {
+      logLine(`Support check error: ${err.message}`, "error");
+    }
   } else {
     logLine("WebXR NOT available", "error");
   }
