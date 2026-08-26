@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Главная — Квест Платформа</title>
+  <title>Features</title>
   <link rel="icon" type="image/png" sizes="16x16" href="favicon.png">
   
   <style>
@@ -92,7 +92,7 @@
 
     .card {
       position: relative;
-      min-height: 320px;
+      min-height: 120px;
       padding: 30px;
       background: rgba(17, 24, 39, .82);
       border: 1px solid var(--border);
@@ -135,37 +135,6 @@
               var(--gold),
               #ff4500
       );
-    }
-
-    /* NUMBER */
-
-    .number {
-      margin-bottom: 20px;
-      color: #475569;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-    }
-
-    /* ICON */
-
-    .icon {
-      width: 48px;
-      height: 48px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 24px;
-      border-radius: 10px;
-      color: #a5b4fc;
-      background:
-              linear-gradient(
-                      135deg,
-                      rgba(99, 102, 241, .18),
-                      rgba(6, 182, 212, .12)
-              );
-      border: 1px solid rgba(129, 140, 248, .18);
-      font-size: 21px;
     }
 
     .card.quest-card .icon {
@@ -291,57 +260,128 @@
 <div class="container">
 
   <header class="header">
-    <h1>КВЕСТ    ПЛАТФОРМА</h1>
-    <div class="eyebrow">---</div>
-    <br>
-    <p class="subtitle">
-      WEB Платформа для создания и запуска квестов в дополненной реальности в браузере.
-    </p>
+<!--    <div class="eyebrow">-&#45;&#45;</div>-->
+    <h1>FEATURES</h1>
+<!--    <p class="subtitle">-->
+<!--      WEB Платформа для создания и запуска квестов в дополненной реальности в браузере.-->
+<!--    </p>-->
   </header>
 
   <main class="cards">
 
-    <!-- 03: Описание -->
     <article class="card">
       <div>
-        <div class="icon">ℹ</div>
-        <h2>Описание</h2>
+<!--        <div class="icon">ℹ</div>-->
+        <h2>WebXR/WebGL</h2>
         <p class="description">
-          Подробная информация о проекте, инструкции по прохождению и спецификация AR-компонентов.
+          Чистая 3D сцена на WebXR/WebGL 
         </p>
       </div>
-      <a class="button" href="about.html">
-        Подробнее
+      <a class="button" href="./1.arindex.html">
         <span>→</span>
       </a>
     </article>
     
-    <!-- 01: Старт Квест -->
-    <article class="card quest-card">
+    <article class="card">
       <div>
-        <div class="icon">✦</div>
-        <h2>Квест неСказка (демо)</h2>
+<!--        <div class="icon">ℹ</div>-->
+        <h2>Recognition images</h2>
         <p class="description">
-          Запуск интерактивного AR-квеста.<br> Погрузитесь в историю с дополненной реальностью.
+          WebXR распознавание картинок
         </p>
       </div>
-      <a class="button" href="startpage.html">
-        Начать квест
+      <a class="button" href="./2.recognitionImage.html">
+        <span>→</span>
+      </a>
+    </article>
+    
+    <article class="card">
+      <div>
+<!--        <div class="icon">ℹ</div>-->
+        <h2>Recognition 3D objects</h2>
+        <p class="description">
+          WebXR распознавание 3Д объектов
+        </p>
+      </div>
+      <a class="button" href="./3.recognition3d.html">
+        <span>→</span>
+      </a>
+    </article>
+    
+    <article class="card">
+      <div>
+<!--        <div class="icon">ℹ</div>-->
+        <h2>MediaPipe</h2>
+        <p class="description">
+          Распознавание объектов<br>c помощью Machine Learning
+        </p>
+      </div>
+      <a class="button" href="./4.mediapipelog.html">
         <span>→</span>
       </a>
     </article>
 
-    <!-- 02: Редактор -->
     <article class="card">
       <div>
-        <div class="icon">⚙</div>
-        <h2>Features</h2>
+        <!--        <div class="icon">ℹ</div>-->
+        <h2>Spatial Scanner</h2>
         <p class="description">
-          Визуальный 3D редактор префабов. <br>Создание и настройка :<br>3Dобъектов, UI-панелей, <br>медиа и ресурсов.<br> Примеры бизнес-кейсов.
+          Сканер окружающего мира
         </p>
       </div>
-      <a class="button" href="editor.html">
-        Посмотреть
+      <a class="button" href="./5.spatialscenner.html">
+        <span>→</span>
+      </a>
+    </article>
+    
+    <article class="card">
+      <div>
+        <!--        <div class="icon">ℹ</div>-->
+        <h2>World Scanner</h2>
+        <p class="description">
+          Комбинация разных сканнеров окружающего мира. 
+        </p>
+      </div>
+      <a class="button" href="./6.worldscenner.html">
+        <span>→</span>
+      </a>
+    </article>
+
+    <article class="card">
+      <div>
+        <!--        <div class="icon">ℹ</div>-->
+        <h2>Three Mesh UI</h2>
+        <p class="description">
+          WebGl/WebXR сцена с Three Mesh UI
+        </p>
+      </div>
+      <a class="button" href="./7.threeuiscene.html">
+        <span>→</span>
+      </a>
+    </article>
+    
+    <article class="card">
+      <div>
+<!--        <div class="icon">ℹ</div>-->
+        <h2>Префаб Редактор</h2>
+        <p class="description">
+          Редактор префабов JSON / HTML
+        </p>
+      </div>
+      <a class="button" href="./8.prefabeditor.html">
+        <span>→</span>
+      </a>
+    </article>
+    
+    <article class="card">
+      <div>
+<!--        <div class="icon">ℹ</div>-->
+        <h2>Квест Редактор</h2>
+        <p class="description">
+          Редактор квестов JSON / HTML
+        </p>
+      </div>
+      <a class="button" href="./9.questconstructor.html">
         <span>→</span>
       </a>
     </article>

@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Three.js + Three-Mesh-UI Prefab Builder</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); font-family: 'Segoe UI', sans-serif; }
+    #ui-overlay {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      background: rgba(0,0,0,0.85);
+      padding: 20px;
+      border-radius: 12px;
+      color: #fff;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      max-width: 380px;
+      backdrop-filter: blur(10px);
+    }
+    #ui-overlay label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+      color: #FFD700;
+      font-weight: 600;
+    }
+    #ui-overlay input[type="file"] {
+      margin-bottom: 15px;
+      color: #fff;
+      width: 100%;
+    }
+    #info {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #aaa;
+      line-height: 1.4;
+    }
+    #debug {
+      margin-top: 10px;
+      font-size: 11px;
+      color: #888;
+      max-height: 150px;
+      overflow-y: auto;
+      background: #111;
+      padding: 8px;
+      border-radius: 6px;
+      font-family: monospace;
+    }
+    .step {
+      padding: 8px 12px;
+      margin: 5px 0;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.05);
+      border-left: 3px solid #555;
+    }
+    .step.done { border-left-color: #4CAF50; background: rgba(76,175,80,0.1); }
+    .step.active { border-left-color: #FFD700; background: rgba(255,215,0,0.1); }
+  </style>
+</head>
+<body>
+
+<div id="ui-overlay">
+  <h3 style="margin:0 0 15px 0; color:#FFD700;">🏗️ Prefab Builder</h3>
+
+  <div class="step" id="step1">
+    <label for="htmlLoader"> Шаг 1: HTML структура префаба</label>
+    <input type="file" id="htmlLoader" accept=".html">
+  </div>
+
+  <div class="step" id="step2">
+    <label for="jsonLoader"> Шаг 2: JSON дизайн</label>
+    <input type="file" id="jsonLoader" accept=".json" disabled>
+  </div>
+
+  <div id="info">Загрузите HTML-файл префаба</div>
+  <div id="debug"></div>
+</div>
+
+<script type="importmap">
+  {
+      "imports": {
+          "three": "https://unpkg.com/three/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three/examples/jsm/",
+          "three-mesh-ui": "https://unpkg.com/three-mesh-ui/build/three-mesh-ui.module.js"
+      }
+  }
+</script>
+
+<script type="module">
+  import * as THREE from 'three';
+  import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+  import * as ThreeMeshUI from "three-mesh-ui";
+
+  // --- 1. Базовая настройка Three.js ---
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x1a1a2e);
+
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.set(0, 0, 5);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  document.body.appendChild(renderer.domElement);
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+
+  scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  dirLight.position.set(5, 5, 5);
+  scene.add(dirLight);
+
+  // --- 2. Утилиты ---
+  const RESOURCE_PATH = '../assets/resources/';
+
+  function parseHexColor(hex) {
+    if (!hex || typeof hex !== 'string' || hex.trim() === "") return { color: new THREE.Color(0x333333), opacity: 1 };
+    hex = hex.trim();
+    if (hex.length === 9) {
+      const alpha = parseInt(hex.substring(7, 9), 16) / 255;
+      return { color: new THREE.Color(hex.substring(0, 7)), opacity: alpha };
+    }
+    if (hex.startsWith('#')) {
+      return { color: new THREE.Color(hex), opacity: 1 };
+    }
+    return { color: new THREE.Color(0x333333), opacity: 1 };
+  }
+
+  function normalizeKey(key) {
+    return key.trim().replace(/\s+/g, '_');
+  }
+
+  function logDebug(msg) {
+    const el = document.getElementById('debug');
+    el.innerHTML += msg + '<br>';
+    el.scrollTop = el.scrollHeight;
+  }
+
+  // --- 3. Загрузка ресурсов ---
+  const textureLoader = new THREE.TextureLoader();
+  const fileLoader = new THREE.FileLoader();
+  const fontCache = {};
+  const imageCache = {};
+
+  async function loadFont(fontName) {
+    if (fontCache[fontName]) return fontCache[fontName];
+
+    const fontMap = {
+      'nk_vitez SDF': 'nk_vitez_SDF.json',
+      'RobotoSlab-Regular SDF': 'RobotoSlab-Regular_SDF.json'
+    };
+
+    const fontFile = fontMap[fontName] || fontName.replace(/\s+/g, '_') + '.json';
+    const texFile = fontFile.replace('.json', '.png');
+
+    try {
+      const fontData = await new Promise((resolve, reject) => {
+        fileLoader.load(RESOURCE_PATH + fontFile, resolve, undefined, reject);
+      });
+
+      const font = JSON.parse(fontData);
+      const texture = await new Promise((resolve, reject) => {
+        textureLoader.load(RESOURCE_PATH + texFile, resolve, undefined, reject);
+      });
+
+      font.texture = texture;
+      fontCache[fontName] = font;
+      logDebug(`✅ Шрифт: ${fontName}`);
+      return font;
+    } catch (e) {
+      console.error(`Ошибка шрифта ${fontName}:`, e);
+      logDebug(`❌ Шрифт ${fontName}`);
+      return null;
+    }
+  }
+
+  async function loadImage(imageName) {
+    if (imageCache[imageName]) return imageCache[imageName];
+
+    const extensions = ['.png', '.jpg', '.jpeg', '.webp'];
+
+    for (const ext of extensions) {
+      try {
+        const texture = await new Promise((resolve, reject) => {
+          textureLoader.load(RESOURCE_PATH + imageName + ext, resolve, undefined, reject);
+        });
+        imageCache[imageName] = texture;
+        logDebug(`✅ Изображение: ${imageName}${ext}`);
+        return texture;
+      } catch (e) {
+        continue;
+      }
+    }
+
+    logDebug(`️ Изображение ${imageName} не найдено`);
+    return null;
+  }
+
+  // --- 4. Парсинг HTML структуры ---
+  let prefabStructure = null;
+  let parsedData = null;
+
+  function parseHTMLContent(htmlContent) {
+    logDebug("🔍 Парсинг HTML...");
+
+    const data = {
+      title: "",
+      mainText: "",
+      hint: "",
+      advice: "",
+      note: "",
+      inputPlaceholder: "",
+      nextButtonText: "",
+      hasLeftArrow: false,
+      hasRightArrow: false
+    };
+
+    // Извлекаем заголовок
+    const titleMatch = htmlContent.match(/Первое задание[^"]*/);
+    if (titleMatch) {
+      data.title = titleMatch[0].trim();
+      logDebug(`📝 Заголовок: ${data.title.substring(0, 30)}...`);
+    }
+
+    // Извлекаем основной текст
+    const mainTextMatch = htmlContent.match(/Ваня, владелец[\s\S]*?(?=Первое задание|📍)/);
+    if (mainTextMatch) {
+      data.mainText = mainTextMatch[0].trim();
+      logDebug(`📝 Основной текст: ${data.mainText.substring(0, 50)}...`);
+    }
+
+    // Извлекаем подсказку
+    const hintMatch = htmlContent.match(/📍\s*ПОДСКАЗКА[\s\S]*?(?=📍|📜|◀)/);
+    if (hintMatch) {
+      data.hint = hintMatch[0].replace(/📍\s*ПОДСКАЗКА/, '').trim();
+      logDebug(`💡 Подсказка найдена`);
+    }
+
+    // Извлекаем совет
+    const adviceMatch = htmlContent.match(/📍\s*СОВЕТ[\s\S]*?(?=📜|◀)/);
+    if (adviceMatch) {
+      data.advice = adviceMatch[0].replace(/\s*СОВЕТ/, '').trim();
+      logDebug(`💡 Совет найден`);
+    }
+
+    // Извлекаем заметку
+    const noteMatch = htmlContent.match(/📜\s*ЗАМЕТКА[\s\S]*?(?=◀)/);
+    if (noteMatch) {
+      data.note = noteMatch[0].replace(/📜\s*ЗАМЕТКА/, '').trim();
+      logDebug(` Заметка найдена`);
+    }
+
+    // Проверяем стрелки
+    data.hasLeftArrow = htmlContent.includes('◀');
+    data.hasRightArrow = htmlContent.includes('▶');
+    logDebug(`⬅️ Стрелки: ${data.hasLeftArrow ? '✓' : '✗'} ➡️ ${data.hasRightArrow ? '✓' : '✗'}`);
+
+    // Извлекаем placeholder
+    const inputMatch = htmlContent.match(/ВВЕДИТЕ\s+ОТВЕТ/);
+    if (inputMatch) {
+      data.inputPlaceholder = inputMatch[0];
+      logDebug(`⌨️ Placeholder: ${data.inputPlaceholder}`);
+    }
+
+    // Извлекаем текст кнопки
+    const nextBtnMatch = htmlContent.match(/Дальше/);
+    if (nextBtnMatch) {
+      data.nextButtonText = nextBtnMatch[0];
+      logDebug(` Кнопка: ${data.nextButtonText}`);
+    }
+
+    parsedData = data;
+    return data;
+  }
+
+  // --- 5. Построение 3D структуры ---
+  function build3DStructure(data) {
+    logDebug("🔨 Построение 3D структуры...");
+
+    if (prefabStructure) {
+      scene.remove(prefabStructure);
+    }
+
+    // Корневой блок
+    const root = new ThreeMeshUI.Block({
+      width: 4.0,
+      height: 3.0,
+      backgroundOpacity: 0.95,
+      backgroundColor: new THREE.Color(0x070707),
+      contentDirection: 'column',
+      justifyContent: 'space-between',
+      alignItems: 'stretch',
+      padding: 0.1,
+      borderRadius: 0.08
+    });
+
+    // Заголовок
+    const titleBlock = new ThreeMeshUI.Block({
+      width: 3.8,
+      height: 0.3,
+      backgroundOpacity: 0.9,
+      backgroundColor: new THREE.Color(0x070707),
+      borderColor: new THREE.Color(0xFFD700),
+      borderWidth: 0.005,
+      borderRadius: 0.05,
+      content: 'center'
+    });
+
+    const titleText = new ThreeMeshUI.Text({
+      content: data.title || "Вопрос",
+      fontSize: 0.12,
+      fontColor: new THREE.Color(0xFFD700),
+      textAlign: 'center'
+    });
+    titleBlock.add(titleText);
+    root.add(titleBlock);
+
+    // Основная область
+    const mainArea = new ThreeMeshUI.Block({
+      width: 3.8,
+      height: 1.8,
+      contentDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'stretch',
+      padding: 0.05
+    });
+
+    // Левая панель
+    const leftPanel = new ThreeMeshUI.Block({
+      width: 1.0,
+      height: 1.7,
+      backgroundOpacity: 0.9,
+      backgroundColor: new THREE.Color(0x070707),
+      borderColor: new THREE.Color(0xFFD700),
+      borderWidth: 0.005,
+      borderRadius: 0.05,
+      contentDirection: 'column',
+      justifyContent: 'space-around',
+      alignItems: 'center',
+      padding: 0.1
+    });
+
+    if (data.hint) {
+      const hintLabel = new ThreeMeshUI.Text({
+        content: "📍 ПОДСКАЗКА",
+        fontSize: 0.05,
+        fontColor: new THREE.Color(0xFF69B4),
+        textAlign: 'center'
+      });
+      leftPanel.add(hintLabel);
+
+      const hintText = new ThreeMeshUI.Text({
+        content: data.hint.substring(0, 100),
+        fontSize: 0.035,
+        fontColor: new THREE.Color(0xFFFFFF),
+        textAlign: 'left',
+        width: 0.9
+      });
+      leftPanel.add(hintText);
+    }
+
+    if (data.advice) {
+      const adviceLabel = new ThreeMeshUI.Text({
+        content: "📍 СОВЕТ",
+        fontSize: 0.05,
+        fontColor: new THREE.Color(0xFF69B4),
+        textAlign: 'center'
+      });
+      leftPanel.add(adviceLabel);
+
+      const adviceText = new ThreeMeshUI.Text({
+        content: data.advice.substring(0, 100),
+        fontSize: 0.035,
+        fontColor: new THREE.Color(0xFFFFFF),
+        textAlign: 'left',
+        width: 0.9
+      });
+      leftPanel.add(adviceText);
+    }
+
+    mainArea.add(leftPanel);
+
+    // Центральная панель
+    const centerPanel = new ThreeMeshUI.Block({
+      width: 1.7,
+      height: 1.7,
+      backgroundOpacity: 0.9,
+      backgroundColor: new THREE.Color(0x070707),
+      borderColor: new THREE.Color(0xFFD700),
+      borderWidth: 0.005,
+      borderRadius: 0.05,
+      contentDirection: 'column',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 0.15
+    });
+
+    if (data.mainText) {
+      const mainText = new ThreeMeshUI.Text({
+        content: data.mainText,
+        fontSize: 0.06,
+        fontColor: new THREE.Color(0xFFD700),
+        textAlign: 'left',
+        lineHeight: 1.4
+      });
+      centerPanel.add(mainText);
+    }
+
+    mainArea.add(centerPanel);
+
+    // Правая панель
+    const rightPanel = new ThreeMeshUI.Block({
+      width: 1.0,
+      height: 1.7,
+      backgroundOpacity: 0.9,
+      backgroundColor: new THREE.Color(0x070707),
+      borderColor: new THREE.Color(0xFFD700),
+      borderWidth: 0.005,
+      borderRadius: 0.05,
+      contentDirection: 'column',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 0.1
+    });
+
+    if (data.note) {
+      const noteLabel = new ThreeMeshUI.Text({
+        content: "📜 ЗАМЕТКА",
+        fontSize: 0.05,
+        fontColor: new THREE.Color(0x888888),
+        textAlign: 'center'
+      });
+      rightPanel.add(noteLabel);
+
+      const noteText = new ThreeMeshUI.Text({
+        content: data.note.substring(0, 100),
+        fontSize: 0.035,
+        fontColor: new THREE.Color(0xFFFFFF),
+        textAlign: 'left',
+        width: 0.9
+      });
+      rightPanel.add(noteText);
+    }
+
+    mainArea.add(rightPanel);
+
+    root.add(mainArea);
+
+    // Нижняя панель
+    const bottomPanel = new ThreeMeshUI.Block({
+      width: 3.8,
+      height: 0.7,
+      backgroundOpacity: 0.9,
+      backgroundColor: new THREE.Color(0x070707),
+      borderColor: new THREE.Color(0xFFD700),
+      borderWidth: 0.005,
+      borderRadius: 0.05,
+      contentDirection: 'column',
+      justifyContent: 'space-around',
+      alignItems: 'center',
+      padding: 0.05
+    });
+
+    const buttonsRow = new ThreeMeshUI.Block({
+      width: 3.6,
+      height: 0.35,
+      contentDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 0.05
+    });
+
+    // Стрелка влево
+    if (data.hasLeftArrow) {
+      const leftArrow = new ThreeMeshUI.Block({
+        width: 0.3,
+        height: 0.3,
+        backgroundOpacity: 0.9,
+        backgroundColor: new THREE.Color(0x0E0E0E),
+        borderColor: new THREE.Color(0xDAA520),
+        borderWidth: 0.008,
+        borderRadius: 0.15,
+        content: 'center'
+      });
+
+      const leftArrowText = new ThreeMeshUI.Text({
+        content: "◀",
+        fontSize: 0.15,
+        fontColor: new THREE.Color(0xFFFFFF),
+        textAlign: 'center'
+      });
+      leftArrow.add(leftArrowText);
+      buttonsRow.add(leftArrow);
+    }
+
+    // Поле ввода
+    const inputField = new ThreeMeshUI.Block({
+      width: 1.5,
+      height: 0.3,
+      backgroundOpacity: 0.9,
+      backgroundColor: new THREE.Color(0x070707),
+      borderColor: new THREE.Color(0xD6A617),
+      borderWidth: 0.008,
+      borderRadius: 0.03,
+      content: 'center'
+    });
+
+    const inputText = new ThreeMeshUI.Text({
+      content: data.inputPlaceholder || "ВВЕДИТЕ ОТВЕТ",
+      fontSize: 0.06,
+      fontColor: new THREE.Color(0xD19C27),
+      textAlign: 'center'
+    });
+    inputField.add(inputText);
+    buttonsRow.add(inputField);
+
+    // Кнопка "Дальше"
+    const nextButton = new ThreeMeshUI.Block({
+      width: 0.8,
+      height: 0.3,
+      backgroundOpacity: 0.95,
+      backgroundColor: new THREE.Color(0xE90E1B),
+      borderColor: new THREE.Color(0x5B1919),
+      borderWidth: 0.008,
+      borderRadius: 0.03,
+      content: 'center'
+    });
+
+    const nextButtonText = new ThreeMeshUI.Text({
+      content: data.nextButtonText || "Дальше",
+      fontSize: 0.07,
+      fontColor: new THREE.Color(0xE9BF15),
+      textAlign: 'center'
+    });
+    nextButton.add(nextButtonText);
+    buttonsRow.add(nextButton);
+
+    // Стрелка вправо
+    if (data.hasRightArrow) {
+      const rightArrow = new ThreeMeshUI.Block({
+        width: 0.3,
+        height: 0.3,
+        backgroundOpacity: 0.9,
+        backgroundColor: new THREE.Color(0x0E0E0E),
+        borderColor: new THREE.Color(0xDAA520),
+        borderWidth: 0.008,
+        borderRadius: 0.15,
+        content: 'center'
+      });
+
+      const rightArrowText = new ThreeMeshUI.Text({
+        content: "▶",
+        fontSize: 0.15,
+        fontColor: new THREE.Color(0xFFFFFF),
+        textAlign: 'center'
+      });
+      rightArrow.add(rightArrowText);
+      buttonsRow.add(rightArrow);
+    }
+
+    bottomPanel.add(buttonsRow);
+
+    // Ряд с 4 кнопками
+    const numbersRow = new ThreeMeshUI.Block({
+      width: 3.6,
+      height: 0.25,
+      contentDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: 0.1
+    });
+
+    for (let i = 1; i <= 4; i++) {
+      const numButton = new ThreeMeshUI.Block({
+        width: 0.35,
+        height: 0.25,
+        backgroundOpacity: 0.9,
+        backgroundColor: new THREE.Color(0x2F32FF),
+        borderColor: new THREE.Color(0x0F0C4B),
+        borderWidth: 0.008,
+        borderRadius: 0.125,
+        content: 'center'
+      });
+
+      const numText = new ThreeMeshUI.Text({
+        content: i.toString(),
+        fontSize: 0.08,
+        fontColor: new THREE.Color(0xE9BF15),
+        textAlign: 'center'
+      });
+      numButton.add(numText);
+      numbersRow.add(numButton);
+    }
+
+    bottomPanel.add(numbersRow);
+    root.add(bottomPanel);
+
+    scene.add(root);
+    prefabStructure = root;
+
+    logDebug("✅ 3D структура построена!");
+    document.getElementById('info').innerText = "Структура загружена. Теперь загрузите JSON дизайн.";
+  }
+
+  // --- 6. Применение JSON дизайна ---
+  async function applyJSONDesign(config) {
+    if (!prefabStructure || !parsedData) {
+      logDebug("❌ Сначала загрузите HTML структуру!");
+      return;
+    }
+
+    logDebug("🎨 Применение JSON дизайна...");
+
+    // Загружаем шрифты
+    const titleFontName = config.TitleText_Font || 'nk_vitez SDF';
+    const mainFontName = config.MainText_MainTxt_Font || 'nk_vitez SDF';
+    const buttonFontName = config.Buttons_Button_NEXT_Label_Font || 'nk_vitez SDF';
+    const inputFontName = config.Buttons_InputField_Placeholder_Font || 'nk_vitez SDF';
+
+    const [titleFont, mainFont, buttonFont, inputFont] = await Promise.all([
+      loadFont(titleFontName),
+      loadFont(mainFontName),
+      loadFont(buttonFontName),
+      loadFont(inputFontName)
+    ]);
+
+    // Загружаем изображения
+    const bgImage = config.BackImage_Image?.trim();
+    const buttonBgImage = config.Buttons_bgButtonsPanel_Image?.trim();
+
+    const [bgTexture, buttonBgTexture] = await Promise.all([
+      bgImage ? loadImage(bgImage) : null,
+      buttonBgImage ? loadImage(buttonBgImage) : null
+    ]);
+
+    // Удаляем старую структуру
+    if (prefabStructure) {
+      scene.remove(prefabStructure);
+    }
+
+    // Создаём новую структуру с дизайном
+    const bgColor = parseHexColor(config.MainText_bg_Color);
+    const root = new ThreeMeshUI.Block({
+      width: 4.0,
+      height: 3.0,
+      backgroundOpacity: Math.max(bgColor.opacity, 0.95),
+      backgroundColor: bgColor.color,
+      backgroundImage: bgTexture || null,
+      contentDirection: 'column',
+      justifyContent: 'space-between',
+      alignItems: 'stretch',
+      padding: 0.1,
+      borderRadius: 0.08
+    });
+
+    // Заголовок
+    const titleBgColor = parseHexColor(config.TitleText_bg_Color);
+    const titleColor = parseHexColor(config.TitleText_Color);
+
+    const titleBlock = new ThreeMeshUI.Block({
+      width: 3.8,
+      height: 0.3,
+      backgroundOpacity: Math.max(titleBgColor.opacity, 0.9),
+      backgroundColor: titleBgColor.color,
+      borderColor: new THREE.Color(0xFFD700),
+      borderWidth: 0.005,
+      borderRadius: 0.05,
+      content: 'center'
+    });
+
+    if (titleFont) {
+      const titleText = new ThreeMeshUI.Text({
+        content: parsedData.title || "Вопрос",
+        fontSize: 0.12,
+        font: titleFont,
+        fontColor: titleColor.color,
+        textAlign: 'center'
+      });
+      titleBlock.add(titleText);
+    }
+    root.add(titleBlock);
+
+    // Основная область
+    const mainArea = new ThreeMeshUI.Block({
+      width: 3.8,
+      height: 1.8,
+      contentDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'stretch',
+      padding: 0.05
+    });
+
+    // Левая панель
+    const leftPanelBg = parseHexColor(config.LeftPanel_bgLeftPanel_Color);
+    const leftPanel = new ThreeMeshUI.Block({
+      width: 1.0,
+      height: 1.7,
+      backgroundOpacity: Math.max(leftPanelBg.opacity, 0.9),
+      backgroundColor: leftPanelBg.color,
+      borderColor: new THREE.Color(0xFFD700),
+      borderWidth: 0.005,
+      borderRadius: 0.05,
+      contentDirection: 'column',
+      justifyContent: 'space-around',
+      alignItems: 'center',
+      padding: 0.1
+    });
+
+    if (parsedData.hint && mainFont) {
+      const hintColor = parseHexColor(config.LeftPanel_HelpUp_Color);
+      const hintLabel = newThreeMeshUI.Text({
+        content: "📍 ПОДСКАЗКА",
+        fontSize: 0.05,
+        font: mainFont,
+        fontColor: hintColor.color,
+        textAlign: 'center'
+      });
+      leftPanel.add(hintLabel);
+
+      const hintText = newThreeMeshUI.Text({
+        content: parsedData.hint.substring(0, 100),
+        fontSize: 0.035,
+        font: mainFont,
+        fontColor: new THREE.Color(0xFFFFFF),
+        textAlign: 'left',
+        width: 0.9
+      });
+      leftPanel.add(hintText);
+    }
+
+    if (parsedData.advice && mainFont) {
+      const adviceColor = parseHexColor(config.LeftPanel_HelpDown_Color);
+      const adviceLabel = newThreeMeshUI.Text({
+        content: " СОВЕТ",
+        fontSize: 0.05,
+        font: mainFont,
+        fontColor: adviceColor.color,
+        textAlign: 'center'
+      });
+      leftPanel.add(adviceLabel);
+
+      const adviceText = newThreeMeshUI.Text({
+        content: parsedData.advice.substring(0, 100),
+        fontSize: 0.035,
+        font: mainFont,
+        fontColor: new THREE.Color(0xFFFFFF),
+        textAlign: 'left',
+        width: 0.9
+      });
+      leftPanel.add(adviceText);
+    }
+
+    mainArea.add(leftPanel);
+
+    // Центральная панель
+    const centerPanelBg = parseHexColor(config.MainText_bg_Color);
+    const centerPanel = new ThreeMeshUI.Block({
+      width: 1.7,
+      height: 1.7,
+      backgroundOpacity: Math.max(centerPanelBg.opacity, 0.9),
+      backgroundColor: centerPanelBg.color,
+      borderColor: new THREE.Color(0xFFD700),
+      borderWidth: 0.005,
+      borderRadius: 0.05,
+      contentDirection: 'column',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 0.15
+    });
+
+    if (parsedData.mainText && mainFont) {
+      const mainTextColor = parseHexColor(config.MainTxt_Color);
+      const mainText = newThreeMeshUI.Text({
+        content: parsedData.mainText,
+        fontSize: 0.06,
+        font: mainFont,
+        fontColor: mainTextColor.color,
+        textAlign: 'left',
+        lineHeight: 1.4
+      });
+      centerPanel.add(mainText);
+    }
+
+    mainArea.add(centerPanel);
+
+    // Правая панель
+    const rightPanelBg = parseHexColor(config.RightPanel_bgRight_Panel_Color);
+    const rightPanel = new ThreeMeshUI.Block({
+      width: 1.0,
+      height: 1.7,
+      backgroundOpacity: Math.max(rightPanelBg.opacity, 0.9),
+      backgroundColor: rightPanelBg.color,
+      borderColor: new THREE.Color(0xFFD700),
+      borderWidth: 0.005,
+      borderRadius: 0.05,
+      contentDirection: 'column',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 0.1
+    });
+
+    if (parsedData.note && mainFont) {
+      const noteLabel = newThreeMeshUI.Text({
+        content: "📜 ЗАМЕТКА",
+        fontSize: 0.05,
+        font: mainFont,
+        fontColor: new THREE.Color(0x888888),
+        textAlign: 'center'
+      });
+      rightPanel.add(noteLabel);
+
+      const noteText = newThreeMeshUI.Text({
+        content: parsedData.note.substring(0, 100),
+        fontSize: 0.035,
+        font: mainFont,
+        fontColor: new THREE.Color(0xFFFFFF),
+        textAlign: 'left',
+        width: 0.9
+      });
+      rightPanel.add(noteText);
+    }
+
+    mainArea.add(rightPanel);
+
+    root.add(mainArea);
+
+    // Нижняя панель
+    const buttonsBg = parseHexColor(config.Buttons_bgButtonsPanel_Color);
+    const bottomPanel = new ThreeMeshUI.Block({
+      width: 3.8,
+      height: 0.7,
+      backgroundOpacity: Math.max(buttonsBg.opacity, 0.9),
+      backgroundColor: buttonsBg.color,
+      backgroundImage: buttonBgTexture || null,
+      borderColor: new THREE.Color(0xFFD700),
+      borderWidth: 0.005,
+      borderRadius: 0.05,
+      contentDirection: 'column',
+      justifyContent: 'space-around',
+      alignItems: 'center',
+      padding: 0.05
+    });
+
+    const buttonsRow = new ThreeMeshUI.Block({
+      width: 3.6,
+      height: 0.35,
+      contentDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 0.05
+    });
+
+    // Стрелка влево
+    if (parsedData.hasLeftArrow && buttonFont) {
+      const leftArrowColor = parseHexColor(config.Buttons_Button_Left_Color);
+      const leftArrow = new ThreeMeshUI.Block({
+        width: 0.3,
+        height: 0.3,
+        backgroundOpacity: Math.max(leftArrowColor.opacity, 0.9),
+        backgroundColor: leftArrowColor.color,
+        borderColor: new THREE.Color(0xDAA520),
+        borderWidth: 0.008,
+        borderRadius: 0.15,
+        content: 'center'
+      });
+
+      const leftArrowText = newThreeMeshUI.Text({
+        content: "",
+        fontSize: 0.15,
+        font: buttonFont,
+        fontColor: new THREE.Color(0xFFFFFF),
+        textAlign: 'center'
+      });
+      leftArrow.add(leftArrowText);
+      buttonsRow.add(leftArrow);
+    }
+
+    // Поле ввода
+    const inputBgColor = parseHexColor(config.Buttons_InputField_Color);
+    const inputBorderColor = parseHexColor(config.Buttons_InputField_Shadow_Color);
+    const inputField = new ThreeMeshUI.Block({
+      width: 1.5,
+      height: 0.3,
+      backgroundOpacity: Math.max(inputBgColor.opacity, 0.9),
+      backgroundColor: inputBgColor.color,
+      borderColor: inputBorderColor.color,
+      borderWidth: 0.008,
+      borderRadius: 0.03,
+      content: 'center'
+    });
+
+    if (inputFont) {
+      const placeholderColor = parseHexColor(config.Buttons_InputField_Placeholder_Color);
+      const inputText = newThreeMeshUI.Text({
+        content: parsedData.inputPlaceholder || "ВВЕДИТЕ ОТВЕТ",
+        fontSize: 0.06,
+        font: inputFont,
+        fontColor: placeholderColor.color,
+        textAlign: 'center'
+      });
+      inputField.add(inputText);
+    }
+    buttonsRow.add(inputField);
+
+    // Кнопка "Дальше"
+    const nextBtnColor = parseHexColor(config.Buttons_Button_NEXT_Color);
+    const nextBtnRimColor = parseHexColor(config.Buttons_Button_NEXT_RIM_Color);
+    const nextButton = new ThreeMeshUI.Block({
+      width: 0.8,
+      height: 0.3,
+      backgroundOpacity: Math.max(nextBtnColor.opacity, 0.95),
+      backgroundColor: nextBtnColor.color,
+      borderColor: nextBtnRimColor.color,
+      borderWidth: 0.008,
+      borderRadius: 0.03,
+      content: 'center'
+    });
+
+    if (buttonFont) {
+      const nextLabelColor = parseHexColor(config.Buttons_Button_NEXT_Label_Color);
+      const nextButtonText = newThreeMeshUI.Text({
+        content: parsedData.nextButtonText || "Дальше",
+        fontSize: 0.07,
+        font: buttonFont,
+        fontColor: nextLabelColor.color,
+        textAlign: 'center'
+      });
+      nextButton.add(nextButtonText);
+    }
+    buttonsRow.add(nextButton);
+
+    // Стрелка вправо
+    if (parsedData.hasRightArrow && buttonFont) {
+      const rightArrowColor = parseHexColor(config.Buttons_Button_Right_Color);
+      const rightArrow = new ThreeMeshUI.Block({
+        width: 0.3,
+        height: 0.3,
+        backgroundOpacity: Math.max(rightArrowColor.opacity, 0.9),
+        backgroundColor: rightArrowColor.color,
+        borderColor: new THREE.Color(0xDAA520),
+        borderWidth: 0.008,
+        borderRadius: 0.15,
+        content: 'center'
+      });
+
+      const rightArrowText = new ThreeMeshUI.Text({
+        content: "▶",
+        fontSize: 0.15,
+        font: buttonFont,
+        fontColor: new THREE.Color(0xFFFFFF),
+        textAlign: 'center'
+      });
+      rightArrow.add(rightArrowText);
+      buttonsRow.add(rightArrow);
+    }
+
+    bottomPanel.add(buttonsRow);
+
+    // Ряд с 4 кнопками
+    const numbersRow = new ThreeMeshUI.Block({
+      width: 3.6,
+      height: 0.25,
+      contentDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: 0.1
+    });
+
+    const fourBtnColor = parseHexColor(config.Buttons_4Buttons_Color);
+    const fourBtnRimColor = parseHexColor(config.Buttons_4Buttons_RIM_Color);
+    const fourBtnLabelColor = parseHexColor(config.Buttons_4Buttons_Label_Color);
+
+    for (let i = 1; i <= 4; i++) {
+      const numButton = new ThreeMeshUI.Block({
+        width: 0.35,
+        height: 0.25,
+        backgroundOpacity: Math.max(fourBtnColor.opacity, 0.9),
+        backgroundColor: fourBtnColor.color,
+        borderColor: fourBtnRimColor.color,
+        borderWidth: 0.008,
+        borderRadius: 0.125,
+        content: 'center'
+      });
+
+      if (buttonFont) {
+        const numText = new ThreeMeshUI.Text({
+          content: i.toString(),
+          fontSize: 0.08,
+          font: buttonFont,
+          fontColor: fourBtnLabelColor.color,
+          textAlign: 'center'
+        });
+        numButton.add(numText);
+      }
+      numbersRow.add(numButton);
+    }
+
+    bottomPanel.add(numbersRow);
+    root.add(bottomPanel);
+
+    scene.add(root);
+    prefabStructure = root;
+
+    logDebug("✅ JSON дизайн применён!");
+    document.getElementById('info').innerText = `✅ Дизайн "${config.name || 'BasePrefab'}" применён!`;
+  }
+
+  // --- 7. Обработчики загрузки ---
+  let loadedConfig = null;
+
+  document.getElementById('htmlLoader').addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const htmlContent = e.target.result;
+        const data = parseHTMLContent(htmlContent);
+        build3DStructure(data);
+        document.getElementById('step1').classList.add('done');
+        document.getElementById('step2').classList.add('active');
+        document.getElementById('jsonLoader').disabled = false;
+      } catch (err) {
+        console.error("Ошибка:", err);
+        logDebug("❌ Ошибка: " + err.message);
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  document.getElementById('jsonLoader').addEventListener('change', async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const jsonData = JSON.parse(e.target.result);
+        logDebug("📊 JSON загружен");
+
+        const headers = jsonData[0].map(h => normalizeKey(h));
+        const values = jsonData[1].map(v => v ? v.trim() : "");
+
+        const config = {};
+        headers.forEach((h, i) => {
+          config[h] = values[i];
+        });
+
+        loadedConfig = config;
+        logDebug(`🔧 Ключей: ${headers.length}`);
+        document.getElementById('step2').classList.add('done');
+
+        await applyJSONDesign(config);
+
+      } catch (err) {
+        console.error("Ошибка JSON:", err);
+        logDebug(" Ошибка JSON: " + err.message);
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  // --- 8. Анимация с UI.update() ---
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+
+    // ВАЖНО: Вызываем UI.update() для обновления layout
+    ThreeMeshUI.update();
+
+    if (prefabStructure) {
+      prefabStructure.rotation.y = Math.sin(Date.now() * 0.0005) * 0.08;
+    }
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+</script>
+</body>
+</html>

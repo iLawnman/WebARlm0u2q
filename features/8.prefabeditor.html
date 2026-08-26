@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>refactor Редактор — Квест Платформа</title>
+
+  <link rel="stylesheet" href="./css/styles.css">
+  <link rel="stylesheet" href="./css/editor-sim.css">
+
+  <script src="./js/utils.js"></script>
+  <script src="./js/panels.js"></script>
+  <script src="./js/objects.js"></script>
+  <script src="./js/scene.js"></script>
+  <script src="./js/io.js"></script>
+  <script src="./js/inspector.js"></script>
+  <script src="./js/main.js"></script>
+  <script src="js/prefab3Ddesign.js"></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS3DRenderer.js"></script>
+
+  <script src="./js/questbuilder.js"></script>
+  <script src="./js/design-preview.js"></script>
+  <script src="./js/questsim.js"></script>
+
+  <style>
+    /* ===== Toolbars always on top ===== */
+    .preview-toolbar,
+    .sim-toolbar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 16px;
+      background: rgba(20, 20, 24, 0.98);
+      border-bottom: 1px solid #2a2a30;
+      z-index: 10000;
+      box-sizing: border-box;
+    }
+    .preview-toolbar button,
+    .sim-toolbar button {
+      background: #2a2a30;
+      border: 1px solid #3a3a44;
+      color: #e0e0e5;
+      padding: 6px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+    .preview-toolbar button:hover,
+    .sim-toolbar button:hover {
+      background: #3a3a48;
+    }
+
+    /* Design preview overlay */
+    #design-preview-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      display: none;
+      flex-direction: column;
+      background: #0a0a0f;
+      z-index: 100;
+    }
+    #design-preview-frame {
+      flex: 1;
+      margin-top: 48px;
+      border: none;
+      width: 100%;
+      background: #0a0a0f;
+    }
+
+    /* Sim overlay */
+    #sim-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #0d0d12;
+      display: none;
+      flex-direction: column;
+      z-index: 2000;
+    }
+    #sim-overlay.active {
+      display: flex;
+    }
+    #sim-body {
+      flex: 1;
+      margin-top: 48px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+  </style>
+  <base target="_blank">
+</head>
+<body>
+
+<div id="sidebar">
+  <div class="section">
+    <h3>Локальные префабы</h3>
+    <button onclick="window.__editor && window.__editor.loadLocalPrefab && window.__editor.loadLocalPrefab()">Загрузить дефолтный шаблон</button>
+    <button onclick="document.getElementById('file-input').click()">Открыть HTML...</button>
+    <button class="btn-success" onclick="document.getElementById('json-input').click()">Загрузить JSON дизайн</button>
+    <button onclick="window.__editor && window.__editor.exportHTML && window.__editor.exportHTML()">Сохранить HTML</button>
+    <button onclick="showPrefab3DDesign()">Показать префаб с дизайном в 3D</button>
+    <input type="file" id="file-input" style="display:none" accept=".html,.template" onchange="window.__editor && window.__editor.handleFileSelect && window.__editor.handleFileSelect(event)">
+    <input type="file" id="json-input" style="display:none" accept=".json" onchange="window.DesignPreview && window.DesignPreview.handleJsonFile(event)">
+    <select id="json-row-selector" style="display:none; margin-top:6px;" onchange="window.DesignPreview && window.DesignPreview.handleRowChange(event)"></select>
+    <div id="json-status"></div>
+    <button id="btn-hide-design" style="display:none; margin-top:4px;" onclick="window.DesignPreview && window.DesignPreview.hidePreview()">Скрыть превью</button>
+  </div>
+  <div class="section">
+    <h3>Симуляция квеста</h3>
+    <button onclick="document.getElementById('bundle-json-input').click()">Загрузить JSON(ы)</button>
+    <input type="file" id="bundle-json-input" style="display:none" accept=".json" multiple onchange="QuestSim.handleBundleFiles(event)">
+    <button id="btn-start-sim" class="btn-run" style="display:none; margin-top:6px;" onclick="QuestSim.start()">▶ Запустить симуляцию</button>
+    <div id="sim-status"></div>
+  </div>
+  <div class="section">
+    <h3>Добавить 3D Элемент</h3>
+    <button onclick="window.__editor && window.__editor.addObject3D && window.__editor.addObject3D()">+ 3D Объект (OBJ)</button>
+    <button onclick="window.__editor && window.__editor.addPanel && window.__editor.addPanel()">+ UI Панель</button>
+    <button onclick="window.__editor && window.__editor.addVideoObject3D && window.__editor.addVideoObject3D()">+ Video</button>
+    <button onclick="window.__editor && window.__editor.addHtmlObject3D && window.__editor.addHtmlObject3D()">+ Other HTML</button>
+  </div>
+  <div class="section hierarchy">
+    <h3>Иерархия сцены</h3>
+    <div id="tree"></div>
+  </div>
+</div>
+
+<div id="viewport">
+  <canvas id="canvas3d"></canvas>
+  <div id="design-preview-overlay">
+    <div class="preview-toolbar">
+      <button onclick="window.DesignPreview && window.DesignPreview.hidePreview()">✕ Закрыть</button>
+      <button onclick="window.DesignPreview && window.DesignPreview.exportDesignHTML()">⬇ Скачать HTML</button>
+      <span id="preview-title" style="margin-left:auto; font-size:13px; color:#aaa;"></span>
+    </div>
+    <iframe id="design-preview-frame" title="Design Preview"></iframe>
+  </div>
+</div>
+
+<div id="sim-overlay">
+  <div class="sim-toolbar">
+    <button onclick="QuestSim.start() stop()">✕ Закрыть</button>
+    <button onclick="QuestSim.exportHTML()">⬇ Скачать HTML</button>
+    <span id="sim-toolbar-title" style="margin-left:auto; font-size:13px; color:#aaa;">Симуляция квеста</span>
+  </div>
+  <div id="sim-body">
+    <div class="sim-bg-img" id="sim-bg"></div>
+    <div id="sim-timer-wrap"><div id="sim-timer-bar"></div></div>
+
+    <div id="sim-quest-banner">
+      <button type="button" id="sim-quest-banner-close" title="Закрыть">✕</button>
+      <div id="sim-quest-banner-text"></div>
+    </div>
+
+    <div id="sim-root">
+      <header id="sim-title-bar" class="sim-panel">
+        <div class="sim-panel-corner tl" id="sim-title-c-tl"></div>
+        <div class="sim-panel-corner tr" id="sim-title-c-tr"></div>
+        <div class="sim-panel-corner bl" id="sim-title-c-bl"></div>
+        <div class="sim-panel-corner br" id="sim-title-c-br"></div>
+        <div id="sim-title-text"></div>
+        <div id="sim-quest-badge"></div>
+      </header>
+      <aside class="side-panel" id="sim-left">
+        <div class="help-card sim-panel" id="sim-help-up">
+          <div class="sim-panel-corner tl" data-corner="left"></div>
+          <div class="sim-panel-corner tr" data-corner="left"></div>
+          <div class="sim-panel-corner bl" data-corner="left"></div>
+          <div class="sim-panel-corner br" data-corner="left"></div>
+          <div class="side-mandala" id="sim-left-mandala"></div>
+          <h4>💡 Подсказка</h4>
+          <div class="help-body"></div>
+        </div>
+        <div class="help-card sim-panel" id="sim-help-down">
+          <div class="sim-panel-corner tl" data-corner="left"></div>
+          <div class="sim-panel-corner tr" data-corner="left"></div>
+          <div class="sim-panel-corner bl" data-corner="left"></div>
+          <div class="sim-panel-corner br" data-corner="left"></div>
+          <h4>🔍 Совет</h4>
+          <div class="help-body"></div>
+        </div>
+      </aside>
+      <main id="sim-main" class="sim-panel">
+        <div class="sim-panel-corner tl" id="sim-main-c-tl"></div>
+        <div class="sim-panel-corner tr" id="sim-main-c-tr"></div>
+        <div class="sim-panel-corner bl" id="sim-main-c-bl"></div>
+        <div class="sim-panel-corner br" id="sim-main-c-br"></div>
+        <div class="deco-line" id="sim-decor-1"></div>
+        <div id="sim-narrative" class="narrative" style="display:none;"></div>
+        <div class="deco-line" id="sim-decor-2"></div>
+        <div id="sim-main-content"></div>
+        <div class="deco-line" id="sim-decor-3"></div>
+      </main>
+      <aside class="side-panel" id="sim-right">
+        <div class="help-card sim-panel" id="sim-right-help">
+          <div class="sim-panel-corner tl" data-corner="right"></div>
+          <div class="sim-panel-corner tr" data-corner="right"></div>
+          <div class="sim-panel-corner bl" data-corner="right"></div>
+          <div class="sim-panel-corner br" data-corner="right"></div>
+          <div class="side-mandala" id="sim-right-mandala"></div>
+          <h4>📜 Заметка</h4>
+          <div class="help-body"></div>
+        </div>
+      </aside>
+      <footer id="sim-footer">
+        <div id="sim-buttons-area"></div>
+      </footer>
+    </div>
+    <div id="sim-reaction">
+      <div id="sim-reaction-sign"></div>
+      <div id="sim-reaction-text"></div>
+      <button class="action-btn" id="sim-reaction-btn" style="margin-top:28px;">Дальше</button>
+    </div>
+  </div>
+</div>
+
+<div id="inspector">
+  <h3>Свойства объекта</h3>
+  <div id="inspector-content">
+    <p style="font-size: 13px; color: var(--muted); margin-top: 8px; line-height: 1.5;">Выберите элемент в сцене для редактирования.</p>
+  </div>
+</div>
+
+</body>
+</html>

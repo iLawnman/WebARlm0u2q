@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>fix 1 Base Image Recognition AR (Three.js / WebXR)</title>
+  <link rel="stylesheet" href="style.css">
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three/examples/jsm/"
+      }
+    }
+  </script>
+
+  <!-- overlaylog.js должен загрузиться и перехватить console.* до старта основного модуля -->
+  <script src="overlaylog.js"></script>
+</head>
+<body>
+
+<div id="hint">
+  Наведите камеру на распечатанное изображение-маркер — оно будет распознано автоматически.
+</div>
+
+<div id="unsupported" style="display:none;">
+  <div>
+    <h2>WebXR AR недоступен</h2>
+    <p>
+      Откройте страницу на Android-устройстве в Chrome (ARCore) по HTTPS,
+      или на устройстве с поддержкой WebXR immersive-ar + image-tracking.
+    </p>
+  </div>
+</div>
+
+<button id="btn-end-ar">End AR</button>
+
+<div id="ar-button-container">
+  <button id="start-ar-btn" disabled>▶ Start AR</button>
+</div>
+
+<div id="webgl-container"></div>
+
+<script type="module">
+  import * as THREE from 'three';
+
+  // ---------------------------------------------------------------------------
+  // UI LOG SYSTEM
+  // ---------------------------------------------------------------------------
+  class UI {
+    constructor() {
+      this.btnAr = document.getElementById('start-ar-btn');
+      this.btnEndAr = document.getElementById('btn-end-ar');
+      this.hintDiv = document.getElementById('hint');
+      this.unsupportedDiv = document.getElementById('unsupported');
+    }
+
+    // Логирование переведено на overlaylog.js: он перехватывает
+    // console.log/warn/error и сам рисует оверлей-панель со свайпом,
+    // сворачиванием и очисткой, так что своя #log-panel больше не нужна.
+    log(msg, type = 'info') {
+      switch (type) {
+        case 'err':
+          console.error(msg);
+          break;
+        case 'warn':
+          console.warn(msg);
+          break;
+        default:
+          console.log(msg);
+          break;
+      }
+    }
+
+    enableArButton() {
+      this.btnAr.disabled = false;
+    }
+
+    disableArButton() {
+      this.btnAr.disabled = true;
+    }
+
+    // Точь-в-точь как в рабочем ar.js: показываем экран "AR недоступен"
+    // и блокируем кнопку запуска.
+    showUnsupported() {
+      this.unsupportedDiv.style.display = 'flex';
+      this.btnAr.disabled = true;
+    }
+
+    showEndArButton(show) {
+      this.btnEndAr.style.display = show ? 'block' : 'none';
+    }
+
+    // Как в ar.js: единый класс на body скрывает подсказку и кнопку
+    // запуска через уже существующие правила в style.css
+    // (body.ar-active #hint / body.ar-active #ar-button-container).
+    setArActive(active) {
+      document.body.classList.toggle('ar-active', active);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // IMAGE RECOGNITION SYSTEM
+  // ---------------------------------------------------------------------------
+  class BaseImageRecognition {
+    constructor(ui) {
+      this.ui = ui;
+      this.targetBitmaps = [];
+      this.trackedMarkers = new Map();
+    }
+
+    static MANIFEST_URL = '../assets/recognitionimages.json';
+
+    async makeGeneratedBitmap() {
+      this.ui.log('Generating fallback bitmap...', 'warn');
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 512;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#f0f0f0';
+      ctx.fillRect(0, 0, 512, 512);
+      ctx.fillStyle = '#ff0055';
+      ctx.fillRect(128, 128, 256, 256);
+      const blob = await new Promise(res => c.toBlob(res, 'image/png'));
+      return await createImageBitmap(blob);
+    }
+
+    async loadImageList() {
+      const url = BaseImageRecognition.MANIFEST_URL;
+      this.ui.log('Loading image list from: ' + url, 'info');
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        let items = Array.isArray(data) ? data : (data.images || data.markers || []);
+        if (!Array.isArray(items) || items.length === 0) throw new Error('Empty image list');
+
+        return items.map((item, i) => {
+          if (typeof item === 'string') {
+            const name = item.replace(/\.[^.]+$/, '') || ('T' + (i + 1));
+            const src = item.startsWith('./') || item.startsWith('/') || item.startsWith('http') ? item : '../assets/recoimages/' + item;
+            return { name, src };
+          }
+          const name = item.name || item.id || ('T' + (i + 1));
+          let src = item.src || item.url || item.path || item.file;
+          if (!src.startsWith('./') && !src.startsWith('/') && !src.startsWith('http')) src = '../assets/recoimages/' + src;
+          return { name, src };
+        });
+      } catch (e) {
+        this.ui.log('Manifest load failed: ' + e.message, 'err');
+        return null;
+      }
+    }
+
+    async loadTargetImage(src) {
+      try {
+        const res = await fetch(src);
+        if (res.ok) {
+          const blob = await res.blob();
+          const bmp = await createImageBitmap(blob);
+          return { bmp, source: 'fetch' };
+        }
+      } catch (e) {
+        this.ui.log('Fetch failed for target: ' + src, 'warn');
+      }
+      return null;
+    }
+
+    async init() {
+      this.targetBitmaps = [];
+      const list = await this.loadImageList();
+
+      if (list && list.length) {
+        for (const item of list) {
+          const result = await this.loadTargetImage(item.src);
+          if (result && result.bmp) {
+            this.targetBitmaps.push({ bmp: result.bmp, name: item.name, src: item.src });
+            this.ui.log('Ready target: ' + item.name, 'ok');
+          }
+        }
+      }
+
+      if (this.targetBitmaps.length === 0) {
+        this.ui.log('No targets loaded. Using generated fallback', 'err');
+        const bmp = await this.makeGeneratedBitmap();
+        this.targetBitmaps.push({ bmp, name: 'FallbackTarget', src: '(generated)' });
+      }
+
+      this.ui.enableArButton();
+    }
+
+    getTrackedImages(widthInMeters = 0.2) {
+      return this.targetBitmaps.map(t => ({
+        image: t.bmp,
+        widthInMeters
+      }));
+    }
+
+    getMarkerName(idx) {
+      return this.targetBitmaps[idx] ? this.targetBitmaps[idx].name : ('T' + (idx + 1));
+    }
+
+    // Создание 3D сферы при первичном распознавании изображения
+    createSphereTarget() {
+      const group = new THREE.Group();
+
+      const geometry = new THREE.SphereGeometry(0.08, 32, 32);
+      const material = new THREE.MeshStandardMaterial({
+        color: 0x00ffaa,
+        roughness: 0.3,
+        metalness: 0.8,
+        wireframe: false
+      });
+      const sphere = new THREE.Mesh(geometry, material);
+      sphere.position.set(0, 0.08, 0); // Легкий сдвиг над центром маркера
+
+      group.add(sphere);
+      return group;
+    }
+
+    processTracking(frame, xrRefSpace, scene) {
+      if (!frame || typeof frame.getImageTrackingResults !== 'function') return;
+
+      const results = frame.getImageTrackingResults();
+      if (!results) return;
+
+      const seen = new Set();
+
+      for (const result of results) {
+        if (!result) continue;
+        const trackingState = result.trackingState;
+        const idx = result.index;
+        seen.add(idx);
+
+        const pose = frame.getPose(result.imageSpace, xrRefSpace);
+        if (!pose || !pose.transform) continue;
+
+        let entry = this.trackedMarkers.get(idx);
+
+        // Если маркер виден впервые — создаем скрафченный 3D анкор/сферу
+        if (!entry) {
+          const markerName = this.getMarkerName(idx);
+          const sphereNode = this.createSphereTarget();
+
+          scene.add(sphereNode);
+          entry = { node: sphereNode, lastState: trackingState };
+          this.trackedMarkers.set(idx, entry);
+
+          this.ui.log(`[Recognized] Image "${markerName}" (Index: ${idx}). Created anchor sphere.`, 'ok');
+        }
+
+        // Обновляем трансформы объекта по данным AR Pose
+        const target = entry.node;
+        const pos = pose.transform.position;
+        const ori = pose.transform.orientation;
+
+        if (Number.isFinite(pos.x) && Number.isFinite(pos.y) && Number.isFinite(pos.z)) {
+          target.position.set(pos.x, pos.y, pos.z);
+        }
+        if (Number.isFinite(ori.x) && Number.isFinite(ori.y) && Number.isFinite(ori.z) && Number.isFinite(ori.w)) {
+          target.quaternion.set(ori.x, ori.y, ori.z, ori.w);
+        }
+
+        target.scale.setScalar(trackingState === 'emulated' ? 0.7 : 1.0);
+        entry.lastState = trackingState;
+      }
+
+      // Обработка потери трекинга
+      for (const [idx, entry] of this.trackedMarkers) {
+        if (!seen.has(idx) && entry.lastState !== 'lost') {
+          entry.lastState = 'lost';
+          this.ui.log(`[Tracking Lost] Marker index: ${idx}`, 'warn');
+        }
+      }
+    }
+
+    reset(scene) {
+      for (const [, entry] of this.trackedMarkers) {
+        if (entry.node) {
+          scene.remove(entry.node);
+          entry.node.traverse(obj => {
+            if (obj.geometry) obj.geometry.dispose();
+            if (obj.material) obj.material.dispose();
+          });
+        }
+      }
+      this.trackedMarkers.clear();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // THREE.JS & WEBXR APP SCENE
+  // ---------------------------------------------------------------------------
+  class App {
+    constructor() {
+      this.ui = new UI();
+      this.recognition = new BaseImageRecognition(this.ui);
+
+      this.renderer = null;
+      this.scene = null;
+      this.camera = null;
+
+      this.xrSession = null;
+      this.xrRefSpace = null;
+
+      // Кнопка Start AR становится активной только когда ОБА условия
+      // выполнены: подтверждена поддержка WebXR (как в ar.js) И готовы
+      // цели распознавания. Раньше кнопка включалась только по второму
+      // условию, и требуемая проверка поддержки не выполнялась вовсе.
+      this.xrSupported = false;
+      this.targetsReady = false;
+
+      this.initThree();
+      this.initEvents();
+      this.checkXRSupport();
+    }
+
+    // Перенесено один в один из рабочего ar.js: проверяем navigator.xr
+    // и isSessionSupported('immersive-ar') ДО того, как разрешить нажатие
+    // Start AR, и показываем экран "AR недоступен", если поддержки нет.
+    async checkXRSupport() {
+      if (!navigator.xr) {
+        this.ui.log('WebXR не поддерживается браузером', 'err');
+        this.ui.showUnsupported();
+        this.xrSupported = false;
+        return false;
+      }
+
+      try {
+        const supported = await navigator.xr.isSessionSupported('immersive-ar');
+        if (!supported) {
+          this.ui.log('immersive-ar не поддерживается', 'err');
+          this.ui.showUnsupported();
+          this.xrSupported = false;
+          return false;
+        }
+        this.ui.log('WebXR AR поддерживается', 'ok');
+        this.xrSupported = true;
+        this.updateStartButtonState();
+        return true;
+      } catch (e) {
+        this.ui.log('Ошибка проверки WebXR: ' + e.message, 'err');
+        this.ui.showUnsupported();
+        this.xrSupported = false;
+        return false;
+      }
+    }
+
+    updateStartButtonState() {
+      if (this.xrSupported && this.targetsReady) {
+        this.ui.enableArButton();
+      }
+    }
+
+    initThree() {
+      this.scene = new THREE.Scene();
+      this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+
+      // Источники света
+      const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+      light.position.set(0.5, 1, 0.25);
+      this.scene.add(light);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      dirLight.position.set(0, 5, 5);
+      this.scene.add(dirLight);
+
+      // КЛЮЧЕВОЕ ОТЛИЧИЕ рабочего ar.js: WebGL-контекст создаётся вручную
+      // с атрибутом xrCompatible: true СРАЗУ при создании, а не через
+      // асинхронный gl.makeXRCompatible(), который Three.js иначе вызывает
+      // сам внутри renderer.xr.setSession(). На части устройств/браузеров
+      // эта асинхронная договорённость отрабатывает нестабильно и именно
+      // из-за этого AR-камера могла не запускаться.
+      const canvas = document.createElement('canvas');
+      let gl = canvas.getContext('webgl2', { xrCompatible: true, alpha: true, antialias: true });
+      if (!gl) {
+        gl = canvas.getContext('webgl', { xrCompatible: true, alpha: true, antialias: true });
+      }
+      if (!gl) {
+        this.ui.log('WebGL не поддерживается', 'err');
+        this.ui.showUnsupported();
+        return;
+      }
+
+      this.renderer = new THREE.WebGLRenderer({ canvas, context: gl, antialias: true, alpha: true });
+      this.renderer.setPixelRatio(window.devicePixelRatio);
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
+      this.renderer.xr.enabled = true;
+
+      // Монтируем canvas в #webgl-container, как в рабочем примере,
+      // а не напрямую в body.
+      document.getElementById('webgl-container').appendChild(this.renderer.domElement);
+
+      window.addEventListener('resize', () => {
+        this.camera.aspect = window.innerWidth / window.innerHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      this.ui.log('Three.js scene initialized.', 'info');
+
+      this.recognition.init().then(() => {
+        this.targetsReady = true;
+        this.updateStartButtonState();
+      });
+    }
+
+    initEvents() {
+      this.ui.btnAr.addEventListener('click', () => this.startAR());
+      this.ui.btnEndAr.addEventListener('click', () => this.endAR());
+    }
+
+    async startAR() {
+      if (!navigator.xr) {
+        this.ui.log('WebXR not supported on this browser', 'err');
+        return;
+      }
+
+      try {
+        const trackedImages = this.recognition.getTrackedImages(0.2);
+
+        this.ui.log('Запуск AR сессии...', 'info');
+
+        const sessionInit = {
+          requiredFeatures: ['image-tracking'],
+          optionalFeatures: ['dom-overlay'],
+          // Без объекта domOverlay фича 'dom-overlay' не активируется,
+          // даже если она указана в optionalFeatures — перенесено из ar.js.
+          domOverlay: { root: document.body },
+          trackedImages: trackedImages
+        };
+
+        const session = await navigator.xr.requestSession('immersive-ar', sessionInit);
+        this.xrSession = session;
+
+        // Регистрируем обработчик завершения сессии сразу,
+        // до всех дальнейших await — чтобы не пропустить событие 'end'
+        session.addEventListener('end', () => this.onSessionEnded());
+
+        // КРИТИЧНО: обязательно дожидаемся setSession.
+        // Это асинхронный метод, который привязывает XR-сессию к WebGL-слою рендерера.
+        // Без await рендер-луп и запрос reference space могли стартовать раньше,
+        // чем сессия готова отдавать кадры — из-за этого AR-камера не запускалась,
+        // а сама сессия могла обрываться (нет поданных кадров -> таймаут).
+        await this.renderer.xr.setSession(session);
+
+        this.ui.showEndArButton(true);
+        this.ui.setArActive(true);
+        this.ui.log('AR Session started successfully', 'ok');
+
+        this.xrRefSpace = await session.requestReferenceSpace('local');
+
+        // Запуск главного render loop
+        this.renderer.setAnimationLoop((time, frame) => this.render(time, frame));
+
+      } catch (e) {
+        this.ui.log('Failed to start AR Session: ' + e.message, 'err');
+        // Видимая ошибка пользователю, как в ar.js — не только запись в лог.
+        alert('Не удалось запустить AR: ' + e.message);
+      }
+    }
+
+    onSessionEnded() {
+      this.ui.log('AR Session ended', 'warn');
+      this.recognition.reset(this.scene);
+      this.ui.showEndArButton(false);
+      this.ui.setArActive(false);
+      this.updateStartButtonState();
+      this.renderer.setAnimationLoop(null);
+      this.xrSession = null;
+    }
+
+    endAR() {
+      if (this.xrSession) {
+        this.xrSession.end();
+      }
+    }
+
+    render(time, frame) {
+      // Оборачиваем кадр в try/catch: необработанное исключение внутри
+      // колбэка setAnimationLoop может молча остановить подачу кадров в XR-сессию
+      // (визуально это выглядит как "всё зависло" без единой записи в лог).
+      try {
+        if (frame && this.xrRefSpace) {
+          this.recognition.processTracking(frame, this.xrRefSpace, this.scene);
+        }
+        this.renderer.render(this.scene, this.camera);
+      } catch (e) {
+        this.ui.log('Render frame error: ' + e.message, 'err');
+      }
+    }
+  }
+
+  // Старт приложения при полной загрузке DOM
+  window.addEventListener('DOMContentLoaded', () => {
+    new App();
+  });
+</script>
+</body>
+</html>

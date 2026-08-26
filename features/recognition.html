@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Base Image Recognition AR (Three.js / WebXR)</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; background: #000; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+    canvas { display: block; }
+
+    /* Лог панель */
+    #log-panel {
+      position: fixed; top: 10px; right: 10px; width: 320px; max-height: 75vh;
+      background: rgba(0,0,0,0.78); backdrop-filter: blur(8px);
+      border-radius: 12px; border: 1px solid rgba(255,255,255,0.12);
+      color: #0f0; font-family: 'SF Mono', Monaco, monospace; font-size: 11px;
+      line-height: 1.5; overflow-y: auto; z-index: 100;
+      transition: transform .3s ease, opacity .3s ease;
+      padding: 12px; word-break: break-word;
+    }
+    #log-panel.collapsed { transform: translateX(calc(100% + 30px)); opacity: 0; pointer-events: none; }
+    #log-panel .entry { margin-bottom: 4px; }
+    #log-panel .entry.err { color: #ff4444; }
+    #log-panel .entry.warn { color: #ffaa00; }
+    #log-panel .entry.info { color: #44aaff; }
+    #log-panel .entry.ok { color: #44ff44; }
+    #log-toggle {
+      position: fixed; top: 10px; right: 10px; z-index: 101;
+      background: rgba(0,0,0,0.6); color: #fff; border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px; padding: 6px 14px; font-size: 12px; cursor: pointer;
+      backdrop-filter: blur(4px);
+    }
+
+    /* Кнопка "End AR" */
+    #btn-end-ar {
+      position: fixed; top: 10px; left: 10px; z-index: 101;
+      background: rgba(255, 59, 48, 0.8); color: #fff; border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer;
+      backdrop-filter: blur(4px); display: none;
+    }
+
+    /* Управление запуском AR */
+    #ctrl {
+      position: fixed; bottom: 24px; left: 0; width: 100%;
+      display: flex; justify-content: center; gap: 12px; z-index: 50;
+      pointer-events: none;
+    }
+    #ctrl button {
+      pointer-events: auto; padding: 12px 24px; font-size: 15px;
+      border: none; border-radius: 10px; font-weight: 600; cursor: pointer;
+      background: #fff; color: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+    #ctrl button:disabled { opacity: .45; cursor: not-allowed; }
+    #btn-ar { display: none; }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+
+<button id="btn-end-ar">End AR</button>
+<button id="log-toggle">LOG</button>
+<div id="log-panel"></div>
+
+<div id="ctrl">
+  <button id="btn-ar" disabled>Start AR</button>
+</div>
+
+<script type="module">
+  import * as THREE from 'three';
+
+  // ---------------------------------------------------------------------------
+  // UI LOG SYSTEM
+  // ---------------------------------------------------------------------------
+  class UI {
+    constructor() {
+      this.logPanel = document.getElementById('log-panel');
+      this.logToggleBtn = document.getElementById('log-toggle');
+      this.btnAr = document.getElementById('btn-ar');
+      this.btnEndAr = document.getElementById('btn-end-ar');
+
+      this.logToggleBtn.addEventListener('click', () => {
+        this.logPanel.classList.toggle('collapsed');
+      });
+    }
+
+    log(msg, type = 'info') {
+      const entry = document.createElement('div');
+      entry.className = `entry ${type}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      this.logPanel.appendChild(entry);
+      this.logPanel.scrollTop = this.logPanel.scrollHeight;
+      console.log(`[${type.toUpperCase()}] ${msg}`);
+    }
+
+    enableArButton() {
+      this.btnAr.style.display = 'inline-block';
+      this.btnAr.disabled = false;
+    }
+
+    showEndArButton(show) {
+      this.btnEndAr.style.display = show ? 'block' : 'none';
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // IMAGE RECOGNITION SYSTEM
+  // ---------------------------------------------------------------------------
+  class BaseImageRecognition {
+    constructor(ui) {
+      this.ui = ui;
+      this.targetBitmaps = [];
+      this.trackedMarkers = new Map();
+    }
+
+    static MANIFEST_URL = './assets/recognitionimages.json';
+
+    async makeGeneratedBitmap() {
+      this.ui.log('Generating fallback bitmap...', 'warn');
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 512;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#f0f0f0';
+      ctx.fillRect(0, 0, 512, 512);
+      ctx.fillStyle = '#ff0055';
+      ctx.fillRect(128, 128, 256, 256);
+      const blob = await new Promise(res => c.toBlob(res, 'image/png'));
+      return await createImageBitmap(blob);
+    }
+
+    async loadImageList() {
+      const url = BaseImageRecognition.MANIFEST_URL;
+      this.ui.log('Loading image list from: ' + url, 'info');
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        let items = Array.isArray(data) ? data : (data.images || data.markers || []);
+        if (!Array.isArray(items) || items.length === 0) throw new Error('Empty image list');
+
+        return items.map((item, i) => {
+          if (typeof item === 'string') {
+            const name = item.replace(/\.[^.]+$/, '') || ('T' + (i + 1));
+            const src = item.startsWith('./') || item.startsWith('/') || item.startsWith('http') ? item : './assets/' + item;
+            return { name, src };
+          }
+          const name = item.name || item.id || ('T' + (i + 1));
+          let src = item.src || item.url || item.path || item.file;
+          if (!src.startsWith('./') && !src.startsWith('/') && !src.startsWith('http')) src = './assets/' + src;
+          return { name, src };
+        });
+      } catch (e) {
+        this.ui.log('Manifest load failed: ' + e.message, 'err');
+        return null;
+      }
+    }
+
+    async loadTargetImage(src) {
+      try {
+        const res = await fetch(src);
+        if (res.ok) {
+          const blob = await res.blob();
+          const bmp = await createImageBitmap(blob);
+          return { bmp, source: 'fetch' };
+        }
+      } catch (e) {
+        this.ui.log('Fetch failed for target: ' + src, 'warn');
+      }
+      return null;
+    }
+
+    async init() {
+      this.targetBitmaps = [];
+      const list = await this.loadImageList();
+
+      if (list && list.length) {
+        for (const item of list) {
+          const result = await this.loadTargetImage(item.src);
+          if (result && result.bmp) {
+            this.targetBitmaps.push({ bmp: result.bmp, name: item.name, src: item.src });
+            this.ui.log('Ready target: ' + item.name, 'ok');
+          }
+        }
+      }
+
+      if (this.targetBitmaps.length === 0) {
+        this.ui.log('No targets loaded. Using generated fallback', 'err');
+        const bmp = await this.makeGeneratedBitmap();
+        this.targetBitmaps.push({ bmp, name: 'FallbackTarget', src: '(generated)' });
+      }
+
+      this.ui.enableArButton();
+    }
+
+    getTrackedImages(widthInMeters = 0.2) {
+      return this.targetBitmaps.map(t => ({
+        image: t.bmp,
+        widthInMeters
+      }));
+    }
+
+    getMarkerName(idx) {
+      return this.targetBitmaps[idx] ? this.targetBitmaps[idx].name : ('T' + (idx + 1));
+    }
+
+    // Создание 3D сферы при первичном распознавании изображения
+    createSphereTarget() {
+      const group = new THREE.Group();
+
+      const geometry = new THREE.SphereGeometry(0.08, 32, 32);
+      const material = new THREE.MeshStandardMaterial({
+        color: 0x00ffaa,
+        roughness: 0.3,
+        metalness: 0.8,
+        wireframe: false
+      });
+      const sphere = new THREE.Mesh(geometry, material);
+      sphere.position.set(0, 0.08, 0); // Легкий сдвиг над центром маркера
+
+      group.add(sphere);
+      return group;
+    }
+
+    processTracking(frame, xrRefSpace, scene) {
+      if (!frame || typeof frame.getImageTrackingResults !== 'function') return;
+
+      const results = frame.getImageTrackingResults();
+      if (!results) return;
+
+      const seen = new Set();
+
+      for (const result of results) {
+        if (!result) continue;
+        const trackingState = result.trackingState;
+        const idx = result.index;
+        seen.add(idx);
+
+        const pose = frame.getPose(result.imageSpace, xrRefSpace);
+        if (!pose || !pose.transform) continue;
+
+        let entry = this.trackedMarkers.get(idx);
+
+        // Если маркер виден впервые — создаем скрафченный 3D анкор/сферу
+        if (!entry) {
+          const markerName = this.getMarkerName(idx);
+          const sphereNode = this.createSphereTarget();
+
+          scene.add(sphereNode);
+          entry = { node: sphereNode, lastState: trackingState };
+          this.trackedMarkers.set(idx, entry);
+
+          this.ui.log(`[Recognized] Image "${markerName}" (Index: ${idx}). Created anchor sphere.`, 'ok');
+        }
+
+        // Обновляем трансформы объекта по данным AR Pose
+        const target = entry.node;
+        const pos = pose.transform.position;
+        const ori = pose.transform.orientation;
+
+        if (Number.isFinite(pos.x) && Number.isFinite(pos.y) && Number.isFinite(pos.z)) {
+          target.position.set(pos.x, pos.y, pos.z);
+        }
+        if (Number.isFinite(ori.x) && Number.isFinite(ori.y) && Number.isFinite(ori.z) && Number.isFinite(ori.w)) {
+          target.quaternion.set(ori.x, ori.y, ori.z, ori.w);
+        }
+
+        target.scale.setScalar(trackingState === 'emulated' ? 0.7 : 1.0);
+        entry.lastState = trackingState;
+      }
+
+      // Обработка потери трекинга
+      for (const [idx, entry] of this.trackedMarkers) {
+        if (!seen.has(idx) && entry.lastState !== 'lost') {
+          entry.lastState = 'lost';
+          this.ui.log(`[Tracking Lost] Marker index: ${idx}`, 'warn');
+        }
+      }
+    }
+
+    reset(scene) {
+      for (const [, entry] of this.trackedMarkers) {
+        if (entry.node) {
+          scene.remove(entry.node);
+          entry.node.traverse(obj => {
+            if (obj.geometry) obj.geometry.dispose();
+            if (obj.material) obj.material.dispose();
+          });
+        }
+      }
+      this.trackedMarkers.clear();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // THREE.JS & WEBXR APP SCENE
+  // ---------------------------------------------------------------------------
+  class App {
+    constructor() {
+      this.ui = new UI();
+      this.recognition = new BaseImageRecognition(this.ui);
+
+      this.renderer = null;
+      this.scene = null;
+      this.camera = null;
+
+      this.xrSession = null;
+      this.xrRefSpace = null;
+
+      this.initThree();
+      this.initEvents();
+    }
+
+    initThree() {
+      this.scene = new THREE.Scene();
+      this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+
+      // Источники света
+      const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+      light.position.set(0.5, 1, 0.25);
+      this.scene.add(light);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      dirLight.position.set(0, 5, 5);
+      this.scene.add(dirLight);
+
+      this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      this.renderer.setPixelRatio(window.devicePixelRatio);
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
+      this.renderer.xr.enabled = true;
+      document.body.appendChild(this.renderer.domElement);
+
+      window.addEventListener('resize', () => {
+        this.camera.aspect = window.innerWidth / window.innerHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      this.ui.log('Three.js scene initialized.', 'info');
+      this.recognition.init();
+    }
+
+    initEvents() {
+      this.ui.btnAr.addEventListener('click', () => this.startAR());
+      this.ui.btnEndAr.addEventListener('click', () => this.endAR());
+    }
+
+    async startAR() {
+      if (!navigator.xr) {
+        this.ui.log('WebXR not supported on this browser', 'err');
+        return;
+      }
+
+      try {
+        const trackedImages = this.recognition.getTrackedImages(0.2);
+
+        const sessionInit = {
+          requiredFeatures: ['image-tracking'],
+          optionalFeatures: ['dom-overlay'],
+          trackedImages: trackedImages
+        };
+
+        const session = await navigator.xr.requestSession('immersive-ar', sessionInit);
+        this.xrSession = session;
+        this.renderer.xr.setSession(session);
+
+        this.ui.showEndArButton(true);
+        this.ui.btnAr.style.display = 'none';
+        this.ui.log('AR Session started successfully', 'ok');
+
+        this.xrRefSpace = await session.requestReferenceSpace('local');
+
+        session.addEventListener('end', () => this.onSessionEnded());
+
+        // Запуск главного render loop
+        this.renderer.setAnimationLoop((time, frame) => this.render(time, frame));
+
+      } catch (e) {
+        this.ui.log('Failed to start AR Session: ' + e.message, 'err');
+      }
+    }
+
+    onSessionEnded() {
+      this.ui.log('AR Session ended', 'warn');
+      this.recognition.reset(this.scene);
+      this.ui.showEndArButton(false);
+      this.ui.enableArButton();
+      this.renderer.setAnimationLoop(null);
+      this.xrSession = null;
+    }
+
+    endAR() {
+      if (this.xrSession) {
+        this.xrSession.end();
+      }
+    }
+
+    render(time, frame) {
+      if (frame && this.xrRefSpace) {
+        this.recognition.processTracking(frame, this.xrRefSpace, this.scene);
+      }
+      this.renderer.render(this.scene, this.camera);
+    }
+  }
+
+  // Старт приложения при полной загрузке DOM
+  window.addEventListener('DOMContentLoaded', () => {
+    new App();
+  });
+</script>
+</body>
+</html>

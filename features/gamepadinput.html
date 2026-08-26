@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>🎮 Gamepad Input Tester</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  body {
+    background: radial-gradient(ellipse at center, #1e293b 0%, #0f172a 100%);
+    color: #e2e8f0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    min-height: 100vh;
+    padding: 20px;
+    overflow-x: hidden;
+  }
+
+  h1 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #a5b4fc;
+    text-shadow: 0 0 20px rgba(129, 140, 248, 0.5);
+    font-size: 24px;
+  }
+
+  .hint {
+    text-align: center;
+    color: #94a3b8;
+    font-size: 13px;
+    margin-bottom: 20px;
+    padding: 10px;
+    background: rgba(30, 41, 59, 0.5);
+    border-radius: 8px;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .hint strong { color: #fbbf24; }
+
+  .container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  @media (max-width: 800px) {
+    .container { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 12px;
+    padding: 16px;
+    backdrop-filter: blur(10px);
+  }
+
+  .panel h2 {
+    color: #a5b4fc;
+    font-size: 14px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  }
+
+  /* Кнопки геймпада */
+  .buttons-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+
+  .gamepad-btn {
+    aspect-ratio: 1;
+    background: rgba(30, 41, 59, 0.8);
+    border: 2px solid rgba(99, 102, 241, 0.3);
+    border-radius: 8px;
+    color: #94a3b8;
+    font-size: 11px;
+    font-weight: 600;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.1s ease;
+    cursor: pointer;
+    position: relative;
+  }
+
+  .gamepad-btn .idx {
+    font-size: 9px;
+    color: #64748b;
+    margin-top: 2px;
+  }
+
+  .gamepad-btn.pressed {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border-color: #c7d2fe;
+    color: white;
+    box-shadow: 0 0 20px rgba(129, 140, 248, 0.8);
+    transform: scale(0.95);
+  }
+
+  /* Оси */
+  .axis-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding: 8px;
+    background: rgba(30, 41, 59, 0.5);
+    border-radius: 6px;
+  }
+
+  .axis-label {
+    font-size: 11px;
+    color: #94a3b8;
+    min-width: 50px;
+  }
+
+  .axis-bar {
+    flex: 1;
+    height: 20px;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 10px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .axis-fill {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 0;
+    background: linear-gradient(90deg, #10b981, #34d399);
+    transition: left 0.05s, width 0.05s;
+    border-radius: 10px;
+  }
+
+  .axis-fill.negative {
+    left: auto;
+    right: 50%;
+    background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  }
+
+  .axis-value {
+    font-size: 11px;
+    color: #e2e8f0;
+    min-width: 60px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Статус подключения */
+  .status {
+    padding: 10px;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 8px;
+    color: #fca5a5;
+    font-size: 12px;
+    text-align: center;
+    margin-bottom: 16px;
+  }
+
+  .status.connected {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: rgba(16, 185, 129, 0.3);
+    color: #6ee7b7;
+  }
+
+  .gamepad-id {
+    font-size: 10px;
+    color: #64748b;
+    margin-top: 4px;
+    word-break: break-all;
+  }
+</style>
+</head>
+<body>
+
+<h1>🎮 Gamepad Input Tester</h1>
+
+<div class="hint">
+  Подключите геймпад или USB-джойстик и нажмите любую кнопку для активации.<br>
+  Логи всех событий отображаются в <strong>перетаскиваемом оверлее</strong> слева.
+</div>
+
+<div class="container">
+  <!-- Панель статуса и кнопок -->
+  <div class="panel">
+    <h2>📡 Статус и кнопки</h2>
+    <div id="status" class="status">⏳ Ожидание подключения геймпада...</div>
+    
+    <h2 style="margin-top: 16px;">🔘 Кнопки</h2>
+    <div id="buttons-grid" class="buttons-grid">
+      <!-- Кнопки генерируются JS -->
+    </div>
+  </div>
+
+  <!-- Панель осей -->
+  <div class="panel">
+    <h2>🕹️ Оси (стики / триггеры)</h2>
+    <div id="axes-container">
+      <div style="color: #64748b; font-size: 12px; text-align: center; padding: 20px;">
+        Оси появятся после подключения устройства
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Overlay Log -->
+<script src="overlaylog.js"></script>
+
+<!-- Gamepad Manager (модуль) -->
+<script type="module">
+  import { GamepadManager } from './gamepad.js';
+
+  const BUTTON_NAMES = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 
+                        'Back', 'Start', 'L3', 'R3', '↑', '↓', '←', '→', 'Home'];
+
+  const statusEl = document.getElementById('status');
+  const buttonsGrid = document.getElementById('buttons-grid');
+  const axesContainer = document.getElementById('axes-container');
+
+  let activeGamepadIndex = null;
+  let buttonElements = [];
+  let axisElements = [];
+
+  // Инициализация менеджера
+  const gpManager = new GamepadManager({
+    deadzone: 0.15,
+    pollingInterval: 16
+  });
+
+  // --- Подключение ---
+  gpManager.on('connect', (e) => {
+    activeGamepadIndex = e.index;
+    statusEl.classList.add('connected');
+    statusEl.innerHTML = `✅ Геймпад подключен (Index: ${e.index})<div class="gamepad-id">${e.id}</div><div class="gamepad-id">Mapping: ${e.mapping || 'custom/old (DirectInput)'}</div>`;
+    
+    console.log(`🎮 Подключен: ${e.id}`);
+    console.log(`📊 Mapping: ${e.mapping || 'нестандартный'}`);
+    
+    buildUI(e.index);
+  });
+
+  gpManager.on('disconnect', (e) => {
+    if (e.index === activeGamepadIndex) {
+      activeGamepadIndex = null;
+      statusEl.classList.remove('connected');
+      statusEl.innerHTML = '⏳ Ожидание подключения геймпада...';
+      buttonsGrid.innerHTML = '';
+      axesContainer.innerHTML = '<div style="color: #64748b; font-size: 12px; text-align: center; padding: 20px;">Оси появятся после подключения устройства</div>';
+      console.warn(`🔌 Отключен: ${e.id}`);
+    }
+  });
+
+  // --- Кнопки ---
+  gpManager.on('buttondown', (e) => {
+    if (e.index !== activeGamepadIndex) return;
+    
+    const name = BUTTON_NAMES[e.button] || `Btn ${e.button}`;
+    const value = e.value !== undefined ? ` (value: ${e.value.toFixed(2)})` : '';
+    
+    console.log(`👇 Кнопка [${e.button}] "${name}" НАЖАТА${value}`);
+    
+    if (buttonElements[e.button]) {
+      buttonElements[e.button].classList.add('pressed');
+    }
+  });
+
+  gpManager.on('buttonup', (e) => {
+    if (e.index !== activeGamepadIndex) return;
+    
+    const name = BUTTON_NAMES[e.button] || `Btn ${e.button}`;
+    console.log(`👆 Кнопка [${e.button}] "${name}" ОТПУЩЕНА`);
+    
+    if (buttonElements[e.button]) {
+      buttonElements[e.button].classList.remove('pressed');
+    }
+  });
+
+  // --- Оси ---
+  gpManager.on('axis', (e) => {
+    if (e.index !== activeGamepadIndex) return;
+    
+    if (axisElements[e.axis]) {
+      const { fill, valueEl } = axisElements[e.axis];
+      const v = e.value;
+      
+      valueEl.textContent = v.toFixed(3);
+      
+      if (v >= 0) {
+        fill.classList.remove('negative');
+        fill.style.left = '50%';
+        fill.style.width = (v * 50) + '%';
+        fill.style.right = 'auto';
+      } else {
+        fill.classList.add('negative');
+        fill.style.right = '50%';
+        fill.style.left = 'auto';
+        fill.style.width = (Math.abs(v) * 50) + '%';
+      }
+    }
+    
+    // Логируем только значимые изменения (чтобы не засорять консоль)
+    if (Math.abs(e.value) > 0.5) {
+      console.log(`🕹️ Ось [${e.axis}]: ${e.value.toFixed(3)}`);
+    }
+  });
+
+  // --- Построение UI ---
+  function buildUI(gamepadIndex) {
+    const raw = gpManager.getRawState(gamepadIndex);
+    if (!raw) return;
+
+    // Кнопки
+    buttonsGrid.innerHTML = '';
+    buttonElements = [];
+    for (let i = 0; i < raw.buttons.length; i++) {
+      const btn = document.createElement('div');
+      btn.className = 'gamepad-btn';
+      const name = BUTTON_NAMES[i] || `Btn`;
+      btn.innerHTML = `<span>${name}</span><span class="idx">#${i}</span>`;
+      buttonsGrid.appendChild(btn);
+      buttonElements[i] = btn;
+    }
+
+    // Оси
+    axesContainer.innerHTML = '';
+    axisElements = [];
+    for (let i = 0; i < raw.axes.length; i++) {
+      const row = document.createElement('div');
+      row.className = 'axis-row';
+      row.innerHTML = `
+        <div class="axis-label">Axis ${i}</div>
+        <div class="axis-bar"><div class="axis-fill"></div></div>
+        <div class="axis-value">0.000</div>
+      `;
+      axesContainer.appendChild(row);
+      axisElements[i] = {
+        fill: row.querySelector('.axis-fill'),
+        valueEl: row.querySelector('.axis-value')
+      };
+    }
+
+    console.log(`🎛️ UI построен: ${raw.buttons.length} кнопок, ${raw.axes.length} осей`);
+  }
+</script>
+
+</body>
+</html>

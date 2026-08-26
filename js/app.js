@@ -66,15 +66,6 @@ export class App {
       this.ui.log('Settings failed to load, using defaults (unique_targets=0)', 'warn');
     }
 
-    // 2. Recognition
-    // TODO/VERIFY: recognition.js needs checking against its actual use of
-    // this third argument. It used to receive the standalone ARInput
-    // instance (for raycasting/binding target buttons); now that raycasting
-    // lives in ARScene, this passes arScene instead. If recognition.js calls
-    // arInput-specific methods (e.g. bindInteractiveEvent, addCSSObject) on
-    // it directly, those calls need to be updated to the ARScene equivalents
-    // (registerInteractive) or removed, since target buttons register
-    // themselves via ModelFactory now.
     this.recognition = new Recognition(this.ui, this.settings, this.arScene);
     await this.recognition.init();
 

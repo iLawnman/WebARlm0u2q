@@ -1,0 +1,270 @@
+/* =========================================================
+   Глобальный сброс
+   ========================================================= */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* =========================================================
+   Базовые стили страницы
+   ========================================================= */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #05070d;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+#webgl-container {
+  position: absolute;
+  inset: 0;
+}
+
+/* =========================================================
+   AR UI — подсказки и экран "не поддерживается"
+   ========================================================= */
+#hint {
+  position: absolute;
+  z-index: 3;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #e2e8f0;
+  font-size: 13px;
+  background: rgba(11, 17, 32, 0.8);
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  pointer-events: none;
+  text-align: center;
+  max-width: 90%;
+}
+
+#ar-info {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 8px;
+  font-size: 13px;
+  text-align: center;
+  z-index: 100;
+  pointer-events: none;
+}
+
+#unsupported,
+#ar-unsupported {
+  position: absolute;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #94a3b8;
+  padding: 32px;
+  background: rgba(5, 7, 13, 0.95);
+}
+
+#unsupported h2,
+#ar-unsupported h2 {
+  color: #f8fafc;
+  margin-bottom: 12px;
+}
+
+#unsupported p,
+#ar-unsupported p {
+  max-width: 420px;
+  line-height: 1.5;
+}
+
+/* =========================================================
+   Кнопка запуска AR
+   ========================================================= */
+#ar-button-container {
+  position: fixed;
+  bottom: 40px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+#start-ar-btn {
+  pointer-events: auto;
+  padding: 16px 40px;
+  border-radius: 12px;
+  border: none;
+  background: #6366f1;
+  color: white;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  box-shadow: 0 8px 30px rgba(99, 102, 241, 0.5);
+  transition: all 0.2s ease;
+}
+
+#start-ar-btn:hover {
+  background: #4f46e5;
+  transform: translateY(-2px);
+}
+
+#start-ar-btn:active {
+  transform: translateY(0);
+}
+
+#start-ar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #475569;
+}
+
+body.ar-active #ar-button-container {
+  display: none;
+}
+
+body.ar-active #hint {
+  display: none;
+}
+
+/* =========================================================
+   Recognition AR — canvas
+   ========================================================= */
+canvas {
+  display: block;
+}
+
+#btn-end-ar {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 101;
+  background: rgba(255, 59, 48, 0.8);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  display: none;
+}
+
+/* =========================================================
+   Overlay Log
+   ========================================================= */
+#overlay-log-container {
+  position: fixed;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 320px;
+  max-height: 70vh;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  z-index: 10000;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#overlay-log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(30, 41, 59, 0.8);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  cursor: move;
+  user-select: none;
+}
+
+#overlay-log-title {
+  color: #e2e8f0;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+#overlay-log-controls {
+  display: flex;
+  gap: 6px;
+}
+
+#overlay-log-controls button {
+  background: rgba(99, 102, 241, 0.2);
+  border: 1px solid rgba(129, 140, 248, 0.3);
+  color: #e0e7ff;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+#overlay-log-controls button:hover {
+  background: rgba(99, 102, 241, 0.4);
+}
+
+#overlay-log-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  max-height: calc(70vh - 40px);
+  transition: max-height 0.3s ease;
+}
+
+#overlay-log-content.collapsed {
+  max-height: 0;
+  padding: 0 8px;
+  overflow: hidden;
+}
+
+.log-entry {
+  padding: 4px 6px;
+  margin-bottom: 4px;
+  border-radius: 4px;
+  word-wrap: break-word;
+  line-height: 1.4;
+}
+
+.log-entry.log {
+  color: #e2e8f0;
+  background: rgba(30, 41, 59, 0.5);
+}
+
+.log-entry.warn {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.1);
+  border-left: 3px solid #fbbf24;
+}
+
+.log-entry.error {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.1);
+  border-left: 3px solid #f87171;
+}
+
+.log-entry .timestamp {
+  color: #64748b;
+  font-size: 9px;
+  margin-right: 6px;
+}
+
+#overlay-log-content::-webkit-scrollbar { width: 6px; }
+#overlay-log-content::-webkit-scrollbar-track { background: rgba(30, 41, 59, 0.3); }
+#overlay-log-content::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.5); border-radius: 3px; }
