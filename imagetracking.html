@@ -1,334 +1,136 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-    <title>4 WebXR Image Tracking</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6 WebXR Image Tracking Example</title>
     <style>
-        html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
-        #startButton {
-            position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%);
-            z-index: 10; padding: 14px 22px; font: 16px sans-serif;
-            border: none; border-radius: 8px; cursor: pointer;
-            background: #4CAF50; color: white;
-        }
-        #status {
-            position: fixed; left: 0; right: 260px; bottom: 0;
-            padding: 10px 14px; font: 13px/1.4 monospace; color: #fff;
-            background: rgba(0,0,0,0.55); z-index: 10; pointer-events: none;
-        }
-        #logPanel {
-            position: fixed; top: 0; right: 0; bottom: 0; width: 260px;
-            background: rgba(0,0,0,0.75); color: #0f0; z-index: 20;
-            font: 11px/1.35 monospace; overflow-y: auto;
-            padding: 8px; box-sizing: border-box;
-            border-left: 1px solid rgba(255,255,255,0.2);
-        }
-        #logPanel .entry { white-space: pre-wrap; word-break: break-word; margin-bottom: 4px; }
-        #logPanel .entry.warn { color: #ff0; }
-        #logPanel .entry.error { color: #f55; }
-        #logPanel .t { color: #888; }
+        body { margin: 0; overflow: hidden; font-family: sans-serif; }
+        #ar-button { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 12px 24px; background: #007bff; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; z-index: 999; }
+        #ar-button:disabled { background: #aaa; cursor: not-allowed; }
     </style>
 </head>
 <body>
-<button id="startButton">Start AR</button>
-<div id="status"></div>
-<div id="logPanel"></div>
 
-<script type="importmap">
-    {
-      "imports": {
-        "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-      }
-    }
-</script>
+<button id="ar-button" disabled>Checking WebXR Support...</button>
+
+<!-- The physical marker image we want the camera to look for -->
+<img id="tracker-image" src="./assets/recoimages/T1.jpg" crossOrigin="anonymous" style="display: none;" />
 
 <script type="module">
-    import * as THREE from "three";
+    const button = document.getElementById('ar-button');
+    const imgElement = document.getElementById('tracker-image');
+    let xrSession = null;
+    let xrRefSpace = null;
 
-    const statusEl = document.getElementById("status");
-    const logPanel = document.getElementById("logPanel");
-    const startButton = document.getElementById("startButton");
-
-    const TRACKED_IMAGE_URL = "./assets/recoimages/T1.jpg";
-    const TRACKED_IMAGE_WIDTH_METERS = 0.1;
-
-    let renderer, scene, camera;
-    let trackedImageBitmap;
-    let placedNode = null;
-    let frameCounter = 0;
-    let session = null;
-
-    function logLine(msg, level) {
-        const time = new Date().toISOString().substring(11, 23);
-        const entry = document.createElement("div");
-        entry.className = "entry" + (level ? " " + level : "");
-        entry.textContent = `[${time}] ${msg}`;
-        logPanel.appendChild(entry);
-        logPanel.scrollTop = logPanel.scrollHeight;
-
-        const consoleFn = level === "error" ? console.error : level === "warn" ? console.warn : console.log;
-        consoleFn("[webxr-image-tracking]", msg);
-    }
-
-    function setStatus(msg) {
-        statusEl.textContent = msg;
-        logLine(msg);
-    }
-
-    async function loadTrackedImage(url) {
-        logLine(`Loading tracked image: ${url}`);
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        const blob = await response.blob();
-        logLine(`Image loaded: ${blob.size} bytes`);
-        const bitmap = await createImageBitmap(blob);
-        logLine(`Image decoded: ${bitmap.width}x${bitmap.height}px`);
-        return bitmap;
-    }
-
-    function initThree() {
-        logLine("Initializing THREE");
-        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        renderer.setPixelRatio(window.devicePixelRatio);
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.xr.enabled = true;
-        document.body.appendChild(renderer.domElement);
-
-        scene = new THREE.Scene();
-        camera = new THREE.PerspectiveCamera();
-
-        const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
-        scene.add(light);
-
-        const gridHelper = new THREE.GridHelper(1, 10);
-        gridHelper.position.y = -0.05;
-        scene.add(gridHelper);
-
-        window.addEventListener("resize", () => {
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-
-        logLine("THREE initialized");
-    }
-
-    function buildContentNode() {
-        const size = TRACKED_IMAGE_WIDTH_METERS * 0.5;
-        const geometry = new THREE.BoxGeometry(size, size, size);
-        const material = new THREE.MeshStandardMaterial({
-            color: 0x00ff00,
-            emissive: 0x00aa00,
-            emissiveIntensity: 0.3,
-            metalness: 0.1,
-            roughness: 0.5
-        });
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.visible = false;
-
-        const edges = new THREE.EdgesGeometry(geometry);
-        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff }));
-        mesh.add(line);
-
-        scene.add(mesh);
-        logLine(`Content node created`);
-        return mesh;
-    }
-
-    // Проверка поддержки image-tracking без создания XRFrame
-    function checkImageTrackingSupport() {
-        // Проверяем наличие метода в прототипе XRFrame
-        // Используем XRSession или navigator.xr для проверки
-        if (!navigator.xr) return false;
-
-        // Проверяем через сессию - более надежный способ
-        // Создаем временную сессию для проверки
-        return 'image-tracking' in navigator.xr;
-    }
-
-    async function startAR() {
-        logLine("=== START AR ===");
-
-        if (!navigator.xr) {
-            throw new Error("WebXR not available");
-        }
-
-        let supported = false;
-        try {
-            supported = await navigator.xr.isSessionSupported("immersive-ar");
-        } catch (err) {
-            throw new Error(`isSessionSupported failed: ${err.message}`);
-        }
-
-        if (!supported) {
-            throw new Error("Immersive AR not supported");
-        }
-        logLine("Immersive AR supported");
-
-        // Загружаем изображение
-        try {
-            trackedImageBitmap = await loadTrackedImage(TRACKED_IMAGE_URL);
-        } catch (err) {
-            throw new Error(`Image load failed: ${err.message}`);
-        }
-
-        initThree();
-        placedNode = buildContentNode();
-
-        // Пробуем создать сессию с image-tracking
-        logLine("Requesting AR session with image-tracking...");
-
-        let session;
-        try {
-            session = await navigator.xr.requestSession("immersive-ar", {
-                requiredFeatures: ["local-floor", "image-tracking"],
-                trackedImages: [{
-                    image: trackedImageBitmap,
-                    widthInMeters: TRACKED_IMAGE_WIDTH_METERS,
-                }]
-            });
-            logLine("Session created with image-tracking");
-        } catch (err) {
-            // Если image-tracking не поддерживается, пробуем без него
-            if (err.message && err.message.includes("image-tracking")) {
-                logLine("Image-tracking not supported, trying without...", "warn");
-                try {
-                    session = await navigator.xr.requestSession("immersive-ar", {
-                        requiredFeatures: ["local-floor"]
-                    });
-                    logLine("Session created without image-tracking", "warn");
-                    setStatus("⚠️ Image tracking not supported");
-                } catch (err2) {
-                    throw new Error(`Session failed: ${err2.message}`);
-                }
+    // 1. Verify WebXR and Image Tracking feature support
+    if ('xr' in navigator) {
+        navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+            if (supported) {
+                button.textContent = 'Start AR Experience';
+                button.disabled = false;
+                button.addEventListener('click', onButtonClicked);
             } else {
-                throw new Error(`Session failed: ${err.message}`);
+                button.textContent = 'AR Not Supported on this Device';
             }
-        }
+        });
+    } else {
+        button.textContent = 'WebXR Not Available';
+    }
 
-        startButton.style.display = "none";
-
-        await renderer.xr.setSession(session);
-        logLine("Session attached to renderer");
-
-        const referenceSpace = await session.requestReferenceSpace("local-floor");
-        if (!referenceSpace) {
-            throw new Error("Reference space failed");
-        }
-        logLine("Reference space acquired");
-
-        // Проверяем наличие image-tracking в реальной сессии
-        const hasImageTracking = 'getImageTrackingResults' in XRFrame.prototype;
-        logLine(`Image tracking API available: ${hasImageTracking}`);
-
-        renderer.setAnimationLoop((timestamp, frame) => {
-            frameCounter++;
-
-            if (!frame) {
-                if (frameCounter % 60 === 0) logLine("No frame", "warn");
-                return;
+    async function onButtonClicked() {
+        if (!xrSession) {
+            // Ensure target image is completely loaded
+            if (!imgElement.complete) {
+                await new Promise(resolve => imgElement.onload = resolve);
             }
 
-            let imageDetected = false;
+            // Convert the HTML Image into an ImageBitmap required by WebXR
+            const imageBitmap = await createImageBitmap(imgElement);
 
-            // Пытаемся получить результаты трекинга
-            if (hasImageTracking) {
-                try {
-                    const results = frame.getImageTrackingResults();
-
-                    if (results && results.length > 0) {
-                        for (const result of results) {
-                            if (result.trackedImageIndex === 0) {
-                                const state = result.trackingState;
-
-                                if (state === "tracked" || state === "emulated") {
-                                    try {
-                                        const pose = frame.getPose(result.imageSpace, referenceSpace);
-                                        if (pose) {
-                                            imageDetected = true;
-                                            placedNode.visible = true;
-                                            placedNode.matrix.fromArray(pose.transform.matrix);
-                                            placedNode.matrix.decompose(
-                                                placedNode.position,
-                                                placedNode.quaternion,
-                                                placedNode.scale
-                                            );
-
-                                            if (frameCounter % 30 === 0) {
-                                                setStatus(`✅ Tracked! State: ${state}`);
-                                            }
-                                            break;
-                                        }
-                                    } catch (poseErr) {
-                                        if (frameCounter % 60 === 0) {
-                                            logLine(`Pose error: ${poseErr.message}`, "warn");
-                                        }
-                                    }
-                                }
-                            }
-                        }
+            // 2. Configure the XR Session and request tracking features
+            const sessionOptions = {
+                requiredFeatures: ['image-tracking'],
+                trackedImages: [
+                    {
+                        image: imageBitmap, // The tracking target bitmap
+                        widthInMeters: 0.2  // Explicit physical width of marker in reality
                     }
-                } catch (err) {
-                    if (frameCounter % 60 === 0) {
-                        logLine(`Tracking error: ${err.message}`, "error");
-                    }
-                }
-            }
+                ]
+            };
 
-            if (!imageDetected) {
-                placedNode.visible = false;
-                if (frameCounter % 30 === 0) {
-                    setStatus(hasImageTracking ? "🔍 Searching..." : "⚠️ No tracking support");
-                }
-            }
+            navigator.xr.requestSession('immersive-ar', sessionOptions)
+                .then(onSessionStarted)
+                .catch(err => console.error("Failed to start session:", err));
+        } else {
+            xrSession.end();
+        }
+    }
 
-            renderer.render(scene, camera);
+    function onSessionStarted(session) {
+        xrSession = session;
+        button.textContent = 'Exit AR';
+
+        // Set up WebGL Context and link it to the WebXR Session layer
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl', { xrCompatible: true });
+        session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
+
+        // 3. Establish the base local coordinate reference space
+        session.requestReferenceSpace('local').then((refSpace) => {
+            xrRefSpace = refSpace;
+            // Kick off the native frame loop
+            session.requestAnimationFrame(onXRFrame);
         });
 
-        session.addEventListener("end", () => {
-            logLine("Session ended");
-            renderer.setAnimationLoop(null);
-            startButton.style.display = "block";
-            startButton.disabled = false;
-            startButton.textContent = "Start AR";
-            setStatus("Session ended");
-        });
-
-        session.addEventListener("visibilitychange", () => {
-            logLine(`Visibility: ${session.visibilityState}`);
+        session.addEventListener('end', () => {
+            xrSession = null;
+            button.textContent = 'Start AR Experience';
         });
     }
 
-    startButton.addEventListener("click", async () => {
-        try {
-            startButton.disabled = true;
-            startButton.textContent = "Starting...";
-            await startAR();
-        } catch (err) {
-            setStatus(`❌ ${err.message}`);
-            logLine(err.stack || String(err), "error");
-            startButton.disabled = false;
-            startButton.textContent = "Start AR";
-            startButton.style.display = "block";
+    // 4. Processing frame loops and querying image coordinates
+    function onXRFrame(time, frame) {
+        const session = frame.session;
+        session.requestAnimationFrame(onXRFrame);
+
+        const glLayer = session.renderState.baseLayer;
+        const gl = glLayer.context;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, glLayer.framebuffer);
+
+        // Fetch the tracking results specific to this frame
+        const results = frame.getImageTrackingResults();
+
+        for (const result of results) {
+            // The index corresponds directly to the array order in trackedImages configuration
+            const imageIndex = result.index;
+            const trackingState = result.trackingState; // Can be "tracked" or "emulated"
+
+            if (trackingState === "tracked") {
+                // Retrieve spatial position and rotation matrix relative to our space
+                const pose = frame.getPose(result.imageSpace, xrRefSpace);
+                if (pose) {
+                    const matrix = pose.transform.matrix;
+                    console.log(`Marker ${imageIndex} updated matrix:`, matrix);
+
+                    // TODO: Apply this 16-element transform matrix directly to your 
+                    // Three.js, Babylon.js, or WebGL custom 3D model entity.
+                }
+            } else if (trackingState === "emulated") {
+                // Marker is currently hidden from camera view, using last known position
+                console.log(`Marker ${imageIndex} tracking is currently emulated.`);
+            }
         }
-    });
 
-    logLine("Page loaded. Click Start AR.");
-
-    // Проверяем поддержку через features
-    if (navigator.xr) {
-        logLine("WebXR available");
-
-        // Проверка доступных features
-        try {
-            const supported = await navigator.xr.isSessionSupported("immersive-ar");
-            logLine(`Immersive AR support: ${supported}`);
-        } catch (err) {
-            logLine(`Support check error: ${err.message}`, "error");
+        // Standard camera rendering logic goes here
+        const viewerPose = frame.getViewerPose(xrRefSpace);
+        if (viewerPose) {
+            for (const view of viewerPose.views) {
+                const viewport = glLayer.getViewport(view);
+                gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
+                // Clear buffer and issue standard draw calls using view.transform.matrix
+            }
         }
-    } else {
-        logLine("WebXR NOT available", "error");
     }
 </script>
 </body>
