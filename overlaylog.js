@@ -1,6 +1,7 @@
 (function() {
   'use strict';
 
+  function init() {
   const logContainer = document.createElement('div');
   logContainer.id = 'overlay-log-container';
   logContainer.innerHTML = `
@@ -33,6 +34,7 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
+        pointer-events: auto;
       }
       #overlay-log-header {
         display: flex;
@@ -101,7 +103,14 @@
   `;
 
   document.head.insertAdjacentHTML('beforeend', styles);
-  document.body.appendChild(logContainer);
+
+  // Во время immersive-ar сессии браузер отображает ТОЛЬКО элемент,
+  // переданный как domOverlay.root (обычно #ar-overlay) — всё, что
+  // висит просто на document.body, во время AR-сессии скрывается.
+  // Поэтому монтируем лог внутрь #ar-overlay, если он есть на странице.
+  const arOverlayRoot = document.getElementById('ar-overlay');
+  const mountTarget = arOverlayRoot || document.body;
+  mountTarget.appendChild(logContainer);
 
   const logContent = document.getElementById('overlay-log-content');
   const toggleBtn = document.getElementById('overlay-log-toggle');
@@ -207,5 +216,12 @@
     isDragging = false;
   }
 
-  console.log('✅ Overlay Log инициализирован');
+  console.log('✅ Overlay Log инициализирован' + (arOverlayRoot ? ' (внутри #ar-overlay)' : ' (в document.body — #ar-overlay не найден)'));
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 })();
