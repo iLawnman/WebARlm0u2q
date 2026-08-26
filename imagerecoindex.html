@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Recognition Image</title>
+  <title>1 Recognition Image</title>
   <style>
     html, body {
       margin: 0;
@@ -315,9 +315,11 @@
       console.log(`[Reco] JSON распарсен, записей: ${recognitionImages.length}`, recognitionImages);
 
       for (const item of recognitionImages) {
-        const fileName = item.file || item.src || item.name;
+        const isPlainString = typeof item === 'string';
+        const fileName = isPlainString ? item : (item.file || item.src || item.name);
+        const displayName = isPlainString ? item.replace(/\.[^.]+$/, '') : (item.name || fileName);
         const imgUrl = `./assets/recoimages/${fileName}`;
-        console.log(`[Reco] Загружаю картинку "${item.name || fileName}" по адресу ${imgUrl} …`);
+        console.log(`[Reco] Загружаю картинку "${displayName}" по адресу ${imgUrl} …`);
         try {
           const imgResponse = await fetch(imgUrl);
           console.log(`[Reco]   → status=${imgResponse.status}, ok=${imgResponse.ok}, content-type=${imgResponse.headers.get('content-type')}`);
@@ -335,8 +337,8 @@
 
           trackedImagesData.push({
             image: bitmap,
-            widthInMeters: item.widthInMeters || 0.2,
-            name: item.name || fileName
+            widthInMeters: (!isPlainString && item.widthInMeters) || 0.2,
+            name: displayName
           });
         } catch (imgErr) {
           console.error(`[Reco] ❌ Ошибка при загрузке изображения ${imgUrl}:`, imgErr);
