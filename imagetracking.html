@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-    <title>overlay WebXR Image Tracking</title>
+    <title>dom WebXR Image Tracking</title>
     <style>
         html, body {
             margin: 0;
@@ -95,12 +95,22 @@
             left: 0 !important;
             z-index: 1 !important;
         }
+        /* WebXR DOM Overlay root — браузер держит этот элемент поверх AR-камеры.
+           Без регистрации 'dom-overlay' в requestSession() всё, что тут лежит,
+           во время immersive-ar сессии просто не рисуется, независимо от z-index. */
+        #overlay-container {
+            position: fixed;
+            inset: 0;
+            z-index: 999;
+            pointer-events: none; /* сам контейнер прозрачен для тапов */
+            display: none;        /* показываем только пока идёт AR-сессия */
+        }
+
         #ar-button {
             position: fixed;
-            left: 200px;
+            left: 50%;
             top: 50%;
             transform: translate(-50%,-50%);
-            z-index: 100;
             padding: 14px 22px;
             font: 16px sans-serif;
             border: none;
@@ -109,6 +119,7 @@
             background: #4CAF50;
             color: white;
             font-weight: bold;
+            pointer-events: auto; /* а кнопка внутри — кликабельна */
         }
     </style>
 </head>
@@ -134,6 +145,11 @@
     const statusEl = document.getElementById("status");
     const logPanel = document.getElementById("logPanel");
     const startButton = document.getElementById("startButton");
+    const arButtonEl = document.getElementById("ar-button");
+
+    arButtonEl.addEventListener("click", () => {
+        logLine("✅ Клик по 'Нажми меня' сработал (DOM Overlay)");
+    });
 
     // Используем известное рабочее изображение для теста
     const TRACKED_IMAGE_URL = "./assets/recoimages/T1.jpg";
@@ -270,8 +286,12 @@
         // Создаем сессию с image-tracking
         logLine("Creating session with image-tracking...");
 
+        const overlayContainer = document.getElementById("overlay-container");
+
         const sessionInit = {
             requiredFeatures: ["local-floor", "image-tracking"],
+            optionalFeatures: ["dom-overlay"],
+            domOverlay: { root: overlayContainer },
             trackedImages: [{
                 image: imageBitmap,
                 widthInMeters: TRACKED_IMAGE_WIDTH_METERS,
@@ -309,6 +329,9 @@
         }
 
         logLine("🚀 Starting tracking loop");
+
+        // Показываем DOM Overlay (кнопку) на время AR-сессии
+        overlayContainer.style.display = "block";
 
         // Основной цикл
         renderer.setAnimationLoop((timestamp, frame) => {
@@ -387,6 +410,7 @@
         session.addEventListener("end", () => {
             logLine("Session ended");
             renderer.setAnimationLoop(null);
+            overlayContainer.style.display = "none";
             startButton.style.display = "block";
             startButton.disabled = false;
             startButton.textContent = "Start AR";
