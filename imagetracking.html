@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-    <title>9 WebXR Image Tracking</title>
+    <title>10 WebXR Image Tracking</title>
     <style>
         html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
         #startButton {
@@ -52,8 +52,8 @@
     const startButton = document.getElementById("startButton");
 
     // Используем известное рабочее изображение для теста
-    const TRACKED_IMAGE_URL = "https://raw.githubusercontent.com/immersive-web/webxr-samples/main/media/pinball.jpg";
-    const TRACKED_IMAGE_WIDTH_METERS = 0.2; // 20 см
+    const TRACKED_IMAGE_URL = "./assets/recoimages/T1.jpg";
+    const TRACKED_IMAGE_WIDTH_METERS = 0.1; // 20 см
 
     let renderer, scene, camera;
     let placedNode = null;
