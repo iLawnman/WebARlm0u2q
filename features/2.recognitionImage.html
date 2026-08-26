@@ -4,56 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>fix 1 Base Image Recognition AR (Three.js / WebXR)</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { overflow: hidden; background: #000; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
-    canvas { display: block; }
-
-    /* Лог панель */
-    #log-panel {
-      position: fixed; top: 10px; right: 10px; width: 320px; max-height: 75vh;
-      background: rgba(0,0,0,0.78); backdrop-filter: blur(8px);
-      border-radius: 12px; border: 1px solid rgba(255,255,255,0.12);
-      color: #0f0; font-family: 'SF Mono', Monaco, monospace; font-size: 11px;
-      line-height: 1.5; overflow-y: auto; z-index: 100;
-      transition: transform .3s ease, opacity .3s ease;
-      padding: 12px; word-break: break-word;
-    }
-    #log-panel.collapsed { transform: translateX(calc(100% + 30px)); opacity: 0; pointer-events: none; }
-    #log-panel .entry { margin-bottom: 4px; }
-    #log-panel .entry.err { color: #ff4444; }
-    #log-panel .entry.warn { color: #ffaa00; }
-    #log-panel .entry.info { color: #44aaff; }
-    #log-panel .entry.ok { color: #44ff44; }
-    #log-toggle {
-      position: fixed; top: 10px; right: 10px; z-index: 101;
-      background: rgba(0,0,0,0.6); color: #fff; border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 8px; padding: 6px 14px; font-size: 12px; cursor: pointer;
-      backdrop-filter: blur(4px);
-    }
-
-    /* Кнопка "End AR" */
-    #btn-end-ar {
-      position: fixed; top: 10px; left: 10px; z-index: 101;
-      background: rgba(255, 59, 48, 0.8); color: #fff; border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 8px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer;
-      backdrop-filter: blur(4px); display: none;
-    }
-
-    /* Управление запуском AR */
-    #ctrl {
-      position: fixed; bottom: 24px; left: 0; width: 100%;
-      display: flex; justify-content: center; gap: 12px; z-index: 50;
-      pointer-events: none;
-    }
-    #ctrl button {
-      pointer-events: auto; padding: 12px 24px; font-size: 15px;
-      border: none; border-radius: 10px; font-weight: 600; cursor: pointer;
-      background: #fff; color: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-    }
-    #ctrl button:disabled { opacity: .45; cursor: not-allowed; }
-    #btn-ar { display: none; }
-  </style>
+  <link rel="stylesheet" href="style.css">
 
   <script type="importmap">
     {
@@ -63,16 +14,33 @@
       }
     }
   </script>
+
+  <!-- overlaylog.js должен загрузиться и перехватить console.* до старта основного модуля -->
+  <script src="overlaylog.js"></script>
 </head>
 <body>
 
-<button id="btn-end-ar">End AR</button>
-<button id="log-toggle">LOG</button>
-<div id="log-panel"></div>
-
-<div id="ctrl">
-  <button id="btn-ar" disabled>Start AR</button>
+<div id="hint">
+  Наведите камеру на распечатанное изображение-маркер — оно будет распознано автоматически.
 </div>
+
+<div id="unsupported" style="display:none;">
+  <div>
+    <h2>WebXR AR недоступен</h2>
+    <p>
+      Откройте страницу на Android-устройстве в Chrome (ARCore) по HTTPS,
+      или на устройстве с поддержкой WebXR immersive-ar + image-tracking.
+    </p>
+  </div>
+</div>
+
+<button id="btn-end-ar">End AR</button>
+
+<div id="ar-button-container">
+  <button id="start-ar-btn" disabled>▶ Start AR</button>
+</div>
+
+<div id="webgl-container"></div>
 
 <script type="module">
   import * as THREE from 'three';
@@ -82,32 +50,53 @@
   // ---------------------------------------------------------------------------
   class UI {
     constructor() {
-      this.logPanel = document.getElementById('log-panel');
-      this.logToggleBtn = document.getElementById('log-toggle');
-      this.btnAr = document.getElementById('btn-ar');
+      this.btnAr = document.getElementById('start-ar-btn');
       this.btnEndAr = document.getElementById('btn-end-ar');
-
-      this.logToggleBtn.addEventListener('click', () => {
-        this.logPanel.classList.toggle('collapsed');
-      });
+      this.hintDiv = document.getElementById('hint');
+      this.unsupportedDiv = document.getElementById('unsupported');
     }
 
+    // Логирование переведено на overlaylog.js: он перехватывает
+    // console.log/warn/error и сам рисует оверлей-панель со свайпом,
+    // сворачиванием и очисткой, так что своя #log-panel больше не нужна.
     log(msg, type = 'info') {
-      const entry = document.createElement('div');
-      entry.className = `entry ${type}`;
-      entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-      this.logPanel.appendChild(entry);
-      this.logPanel.scrollTop = this.logPanel.scrollHeight;
-      console.log(`[${type.toUpperCase()}] ${msg}`);
+      switch (type) {
+        case 'err':
+          console.error(msg);
+          break;
+        case 'warn':
+          console.warn(msg);
+          break;
+        default:
+          console.log(msg);
+          break;
+      }
     }
 
     enableArButton() {
-      this.btnAr.style.display = 'inline-block';
       this.btnAr.disabled = false;
+    }
+
+    disableArButton() {
+      this.btnAr.disabled = true;
+    }
+
+    // Точь-в-точь как в рабочем ar.js: показываем экран "AR недоступен"
+    // и блокируем кнопку запуска.
+    showUnsupported() {
+      this.unsupportedDiv.style.display = 'flex';
+      this.btnAr.disabled = true;
     }
 
     showEndArButton(show) {
       this.btnEndAr.style.display = show ? 'block' : 'none';
+    }
+
+    // Как в ar.js: единый класс на body скрывает подсказку и кнопку
+    // запуска через уже существующие правила в style.css
+    // (body.ar-active #hint / body.ar-active #ar-button-container).
+    setArActive(active) {
+      document.body.classList.toggle('ar-active', active);
     }
   }
 
@@ -315,8 +304,53 @@
       this.xrSession = null;
       this.xrRefSpace = null;
 
+      // Кнопка Start AR становится активной только когда ОБА условия
+      // выполнены: подтверждена поддержка WebXR (как в ar.js) И готовы
+      // цели распознавания. Раньше кнопка включалась только по второму
+      // условию, и требуемая проверка поддержки не выполнялась вовсе.
+      this.xrSupported = false;
+      this.targetsReady = false;
+
       this.initThree();
       this.initEvents();
+      this.checkXRSupport();
+    }
+
+    // Перенесено один в один из рабочего ar.js: проверяем navigator.xr
+    // и isSessionSupported('immersive-ar') ДО того, как разрешить нажатие
+    // Start AR, и показываем экран "AR недоступен", если поддержки нет.
+    async checkXRSupport() {
+      if (!navigator.xr) {
+        this.ui.log('WebXR не поддерживается браузером', 'err');
+        this.ui.showUnsupported();
+        this.xrSupported = false;
+        return false;
+      }
+
+      try {
+        const supported = await navigator.xr.isSessionSupported('immersive-ar');
+        if (!supported) {
+          this.ui.log('immersive-ar не поддерживается', 'err');
+          this.ui.showUnsupported();
+          this.xrSupported = false;
+          return false;
+        }
+        this.ui.log('WebXR AR поддерживается', 'ok');
+        this.xrSupported = true;
+        this.updateStartButtonState();
+        return true;
+      } catch (e) {
+        this.ui.log('Ошибка проверки WebXR: ' + e.message, 'err');
+        this.ui.showUnsupported();
+        this.xrSupported = false;
+        return false;
+      }
+    }
+
+    updateStartButtonState() {
+      if (this.xrSupported && this.targetsReady) {
+        this.ui.enableArButton();
+      }
     }
 
     initThree() {
@@ -332,11 +366,31 @@
       dirLight.position.set(0, 5, 5);
       this.scene.add(dirLight);
 
-      this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      // КЛЮЧЕВОЕ ОТЛИЧИЕ рабочего ar.js: WebGL-контекст создаётся вручную
+      // с атрибутом xrCompatible: true СРАЗУ при создании, а не через
+      // асинхронный gl.makeXRCompatible(), который Three.js иначе вызывает
+      // сам внутри renderer.xr.setSession(). На части устройств/браузеров
+      // эта асинхронная договорённость отрабатывает нестабильно и именно
+      // из-за этого AR-камера могла не запускаться.
+      const canvas = document.createElement('canvas');
+      let gl = canvas.getContext('webgl2', { xrCompatible: true, alpha: true, antialias: true });
+      if (!gl) {
+        gl = canvas.getContext('webgl', { xrCompatible: true, alpha: true, antialias: true });
+      }
+      if (!gl) {
+        this.ui.log('WebGL не поддерживается', 'err');
+        this.ui.showUnsupported();
+        return;
+      }
+
+      this.renderer = new THREE.WebGLRenderer({ canvas, context: gl, antialias: true, alpha: true });
       this.renderer.setPixelRatio(window.devicePixelRatio);
       this.renderer.setSize(window.innerWidth, window.innerHeight);
       this.renderer.xr.enabled = true;
-      document.body.appendChild(this.renderer.domElement);
+
+      // Монтируем canvas в #webgl-container, как в рабочем примере,
+      // а не напрямую в body.
+      document.getElementById('webgl-container').appendChild(this.renderer.domElement);
 
       window.addEventListener('resize', () => {
         this.camera.aspect = window.innerWidth / window.innerHeight;
@@ -345,7 +399,11 @@
       });
 
       this.ui.log('Three.js scene initialized.', 'info');
-      this.recognition.init();
+
+      this.recognition.init().then(() => {
+        this.targetsReady = true;
+        this.updateStartButtonState();
+      });
     }
 
     initEvents() {
@@ -362,9 +420,14 @@
       try {
         const trackedImages = this.recognition.getTrackedImages(0.2);
 
+        this.ui.log('Запуск AR сессии...', 'info');
+
         const sessionInit = {
           requiredFeatures: ['image-tracking'],
           optionalFeatures: ['dom-overlay'],
+          // Без объекта domOverlay фича 'dom-overlay' не активируется,
+          // даже если она указана в optionalFeatures — перенесено из ar.js.
+          domOverlay: { root: document.body },
           trackedImages: trackedImages
         };
 
@@ -383,7 +446,7 @@
         await this.renderer.xr.setSession(session);
 
         this.ui.showEndArButton(true);
-        this.ui.btnAr.style.display = 'none';
+        this.ui.setArActive(true);
         this.ui.log('AR Session started successfully', 'ok');
 
         this.xrRefSpace = await session.requestReferenceSpace('local');
@@ -393,6 +456,8 @@
 
       } catch (e) {
         this.ui.log('Failed to start AR Session: ' + e.message, 'err');
+        // Видимая ошибка пользователю, как в ar.js — не только запись в лог.
+        alert('Не удалось запустить AR: ' + e.message);
       }
     }
 
@@ -400,7 +465,8 @@
       this.ui.log('AR Session ended', 'warn');
       this.recognition.reset(this.scene);
       this.ui.showEndArButton(false);
-      this.ui.enableArButton();
+      this.ui.setArActive(false);
+      this.updateStartButtonState();
       this.renderer.setAnimationLoop(null);
       this.xrSession = null;
     }
