@@ -5,7 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <title>WebXR Image Tracking</title>
   <style>
-    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
+
+    body:xr-overlay {
+      background: transparent;
+    }
 
     #startButton {
       position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%);
@@ -57,8 +61,8 @@
     // The tracked image must be provided as a decoded ImageBitmap plus its
     // physical width in meters, so AR.js's .patt marker file is not used here.
 
-    const TRACKED_IMAGE_URL = "assets/asset.png";
-    const TRACKED_IMAGE_WIDTH_METERS = 0.2; // measure your printed/screen image and set this correctly
+    const TRACKED_IMAGE_URL = "assets/recoimages/";
+    const TRACKED_IMAGE_WIDTH_METERS = 0.1; // measure your printed/screen image and set this correctly
 
     let renderer, scene, camera;
     let trackedImageBitmap;
@@ -179,6 +183,8 @@
       try {
         session = await navigator.xr.requestSession("immersive-ar", {
           requiredFeatures: ["image-tracking", "local-floor"],
+          optionalFeatures: ["dom-overlay"],
+          domOverlay: { root: document.body },
           trackedImages: [
             {
               image: trackedImageBitmap,
@@ -187,6 +193,43 @@
           ],
         });
         logLine("requestSession resolved OK");
+        if (session.domOverlayState) {
+          logLine("domOverlayState: " + session.domOverlayState.type);
+        } else {
+          logLine(
+            "dom-overlay unsupported on this device — the log panel will NOT be " +
+              "visible during the session. Use `adb logcat` / chrome://inspect " +
+              "remote debugging to read console.log output instead.",
+            "warn"
+          );
+        }
+
+        if (typeof session.getTrackedImageScores === "function") {
+          try {
+            const scores = await session.getTrackedImageScores();
+            scores.forEach((score, i) => {
+              logLine(
+                "Tracked image[" + i + "] score: " + score,
+                score === "untrackable" ? "error" : undefined
+              );
+            });
+            if (scores.some((s) => s === "untrackable")) {
+              logLine(
+                "Image marked UNTRACKABLE by the browser at session start — " +
+                  "this is why results are always empty. Use an image with more " +
+                  "contrast/detail/asymmetry, higher resolution, and no repeating patterns.",
+                "error"
+              );
+            }
+          } catch (scoreErr) {
+            logLine("getTrackedImageScores threw: " + scoreErr.message, "warn");
+          }
+        } else {
+          logLine(
+            "session.getTrackedImageScores not available in this browser build",
+            "warn"
+          );
+        }
       } catch (err) {
         setStatus("Failed to start immersive-ar session: " + err.message);
         logLine(err.stack || String(err), "error");
