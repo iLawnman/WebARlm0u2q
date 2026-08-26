@@ -3,253 +3,193 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WebXR Image Tracking + DOM Overlay</title>
+  <title>simple WebXR Image Tracking</title>
   <style>
-    html, body {
+    * {
       margin: 0;
       padding: 0;
-      width: 100%;
-      height: 100%;
+      box-sizing: border-box;
+    }
+
+    body {
       overflow: hidden;
-      background: #05070d;
+      background: #000;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      touch-action: none;
     }
 
-    #webgl-container {
-      position: absolute;
-      inset: 0;
-    }
-
-    #hint {
-      position: absolute;
-      z-index: 10;
-      top: 16px;
-      left: 50%;
-      transform: translateX(-50%);
-      color: #e2e8f0;
-      font-size: 13px;
-      background: rgba(11, 17, 32, 0.85);
-      padding: 8px 16px;
-      border-radius: 999px;
-      border: 1px solid rgba(148, 163, 184, 0.25);
-      pointer-events: none;
-      text-align: center;
-      max-width: 90%;
-      display: block;
-    }
-
-    /* WebXR DOM Overlay root */
-    #ar-overlay {
+    #container {
       position: fixed;
       inset: 0;
-      pointer-events: none;
-      display: none;
-      z-index: 1000;
     }
 
-    /* ---------- Панель лога ---------- */
-    #log-panel {
-      position: absolute;
-      top: 0;
-      right: 0;
-      bottom: 0;
-      width: 300px;
+    #info {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      color: #fff;
+      background: rgba(0,0,0,0.7);
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 14px;
+      text-align: center;
       pointer-events: none;
-      background: rgba(0, 0, 0, 0.88);
-      border-left: 2px solid rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255,255,255,0.1);
+      max-width: 90%;
+    }
+
+    #log-container {
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      width: 90%;
+      max-width: 600px;
+      max-height: 200px;
       overflow-y: auto;
-      padding: 12px 14px;
-      box-sizing: border-box;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 10px;
-      line-height: 1.6;
+      background: rgba(0,0,0,0.85);
+      border-radius: 12px;
+      padding: 10px 14px;
+      border: 1px solid rgba(255,255,255,0.1);
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
       color: #0f0;
+      pointer-events: none;
     }
 
-    #log-panel .entry {
-      padding: 3px 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    #log-container::-webkit-scrollbar {
+      width: 4px;
+    }
+    #log-container::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.2);
+      border-radius: 2px;
+    }
+
+    .log-entry {
+      padding: 2px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
       word-break: break-word;
     }
-
-    #log-panel .entry .time {
-      color: #64748b;
+    .log-entry .time {
+      color: #666;
       margin-right: 8px;
-      font-size: 9px;
     }
+    .log-entry.error { color: #ff6b6b; }
+    .log-entry.warn { color: #ffd93d; }
+    .log-entry.success { color: #6bcb77; }
 
-    #log-panel .entry.warn {
-      color: #fbbf24;
-      background: rgba(251, 191, 36, 0.05);
-    }
-
-    #log-panel .entry.error {
-      color: #f87171;
-      background: rgba(248, 113, 113, 0.05);
-    }
-
-    #log-panel .entry.success {
-      color: #34d399;
-      background: rgba(52, 211, 153, 0.05);
-    }
-
-    #log-panel .empty {
-      color: #475569;
-      font-style: italic;
-    }
-
-    /* ---------- Статус ---------- */
     #status {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 300px;
-      padding: 12px 16px;
-      background: rgba(0, 0, 0, 0.8);
-      border-top: 1px solid rgba(255, 255, 255, 0.1);
-      color: #e2e8f0;
-      font-size: 13px;
-      pointer-events: none;
-      font-family: monospace;
-    }
-
-    /* ---------- Кнопка запуска AR ---------- */
-    #ar-button-wrapper {
       position: fixed;
-      bottom: 80px;
+      bottom: 60px;
       left: 50%;
       transform: translateX(-50%);
-      z-index: 99999;
-      pointer-events: auto;
+      z-index: 10;
+      color: #fff;
+      font-size: 14px;
+      text-align: center;
+      pointer-events: none;
+      background: rgba(0,0,0,0.5);
+      padding: 6px 16px;
+      border-radius: 12px;
     }
 
-    #ar-button-wrapper button {
-      padding: 16px 40px;
-      border-radius: 14px;
-      border: none;
-      background: #6366f1;
-      color: white;
+    #ar-btn {
+      position: fixed;
+      bottom: 120px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      padding: 16px 48px;
       font-size: 20px;
       font-weight: 700;
+      color: #fff;
+      background: #6366f1;
+      border: none;
+      border-radius: 14px;
       cursor: pointer;
-      box-shadow: 0 8px 40px rgba(99, 102, 241, 0.5);
+      box-shadow: 0 8px 30px rgba(99,102,241,0.4);
       transition: all 0.2s;
-      letter-spacing: 0.5px;
-      pointer-events: auto;
-      position: relative;
       touch-action: manipulation;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
     }
 
-    #ar-button-wrapper button:hover {
-      background: #4f46e5;
-      transform: scale(1.03);
-      box-shadow: 0 8px 50px rgba(99, 102, 241, 0.6);
-    }
-
-    #ar-button-wrapper button:active {
+    #ar-btn:active {
       transform: scale(0.95);
     }
-
-    #ar-button-wrapper button:disabled {
+    #ar-btn:disabled {
       opacity: 0.5;
-      cursor: not-allowed;
       transform: none;
+      cursor: not-allowed;
+    }
+    #ar-btn.hidden {
+      display: none;
     }
 
-    /* ---------- Unsupported ---------- */
     #unsupported {
       position: fixed;
       inset: 0;
-      z-index: 99999;
+      z-index: 100;
       display: none;
       align-items: center;
       justify-content: center;
-      text-align: center;
-      color: #94a3b8;
-      padding: 32px;
       background: #05070d;
+      color: #94a3b8;
+      text-align: center;
+      padding: 20px;
       flex-direction: column;
     }
-
     #unsupported h2 {
       color: #f8fafc;
       margin-bottom: 12px;
       font-size: 24px;
     }
-
-    #unsupported p {
-      max-width: 500px;
-      line-height: 1.6;
-    }
-
     #unsupported .info {
       margin-top: 20px;
-      font-size: 12px;
-      color: #64748b;
+      font-size: 13px;
       background: rgba(255,255,255,0.05);
       padding: 12px 20px;
       border-radius: 8px;
       border: 1px solid rgba(255,255,255,0.05);
     }
-
-    #unsupported .info code {
+    #unsupported code {
       background: rgba(255,255,255,0.1);
       padding: 2px 8px;
       border-radius: 4px;
       color: #e2e8f0;
     }
-
-    #log-panel::-webkit-scrollbar {
-      width: 4px;
-    }
-
-    #log-panel::-webkit-scrollbar-track {
-      background: rgba(255, 255, 255, 0.05);
-    }
-
-    #log-panel::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.15);
-      border-radius: 2px;
-    }
-
-    #log-panel::-webkit-scrollbar-thumb:hover {
-      background: rgba(255, 255, 255, 0.25);
-    }
   </style>
 </head>
 <body>
 
-<div id="webgl-container"></div>
-<div id="hint">📷 Наведите камеру на изображение для трекинга</div>
+<div id="container"></div>
+
+<div id="info">📷 Наведите камеру на изображение</div>
 
 <div id="unsupported">
   <h2>⚠️ WebXR AR недоступен</h2>
-  <p>Откройте страницу на Android-устройстве в Chrome (ARCore) по HTTPS,<br>
-    или на устройстве с поддержкой WebXR immersive-ar.</p>
+  <p>Откройте страницу на Android в Chrome (ARCore) по HTTPS</p>
   <div class="info">
     Для image-tracking включите флаг:<br>
     <code>chrome://flags/#webxr-image-tracking</code>
   </div>
 </div>
 
-<!-- WebXR DOM Overlay root -->
-<div id="ar-overlay">
-  <div id="log-panel">
-    <div class="empty">🟢 Ожидание запуска...</div>
-  </div>
-  <div id="status">📌 Готов к запуску</div>
+<div id="log-container">
+  <div class="log-entry"><span class="time">[--:--:--]</span> Ожидание запуска...</div>
 </div>
 
-<!-- Кнопка AR -->
-<div id="ar-button-wrapper">
-  <button id="ar-start-btn">🚀 Start AR</button>
-</div>
+<div id="status">📌 Готов к запуску</div>
+
+<button id="ar-btn">🚀 Start AR</button>
 
 <script type="importmap">
   {
     "imports": {
-      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
     }
   }
 </script>
@@ -257,106 +197,99 @@
 <script type="module">
   import * as THREE from 'three';
 
-  // ---------- DOM элементы ----------
-  const webglContainer = document.getElementById('webgl-container');
-  const hint = document.getElementById('hint');
-  const unsupportedEl = document.getElementById('unsupported');
-  const arOverlay = document.getElementById('ar-overlay');
-  const logPanel = document.getElementById('log-panel');
+  // ---------- DOM ----------
+  const container = document.getElementById('container');
+  const logContainer = document.getElementById('log-container');
   const statusEl = document.getElementById('status');
-  const arButton = document.getElementById('ar-start-btn');
+  const arBtn = document.getElementById('ar-btn');
+  const unsupportedEl = document.getElementById('unsupported');
+  const infoEl = document.getElementById('info');
 
-  // ---------- Функции лога ----------
-  function logLine(msg, level = '') {
+  // ---------- Лог ----------
+  function log(msg, level = '') {
     const time = new Date().toISOString().substring(11, 23);
     const entry = document.createElement('div');
-    entry.className = `entry${level ? ' ' + level : ''}`;
+    entry.className = `log-entry${level ? ' ' + level : ''}`;
     entry.innerHTML = `<span class="time">[${time}]</span> ${msg}`;
+    logContainer.appendChild(entry);
+    logContainer.scrollTop = logContainer.scrollHeight;
 
-    const empty = logPanel.querySelector('.empty');
-    if (empty) empty.remove();
-
-    logPanel.appendChild(entry);
-    logPanel.scrollTop = logPanel.scrollHeight;
-
-    while (logPanel.children.length > 100) {
-      logPanel.removeChild(logPanel.firstChild);
+    while (logContainer.children.length > 50) {
+      logContainer.removeChild(logContainer.firstChild);
     }
 
-    const consoleFn = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
-    consoleFn('[ImageTracking]', msg);
+    console.log('[AR]', msg);
   }
 
   function setStatus(msg) {
     statusEl.textContent = msg;
-    logLine(msg);
+    log(msg);
   }
 
-  // ---------- Проверка поддержки WebXR ----------
+  // ---------- Проверка WebXR ----------
   if (!('xr' in navigator)) {
     unsupportedEl.style.display = 'flex';
-    logLine('❌ WebXR не поддерживается', 'error');
+    log('WebXR не поддерживается', 'error');
   } else {
-    navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+    navigator.xr.isSessionSupported('immersive-ar').then(supported => {
       if (!supported) {
         unsupportedEl.style.display = 'flex';
-        logLine('❌ immersive-ar не поддерживается', 'error');
+        log('immersive-ar не поддерживается', 'error');
       } else {
-        logLine('✅ immersive-ar поддерживается', 'success');
+        log('✅ immersive-ar поддерживается', 'success');
       }
     }).catch(() => {
       unsupportedEl.style.display = 'flex';
-      logLine('❌ Ошибка проверки поддержки', 'error');
+      log('Ошибка проверки', 'error');
     });
   }
 
-  // ---------- Параметры трекинга ----------
-  const TRACKED_IMAGE_URL = "https://raw.githubusercontent.com/immersive-web/webxr-samples/main/media/pinball.jpg";
-  const TRACKED_IMAGE_WIDTH_METERS = 0.2;
+  // ---------- Параметры ----------
+  const IMAGE_URL = "https://raw.githubusercontent.com/immersive-web/webxr-samples/main/media/pinball.jpg";
+  const IMAGE_WIDTH = 0.2;
 
-  let trackedImageBitmap = null;
-  let placedNode = null;
-  let frameCounter = 0;
-  let referenceSpace = null;
   let session = null;
-  let isArStarted = false;
+  let referenceSpace = null;
+  let trackedObject = null;
+  let frameCount = 0;
+  let isRunning = false;
 
-  // ---------- THREE.js ----------
+  // ---------- THREE ----------
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.xr.enabled = true;
-  webglContainer.appendChild(renderer.domElement);
+  container.appendChild(renderer.domElement);
 
   // ---------- Освещение ----------
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x333344, 1.2));
-  const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-  dirLight.position.set(2, 4, 2);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x444466, 1.5));
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+  dirLight.position.set(1, 3, 2);
   scene.add(dirLight);
 
   // ---------- Сетка ----------
-  const gridHelper = new THREE.GridHelper(1, 10);
-  gridHelper.position.y = -0.05;
-  scene.add(gridHelper);
+  const grid = new THREE.GridHelper(0.5, 10);
+  grid.position.y = -0.05;
+  scene.add(grid);
 
-  // ---------- Объект для отображения ----------
-  function createTrackedObject() {
-    const size = TRACKED_IMAGE_WIDTH_METERS * 0.5;
-    const geometry = new THREE.BoxGeometry(size, size, size);
-    const material = new THREE.MeshStandardMaterial({
+  // ---------- Объект для трекинга ----------
+  function createObject() {
+    const size = IMAGE_WIDTH * 0.5;
+    const geo = new THREE.BoxGeometry(size, size, size);
+    const mat = new THREE.MeshStandardMaterial({
       color: 0xff4400,
       emissive: 0xff2200,
       emissiveIntensity: 0.3,
-      metalness: 0.3,
-      roughness: 0.4
+      metalness: 0.2,
+      roughness: 0.5
     });
-    const mesh = new THREE.Mesh(geometry, material);
+    const mesh = new THREE.Mesh(geo, mat);
     mesh.visible = false;
 
-    const edges = new THREE.EdgesGeometry(geometry);
+    const edges = new THREE.EdgesGeometry(geo);
     const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff }));
     mesh.add(line);
 
@@ -365,92 +298,78 @@
   }
 
   // ---------- Загрузка изображения ----------
-  async function loadTrackedImage(url) {
-    logLine(`📥 Загрузка изображения: ${url}`);
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    const blob = await response.blob();
-    logLine(`📦 Изображение загружено: ${blob.size} байт`);
+  async function loadImage(url) {
+    log(`Загрузка: ${url}`);
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const blob = await resp.blob();
+    log(`Размер: ${blob.size} байт`);
     const bitmap = await createImageBitmap(blob);
-    logLine(`✅ Изображение декодировано: ${bitmap.width}x${bitmap.height}px`, 'success');
+    log(`Декодировано: ${bitmap.width}x${bitmap.height}`, 'success');
     return bitmap;
   }
 
   // ---------- Запуск AR ----------
   async function startAR() {
-    if (isArStarted) return;
-    isArStarted = true;
+    if (isRunning) return;
+    isRunning = true;
 
-    logLine('=== 🚀 ЗАПУСК AR ===');
-
-    arButton.disabled = true;
-    arButton.textContent = '⏳ Запуск...';
+    arBtn.disabled = true;
+    arBtn.textContent = '⏳ Запуск...';
 
     try {
-      // Загружаем изображение
-      trackedImageBitmap = await loadTrackedImage(TRACKED_IMAGE_URL);
+      // 1. Загружаем изображение
+      const imageBitmap = await loadImage(IMAGE_URL);
 
-      // Создаем объект
-      placedNode = createTrackedObject();
-      logLine('📦 Объект создан');
+      // 2. Создаем объект
+      trackedObject = createObject();
+      log('Объект создан');
 
-      // Создаем сессию
+      // 3. Создаем сессию
+      log('Запрос сессии...');
+
       const sessionInit = {
-        requiredFeatures: ['local-floor', 'image-tracking'],
+        requiredFeatures: ['image-tracking'],
         trackedImages: [{
-          image: trackedImageBitmap,
-          widthInMeters: TRACKED_IMAGE_WIDTH_METERS,
+          image: imageBitmap,
+          widthInMeters: IMAGE_WIDTH,
         }]
       };
 
-      logLine(`📋 Запрос сессии с image-tracking`);
+      session = await navigator.xr.requestSession('immersive-ar', sessionInit);
+      log('✅ Сессия создана', 'success');
 
-      try {
-        session = await navigator.xr.requestSession('immersive-ar', sessionInit);
-        logLine('✅ Сессия создана', 'success');
-      } catch (err) {
-        logLine(`❌ Ошибка: ${err.message}`, 'error');
-        logLine('🔄 Пробуем без image-tracking...', 'warn');
+      // 4. Настраиваем рендерер
+      await renderer.xr.setSession(session);
+      log('Рендерер настроен');
 
-        session = await navigator.xr.requestSession('immersive-ar', {
-          requiredFeatures: ['local-floor']
-        });
-        logLine('⚠️ Сессия создана без image-tracking', 'warn');
-        setStatus('⚠️ Image tracking не поддерживается');
+      // 5. Получаем reference space
+      referenceSpace = await session.requestReferenceSpace('local-floor');
+      log('Reference space получен', 'success');
+
+      // 6. Проверяем API
+      const hasTracking = 'getImageTrackingResults' in XRFrame.prototype;
+      log(`Image tracking API: ${hasTracking ? '✅' : '❌'}`);
+
+      if (!hasTracking) {
+        log('⚠️ Image tracking не поддерживается', 'warn');
       }
 
-      // Показываем оверлей
-      arOverlay.style.display = 'block';
-      hint.style.display = 'none';
-      arButton.style.display = 'none';
+      // 7. Скрываем кнопку
+      arBtn.classList.add('hidden');
+      infoEl.style.display = 'none';
       setStatus('🔍 Поиск изображения...');
 
-      // Настраиваем рендерер
-      await renderer.xr.setSession(session);
-      logLine('🔗 Сессия прикреплена к рендереру');
-
-      referenceSpace = await session.requestReferenceSpace('local-floor');
-      if (!referenceSpace) {
-        throw new Error('Не удалось получить reference space');
-      }
-      logLine('✅ Reference space получен', 'success');
-
-      // Проверяем API трекинга
-      const hasTracking = 'getImageTrackingResults' in XRFrame.prototype;
-      logLine(`📡 Image tracking API: ${hasTracking ? '✅' : '❌'}`);
-
-      // Основной цикл
+      // 8. Основной цикл
       renderer.setAnimationLoop((timestamp, frame) => {
-        frameCounter++;
+        frameCount++;
 
         if (!frame) {
-          if (frameCounter % 60 === 0) logLine('⏳ Нет кадра', 'warn');
+          if (frameCount % 60 === 0) log('Нет кадра', 'warn');
           return;
         }
 
-        let imageDetected = false;
+        let detected = false;
 
         if (hasTracking) {
           try {
@@ -458,30 +377,30 @@
 
             if (results && results.length > 0) {
               for (const result of results) {
-                const state = result.trackingState;
-
                 if (result.trackedImageIndex === 0) {
+                  const state = result.trackingState;
+
                   if (state === 'tracked' || state === 'emulated') {
                     try {
                       const pose = frame.getPose(result.imageSpace, referenceSpace);
                       if (pose) {
-                        imageDetected = true;
-                        placedNode.visible = true;
-                        placedNode.matrix.fromArray(pose.transform.matrix);
-                        placedNode.matrix.decompose(
-                                placedNode.position,
-                                placedNode.quaternion,
-                                placedNode.scale
+                        detected = true;
+                        trackedObject.visible = true;
+                        trackedObject.matrix.fromArray(pose.transform.matrix);
+                        trackedObject.matrix.decompose(
+                                trackedObject.position,
+                                trackedObject.quaternion,
+                                trackedObject.scale
                         );
 
-                        if (frameCounter % 30 === 0) {
-                          setStatus(`✅ ТРЕКИНГ! Состояние: ${state}`);
+                        if (frameCount % 30 === 0) {
+                          setStatus(`✅ ТРЕКИНГ! ${state}`);
                         }
                         break;
                       }
                     } catch (err) {
-                      if (frameCounter % 60 === 0) {
-                        logLine(`❌ Ошибка позы: ${err.message}`, 'error');
+                      if (frameCount % 60 === 0) {
+                        log(`Ошибка позы: ${err.message}`, 'error');
                       }
                     }
                   }
@@ -489,15 +408,15 @@
               }
             }
           } catch (err) {
-            if (frameCounter % 60 === 0) {
-              logLine(`❌ Ошибка getImageTrackingResults: ${err.message}`, 'error');
+            if (frameCount % 60 === 0) {
+              log(`Ошибка: ${err.message}`, 'error');
             }
           }
         }
 
-        if (!imageDetected) {
-          placedNode.visible = false;
-          if (frameCounter % 60 === 0) {
+        if (!detected) {
+          trackedObject.visible = false;
+          if (frameCount % 60 === 0) {
             setStatus('🔍 Поиск изображения...');
           }
         }
@@ -505,44 +424,34 @@
         renderer.render(scene, camera);
       });
 
-      // Обработчики сессии
+      // 9. Обработчик завершения
       session.addEventListener('end', () => {
-        logLine('📴 Сессия завершена');
+        log('Сессия завершена');
         renderer.setAnimationLoop(null);
-        arOverlay.style.display = 'none';
-        hint.style.display = 'block';
-        arButton.style.display = 'block';
-        arButton.disabled = false;
-        arButton.textContent = '🚀 Start AR';
-        isArStarted = false;
+        arBtn.classList.remove('hidden');
+        arBtn.disabled = false;
+        arBtn.textContent = '🚀 Start AR';
+        infoEl.style.display = 'block';
+        isRunning = false;
         setStatus('📌 Сессия завершена');
       });
 
     } catch (err) {
       setStatus(`❌ ${err.message}`);
-      logLine(err.stack || String(err), 'error');
-      arButton.disabled = false;
-      arButton.textContent = '🚀 Start AR';
-      arButton.style.display = 'block';
-      isArStarted = false;
+      log(err.stack || String(err), 'error');
+      arBtn.disabled = false;
+      arBtn.textContent = '🚀 Start AR';
+      arBtn.classList.remove('hidden');
+      isRunning = false;
     }
   }
 
   // ---------- Обработчик кнопки ----------
-  arButton.addEventListener('click', (e) => {
+  arBtn.addEventListener('click', (e) => {
     e.preventDefault();
-    e.stopPropagation();
-    logLine('👆 Клик по кнопке Start AR');
+    log('👆 Нажата кнопка');
     startAR();
   });
-
-  // Также на touchstart для мобильных
-  arButton.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    logLine('👆 Тач по кнопке Start AR');
-    startAR();
-  }, { passive: false });
 
   // ---------- Resize ----------
   window.addEventListener('resize', () => {
@@ -551,11 +460,11 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 
-  // ---------- Инициализация ----------
-  logLine('📄 Страница загружена. Нажмите Start AR');
-  setStatus('📌 Готов к запуску');
+  // ---------- Старт ----------
+  log('📄 Страница загружена');
+  setStatus('📌 Нажмите Start AR');
 
-  console.log('AR Button ready:', arButton);
+  console.log('AR Button:', arBtn);
 </script>
 </body>
 </html>
