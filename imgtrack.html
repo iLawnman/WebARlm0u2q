@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>?? WebXR Image Tracking + DOM Overlay</title>
+  <title>WebXR Image Tracking + DOM Overlay</title>
   <style>
     html, body {
       margin: 0;
@@ -38,7 +38,7 @@
       display: block;
     }
 
-    /* WebXR DOM Overlay root - теперь поверх всего */
+    /* WebXR DOM Overlay root */
     #ar-overlay {
       position: fixed;
       inset: 0;
@@ -113,13 +113,13 @@
       font-family: monospace;
     }
 
-    /* ---------- Кнопка запуска AR - ВНЕ оверлея ---------- */
+    /* ---------- Кнопка запуска AR ---------- */
     #ar-button-wrapper {
       position: fixed;
       bottom: 80px;
       left: 50%;
       transform: translateX(-50%);
-      z-index: 9999;
+      z-index: 99999;
       pointer-events: auto;
     }
 
@@ -137,6 +137,7 @@
       letter-spacing: 0.5px;
       pointer-events: auto;
       position: relative;
+      touch-action: manipulation;
     }
 
     #ar-button-wrapper button:hover {
@@ -198,7 +199,6 @@
       color: #e2e8f0;
     }
 
-    /* ---------- Scrollbar стили ---------- */
     #log-panel::-webkit-scrollbar {
       width: 4px;
     }
@@ -234,16 +234,13 @@
 
 <!-- WebXR DOM Overlay root -->
 <div id="ar-overlay">
-  <!-- Панель лога -->
   <div id="log-panel">
     <div class="empty">🟢 Ожидание запуска...</div>
   </div>
-
-  <!-- Статус -->
   <div id="status">📌 Готов к запуску</div>
 </div>
 
-<!-- Кнопка AR - ВНЕ оверлея -->
+<!-- Кнопка AR -->
 <div id="ar-button-wrapper">
   <button id="ar-start-btn">🚀 Start AR</button>
 </div>
@@ -322,6 +319,7 @@
   let frameCounter = 0;
   let referenceSpace = null;
   let session = null;
+  let isArStarted = false;
 
   // ---------- THREE.js ----------
   const scene = new THREE.Scene();
@@ -339,7 +337,7 @@
   dirLight.position.set(2, 4, 2);
   scene.add(dirLight);
 
-  // ---------- Сетка для ориентации ----------
+  // ---------- Сетка ----------
   const gridHelper = new THREE.GridHelper(1, 10);
   gridHelper.position.y = -0.05;
   scene.add(gridHelper);
@@ -366,7 +364,7 @@
     return mesh;
   }
 
-  // ---------- Загрузка изображения для трекинга ----------
+  // ---------- Загрузка изображения ----------
   async function loadTrackedImage(url) {
     logLine(`📥 Загрузка изображения: ${url}`);
     const response = await fetch(url);
@@ -382,181 +380,169 @@
 
   // ---------- Запуск AR ----------
   async function startAR() {
+    if (isArStarted) return;
+    isArStarted = true;
+
     logLine('=== 🚀 ЗАПУСК AR ===');
 
-    // Отключаем кнопку
     arButton.disabled = true;
     arButton.textContent = '⏳ Запуск...';
 
-    // Загружаем изображение
     try {
+      // Загружаем изображение
       trackedImageBitmap = await loadTrackedImage(TRACKED_IMAGE_URL);
-    } catch (err) {
-      setStatus(`❌ Ошибка загрузки: ${err.message}`);
-      logLine(err.stack || String(err), 'error');
-      arButton.disabled = false;
-      arButton.textContent = '🚀 Start AR';
-      return;
-    }
 
-    // Создаем объект
-    placedNode = createTrackedObject();
-    logLine('📦 Объект создан');
+      // Создаем объект
+      placedNode = createTrackedObject();
+      logLine('📦 Объект создан');
 
-    // Создаем сессию
-    const sessionInit = {
-      requiredFeatures: ['local-floor', 'image-tracking'],
-      trackedImages: [{
-        image: trackedImageBitmap,
-        widthInMeters: TRACKED_IMAGE_WIDTH_METERS,
-      }]
-    };
+      // Создаем сессию
+      const sessionInit = {
+        requiredFeatures: ['local-floor', 'image-tracking'],
+        trackedImages: [{
+          image: trackedImageBitmap,
+          widthInMeters: TRACKED_IMAGE_WIDTH_METERS,
+        }]
+      };
 
-    logLine(`📋 Запрос сессии с image-tracking, размер: ${TRACKED_IMAGE_WIDTH_METERS}м`);
+      logLine(`📋 Запрос сессии с image-tracking`);
 
-    try {
-      session = await navigator.xr.requestSession('immersive-ar', sessionInit);
-      logLine('✅ Сессия создана', 'success');
-    } catch (err) {
-      setStatus(`❌ Ошибка сессии: ${err.message}`);
-      logLine(err.stack || String(err), 'error');
-
-      // Пробуем без image-tracking
-      logLine('🔄 Пробуем без image-tracking...', 'warn');
       try {
+        session = await navigator.xr.requestSession('immersive-ar', sessionInit);
+        logLine('✅ Сессия создана', 'success');
+      } catch (err) {
+        logLine(`❌ Ошибка: ${err.message}`, 'error');
+        logLine('🔄 Пробуем без image-tracking...', 'warn');
+
         session = await navigator.xr.requestSession('immersive-ar', {
           requiredFeatures: ['local-floor']
         });
         logLine('⚠️ Сессия создана без image-tracking', 'warn');
         setStatus('⚠️ Image tracking не поддерживается');
-      } catch (err2) {
-        setStatus(`❌ Ошибка сессии: ${err2.message}`);
-        logLine(err2.stack || String(err2), 'error');
-        arButton.disabled = false;
-        arButton.textContent = '🚀 Start AR';
-        return;
-      }
-    }
-
-    // Показываем оверлей
-    arOverlay.style.display = 'block';
-    hint.style.display = 'none';
-    arButton.style.display = 'none';
-    setStatus('🔍 Поиск изображения...');
-
-    // Настраиваем рендерер
-    await renderer.xr.setSession(session);
-    logLine('🔗 Сессия прикреплена к рендереру');
-
-    referenceSpace = await session.requestReferenceSpace('local-floor');
-    if (!referenceSpace) {
-      setStatus('❌ Не удалось получить reference space');
-      logLine('❌ referenceSpace = null', 'error');
-      return;
-    }
-    logLine('✅ Reference space получен', 'success');
-
-    // Проверяем API трекинга
-    const hasTracking = 'getImageTrackingResults' in XRFrame.prototype;
-    logLine(`📡 Image tracking API: ${hasTracking ? '✅' : '❌'}`);
-
-    if (!hasTracking) {
-      setStatus('⚠️ Image tracking не поддерживается');
-      logLine('⚠️ API getImageTrackingResults не найден', 'warn');
-    }
-
-    // Основной цикл
-    renderer.setAnimationLoop((timestamp, frame) => {
-      frameCounter++;
-
-      if (!frame) {
-        if (frameCounter % 60 === 0) logLine('⏳ Нет кадра', 'warn');
-        return;
       }
 
-      let imageDetected = false;
+      // Показываем оверлей
+      arOverlay.style.display = 'block';
+      hint.style.display = 'none';
+      arButton.style.display = 'none';
+      setStatus('🔍 Поиск изображения...');
 
-      if (hasTracking) {
-        try {
-          const results = frame.getImageTrackingResults();
+      // Настраиваем рендерер
+      await renderer.xr.setSession(session);
+      logLine('🔗 Сессия прикреплена к рендереру');
 
-          if (results && results.length > 0) {
-            if (frameCounter % 60 === 0 && results.length > 0) {
-              logLine(`📊 Найдено ${results.length} результатов`);
-            }
+      referenceSpace = await session.requestReferenceSpace('local-floor');
+      if (!referenceSpace) {
+        throw new Error('Не удалось получить reference space');
+      }
+      logLine('✅ Reference space получен', 'success');
 
-            for (const result of results) {
-              const state = result.trackingState;
+      // Проверяем API трекинга
+      const hasTracking = 'getImageTrackingResults' in XRFrame.prototype;
+      logLine(`📡 Image tracking API: ${hasTracking ? '✅' : '❌'}`);
 
-              if (result.trackedImageIndex === 0) {
-                if (state === 'tracked' || state === 'emulated') {
-                  try {
-                    const pose = frame.getPose(result.imageSpace, referenceSpace);
-                    if (pose) {
-                      imageDetected = true;
-                      placedNode.visible = true;
-                      placedNode.matrix.fromArray(pose.transform.matrix);
-                      placedNode.matrix.decompose(
-                              placedNode.position,
-                              placedNode.quaternion,
-                              placedNode.scale
-                      );
+      // Основной цикл
+      renderer.setAnimationLoop((timestamp, frame) => {
+        frameCounter++;
 
-                      if (frameCounter % 30 === 0) {
-                        setStatus(`✅ ТРЕКИНГ! Состояние: ${state}`);
+        if (!frame) {
+          if (frameCounter % 60 === 0) logLine('⏳ Нет кадра', 'warn');
+          return;
+        }
+
+        let imageDetected = false;
+
+        if (hasTracking) {
+          try {
+            const results = frame.getImageTrackingResults();
+
+            if (results && results.length > 0) {
+              for (const result of results) {
+                const state = result.trackingState;
+
+                if (result.trackedImageIndex === 0) {
+                  if (state === 'tracked' || state === 'emulated') {
+                    try {
+                      const pose = frame.getPose(result.imageSpace, referenceSpace);
+                      if (pose) {
+                        imageDetected = true;
+                        placedNode.visible = true;
+                        placedNode.matrix.fromArray(pose.transform.matrix);
+                        placedNode.matrix.decompose(
+                                placedNode.position,
+                                placedNode.quaternion,
+                                placedNode.scale
+                        );
+
+                        if (frameCounter % 30 === 0) {
+                          setStatus(`✅ ТРЕКИНГ! Состояние: ${state}`);
+                        }
+                        break;
                       }
-                      break;
-                    }
-                  } catch (err) {
-                    if (frameCounter % 60 === 0) {
-                      logLine(`❌ Ошибка позы: ${err.message}`, 'error');
+                    } catch (err) {
+                      if (frameCounter % 60 === 0) {
+                        logLine(`❌ Ошибка позы: ${err.message}`, 'error');
+                      }
                     }
                   }
                 }
               }
             }
+          } catch (err) {
+            if (frameCounter % 60 === 0) {
+              logLine(`❌ Ошибка getImageTrackingResults: ${err.message}`, 'error');
+            }
           }
-        } catch (err) {
+        }
+
+        if (!imageDetected) {
+          placedNode.visible = false;
           if (frameCounter % 60 === 0) {
-            logLine(`❌ Ошибка getImageTrackingResults: ${err.message}`, 'error');
+            setStatus('🔍 Поиск изображения...');
           }
         }
-      }
 
-      if (!imageDetected) {
-        placedNode.visible = false;
-        if (frameCounter % 60 === 0) {
-          setStatus('🔍 Поиск изображения...');
-        }
-      }
+        renderer.render(scene, camera);
+      });
 
-      renderer.render(scene, camera);
-    });
+      // Обработчики сессии
+      session.addEventListener('end', () => {
+        logLine('📴 Сессия завершена');
+        renderer.setAnimationLoop(null);
+        arOverlay.style.display = 'none';
+        hint.style.display = 'block';
+        arButton.style.display = 'block';
+        arButton.disabled = false;
+        arButton.textContent = '🚀 Start AR';
+        isArStarted = false;
+        setStatus('📌 Сессия завершена');
+      });
 
-    // Обработчики сессии
-    session.addEventListener('end', () => {
-      logLine('📴 Сессия завершена');
-      renderer.setAnimationLoop(null);
-      arOverlay.style.display = 'none';
-      hint.style.display = 'block';
-      arButton.style.display = 'block';
-      arButton.disabled = false;
-      arButton.textContent = '🚀 Start AR';
-      setStatus('📌 Сессия завершена');
-    });
-  }
-
-  // ---------- Обработчик кнопки ----------
-  arButton.addEventListener('click', () => {
-    logLine('👆 Нажата кнопка Start AR');
-    startAR().catch((err) => {
+    } catch (err) {
       setStatus(`❌ ${err.message}`);
       logLine(err.stack || String(err), 'error');
       arButton.disabled = false;
       arButton.textContent = '🚀 Start AR';
       arButton.style.display = 'block';
-    });
+      isArStarted = false;
+    }
+  }
+
+  // ---------- Обработчик кнопки ----------
+  arButton.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    logLine('👆 Клик по кнопке Start AR');
+    startAR();
   });
+
+  // Также на touchstart для мобильных
+  arButton.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    logLine('👆 Тач по кнопке Start AR');
+    startAR();
+  }, { passive: false });
 
   // ---------- Resize ----------
   window.addEventListener('resize', () => {
@@ -569,7 +555,7 @@
   logLine('📄 Страница загружена. Нажмите Start AR');
   setStatus('📌 Готов к запуску');
 
-  console.log('AR Button:', arButton);
+  console.log('AR Button ready:', arButton);
 </script>
 </body>
 </html>
