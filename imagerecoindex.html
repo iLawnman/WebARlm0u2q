@@ -157,51 +157,6 @@
     #debug-log .log-empty { color: #475569; }
     #debug-log .log-line { color: #67e8f9; }
 
-    /* ---------- Стили для панелей конвертора ---------- */
-    .convertor-panel {
-      width: min(88vw, 320px);
-      font-size: 13px;
-      color: #e2e8f0;
-    }
-
-    .convertor-panel-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      padding: 10px 12px;
-      background: rgba(99, 102, 241, 0.18);
-      font-weight: 600;
-    }
-
-    .convertor-panel-close {
-      background: none;
-      border: 0;
-      color: #94a3b8;
-      font-size: 18px;
-      line-height: 1;
-      padding: 0 4px;
-      cursor: pointer;
-    }
-
-    .convertor-panel-body {
-      padding: 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .convertor-row {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 12px;
-    }
-
-    .convertor-row.ok { color: #86efac; }
-    .convertor-row.missing { color: #fca5a5; }
-
     /* ---------- Кнопка AR ---------- */
     #ar-button-container {
       position: absolute;
@@ -238,26 +193,6 @@
       opacity: 0.5;
       cursor: not-allowed;
     }
-
-    /* ---------- Кнопка-триггер конвертора ---------- */
-    .convertor-trigger {
-      position: absolute;
-      top: 16px;
-      right: 16px;
-      pointer-events: auto;
-      z-index: 10;
-      padding: 10px 14px;
-      border-radius: 10px;
-      border: 1px solid rgba(6, 182, 212, 0.4);
-      background: rgba(6, 182, 212, 0.15);
-      color: #cffafe;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .convertor-trigger:disabled { opacity: 0.6; }
-    .convertor-trigger:active { background: rgba(6, 182, 212, 0.3); }
   </style>
 </head>
 <body>
@@ -293,12 +228,6 @@
       <div id="debug-log"><span class="log-empty">лог пуст…</span></div>
     </div>
   </div>
-
-  <!-- Контейнер для динамических панелей конвертора -->
-  <div id="convertor-panels-container"></div>
-
-  <!-- Кнопка-триггер конвертора -->
-  <button id="convertor-trigger-btn" type="button" class="convertor-trigger">📦 Проверить assets</button>
 </div>
 
 <script type="importmap">
