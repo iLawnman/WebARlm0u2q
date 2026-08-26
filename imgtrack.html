@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>log WebXR Image Tracking + DOM Overlay</title>
+  <title>?? WebXR Image Tracking + DOM Overlay</title>
   <style>
     html, body {
       margin: 0;
@@ -38,13 +38,13 @@
       display: block;
     }
 
-    /* WebXR DOM Overlay root */
+    /* WebXR DOM Overlay root - теперь поверх всего */
     #ar-overlay {
       position: fixed;
       inset: 0;
       pointer-events: none;
       display: none;
-      z-index: 100;
+      z-index: 1000;
     }
 
     /* ---------- Панель лога ---------- */
@@ -64,7 +64,6 @@
       font-size: 10px;
       line-height: 1.6;
       color: #0f0;
-      z-index: 101;
     }
 
     #log-panel .entry {
@@ -111,21 +110,20 @@
       color: #e2e8f0;
       font-size: 13px;
       pointer-events: none;
-      z-index: 101;
       font-family: monospace;
     }
 
-    /* ---------- Кнопка запуска AR ---------- */
-    #ar-button-container {
+    /* ---------- Кнопка запуска AR - ВНЕ оверлея ---------- */
+    #ar-button-wrapper {
       position: fixed;
       bottom: 80px;
       left: 50%;
       transform: translateX(-50%);
-      z-index: 200;
+      z-index: 9999;
       pointer-events: auto;
     }
 
-    #ar-button-container button {
+    #ar-button-wrapper button {
       padding: 16px 40px;
       border-radius: 14px;
       border: none;
@@ -137,19 +135,21 @@
       box-shadow: 0 8px 40px rgba(99, 102, 241, 0.5);
       transition: all 0.2s;
       letter-spacing: 0.5px;
+      pointer-events: auto;
+      position: relative;
     }
 
-    #ar-button-container button:hover {
+    #ar-button-wrapper button:hover {
       background: #4f46e5;
       transform: scale(1.03);
       box-shadow: 0 8px 50px rgba(99, 102, 241, 0.6);
     }
 
-    #ar-button-container button:active {
+    #ar-button-wrapper button:active {
       transform: scale(0.95);
     }
 
-    #ar-button-container button:disabled {
+    #ar-button-wrapper button:disabled {
       opacity: 0.5;
       cursor: not-allowed;
       transform: none;
@@ -159,7 +159,7 @@
     #unsupported {
       position: fixed;
       inset: 0;
-      z-index: 300;
+      z-index: 99999;
       display: none;
       align-items: center;
       justify-content: center;
@@ -241,9 +241,11 @@
 
   <!-- Статус -->
   <div id="status">📌 Готов к запуску</div>
+</div>
 
-  <!-- Кнопка AR -->
-  <div id="ar-button-container"></div>
+<!-- Кнопка AR - ВНЕ оверлея -->
+<div id="ar-button-wrapper">
+  <button id="ar-start-btn">🚀 Start AR</button>
 </div>
 
 <script type="importmap">
@@ -257,7 +259,6 @@
 
 <script type="module">
   import * as THREE from 'three';
-  import { ARButton } from 'three/addons/webxr/ARButton.js';
 
   // ---------- DOM элементы ----------
   const webglContainer = document.getElementById('webgl-container');
@@ -266,7 +267,7 @@
   const arOverlay = document.getElementById('ar-overlay');
   const logPanel = document.getElementById('log-panel');
   const statusEl = document.getElementById('status');
-  const arButtonContainer = document.getElementById('ar-button-container');
+  const arButton = document.getElementById('ar-start-btn');
 
   // ---------- Функции лога ----------
   function logLine(msg, level = '') {
@@ -281,7 +282,6 @@
     logPanel.appendChild(entry);
     logPanel.scrollTop = logPanel.scrollHeight;
 
-    // Ограничиваем количество строк
     while (logPanel.children.length > 100) {
       logPanel.removeChild(logPanel.firstChild);
     }
@@ -306,7 +306,6 @@
         logLine('❌ immersive-ar не поддерживается', 'error');
       } else {
         logLine('✅ immersive-ar поддерживается', 'success');
-        unsupportedEl.style.display = 'none';
       }
     }).catch(() => {
       unsupportedEl.style.display = 'flex';
@@ -322,7 +321,6 @@
   let placedNode = null;
   let frameCounter = 0;
   let referenceSpace = null;
-  let isTracking = false;
   let session = null;
 
   // ---------- THREE.js ----------
@@ -386,12 +384,18 @@
   async function startAR() {
     logLine('=== 🚀 ЗАПУСК AR ===');
 
+    // Отключаем кнопку
+    arButton.disabled = true;
+    arButton.textContent = '⏳ Запуск...';
+
     // Загружаем изображение
     try {
       trackedImageBitmap = await loadTrackedImage(TRACKED_IMAGE_URL);
     } catch (err) {
       setStatus(`❌ Ошибка загрузки: ${err.message}`);
       logLine(err.stack || String(err), 'error');
+      arButton.disabled = false;
+      arButton.textContent = '🚀 Start AR';
       return;
     }
 
@@ -428,9 +432,17 @@
       } catch (err2) {
         setStatus(`❌ Ошибка сессии: ${err2.message}`);
         logLine(err2.stack || String(err2), 'error');
+        arButton.disabled = false;
+        arButton.textContent = '🚀 Start AR';
         return;
       }
     }
+
+    // Показываем оверлей
+    arOverlay.style.display = 'block';
+    hint.style.display = 'none';
+    arButton.style.display = 'none';
+    setStatus('🔍 Поиск изображения...');
 
     // Настраиваем рендерер
     await renderer.xr.setSession(session);
@@ -452,12 +464,6 @@
       setStatus('⚠️ Image tracking не поддерживается');
       logLine('⚠️ API getImageTrackingResults не найден', 'warn');
     }
-
-    // Показываем оверлей
-    arOverlay.style.display = 'block';
-    hint.style.display = 'none';
-    setStatus('🔍 Поиск изображения...');
-    isTracking = true;
 
     // Основной цикл
     renderer.setAnimationLoop((timestamp, frame) => {
@@ -530,49 +536,27 @@
     // Обработчики сессии
     session.addEventListener('end', () => {
       logLine('📴 Сессия завершена');
-      isTracking = false;
       renderer.setAnimationLoop(null);
       arOverlay.style.display = 'none';
       hint.style.display = 'block';
+      arButton.style.display = 'block';
+      arButton.disabled = false;
+      arButton.textContent = '🚀 Start AR';
       setStatus('📌 Сессия завершена');
-      // Показываем кнопку снова
-      const btn = arButtonContainer.querySelector('button');
-      if (btn) {
-        btn.style.display = 'block';
-        btn.disabled = false;
-        btn.textContent = 'Start AR';
-      }
     });
   }
 
-  // ---------- Создание AR кнопки ----------
-  function createARButton() {
-    const button = document.createElement('button');
-    button.textContent = '🚀 Start AR';
-    button.id = 'ar-start-btn';
-
-    button.addEventListener('click', async () => {
-      button.disabled = true;
-      button.textContent = '⏳ Запуск...';
-      logLine('👆 Нажата кнопка Start AR');
-
-      try {
-        await startAR();
-        button.style.display = 'none';
-      } catch (err) {
-        setStatus(`❌ ${err.message}`);
-        logLine(err.stack || String(err), 'error');
-        button.disabled = false;
-        button.textContent = '🚀 Start AR';
-      }
+  // ---------- Обработчик кнопки ----------
+  arButton.addEventListener('click', () => {
+    logLine('👆 Нажата кнопка Start AR');
+    startAR().catch((err) => {
+      setStatus(`❌ ${err.message}`);
+      logLine(err.stack || String(err), 'error');
+      arButton.disabled = false;
+      arButton.textContent = '🚀 Start AR';
+      arButton.style.display = 'block';
     });
-
-    return button;
-  }
-
-  // Добавляем кнопку в контейнер
-  const arButton = createARButton();
-  arButtonContainer.appendChild(arButton);
+  });
 
   // ---------- Resize ----------
   window.addEventListener('resize', () => {
@@ -585,8 +569,6 @@
   logLine('📄 Страница загружена. Нажмите Start AR');
   setStatus('📌 Готов к запуску');
 
-  // Проверяем, что кнопка видна
-  console.log('AR Button container:', arButtonContainer);
   console.log('AR Button:', arButton);
 </script>
 </body>
