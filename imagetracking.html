@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebXR Image Tracking Тест</title>
+    <!-- Подключаем A-Frame и официальный компонент для трекинга изображений -->
+    <script src="https://aframe.io"></script>
+</head>
+<body style="margin: 0; overflow: hidden;">
+
+<!-- Сцена с включенным модулем трекинга изображений -->
+<a-scene webxr="optionalFeatures: image-tracking;">
+
+    <!-- Предзагрузка медиа-файлов -->
+    <a-assets>
+        <!-- 1. Ваша картинка-маркер (укажите прямую ссылку) -->
+        <img id="my-marker" src="https://unsplash.com" crossorigin="anonymous">
+    </a-assets>
+
+    <!-- 
+        Компонент трекинга: 
+        src: ID картинки из assets
+        widthInMeters: реальный физический размер распечатанного или открытого на экране маркера
+    -->
+
+    <!-- Внутри этой сущности находится контент, который появится ПОВЕРХ картинки -->
+    <!-- Рисуем красный полупрозрачный куб прямо на маркере -->
+    <a-box position="0 0.05 0" scale="0.1 0.1 0.1" material="color: red; opacity: 0.8;"></a-box>
+
+
+    <!-- Камера устройства -->
+
+
+</a-scene>
+
+<script>
+    // Логируем события распознавания маркера в консоль
+    const tracker = document.querySelector('#tracker');
+
+    tracker.addEventListener('xrimagefound', (e) => {
+        console.log('Маркер успешно найден в реальном мире!');
+    });
+
+    tracker.addEventListener('xrimagelost', (e) => {
+        console.log('Маркер утерян из поля зрения камеры.');
+    });
+</script>
+</body>
+</html>
