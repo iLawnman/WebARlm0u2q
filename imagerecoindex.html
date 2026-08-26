@@ -387,14 +387,14 @@
 
       for (const item of recognitionImages) {
         const fileName = item.file || item.src || item.name;
-        const imgUrl = `../assets/recoimages/${fileName}`;
+        const imgUrl = `./assets/recoimages/${fileName}`;
         console.log(`[Reco] Загружаю картинку "${item.name || fileName}" по адресу ${imgUrl} …`);
         try {
           const imgResponse = await fetch(imgUrl);
           console.log(`[Reco]   → status=${imgResponse.status}, ok=${imgResponse.ok}, content-type=${imgResponse.headers.get('content-type')}`);
 
           if (!imgResponse.ok) {
-            console.warn(`[Reco] ❌ Не удалось получить файл ${imgUrl} (HTTP ${imgResponse.status}). Проверьте, что файл лежит именно в ../assets/recoimages/`);
+            console.warn(`[Reco] ❌ Не удалось получить файл ${imgUrl} (HTTP ${imgResponse.status}). Проверьте, что файл лежит именно в ${imgUrl}`);
             continue;
           }
 
