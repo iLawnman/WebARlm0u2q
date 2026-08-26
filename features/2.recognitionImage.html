@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Base Image Recognition AR (Three.js / WebXR)</title>
+  <title>fix 1 Base Image Recognition AR (Three.js / WebXR)</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { overflow: hidden; background: #000; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
@@ -58,8 +58,8 @@
   <script type="importmap">
     {
       "imports": {
-        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        "three": "https://unpkg.com/three/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three/examples/jsm/"
       }
     }
   </script>
@@ -121,7 +121,7 @@
       this.trackedMarkers = new Map();
     }
 
-    static MANIFEST_URL = './assets/recognitionimages.json';
+    static MANIFEST_URL = '../assets/recognitionimages.json';
 
     async makeGeneratedBitmap() {
       this.ui.log('Generating fallback bitmap...', 'warn');
@@ -150,12 +150,12 @@
         return items.map((item, i) => {
           if (typeof item === 'string') {
             const name = item.replace(/\.[^.]+$/, '') || ('T' + (i + 1));
-            const src = item.startsWith('./') || item.startsWith('/') || item.startsWith('http') ? item : './assets/' + item;
+            const src = item.startsWith('./') || item.startsWith('/') || item.startsWith('http') ? item : '../assets/recoimages/' + item;
             return { name, src };
           }
           const name = item.name || item.id || ('T' + (i + 1));
           let src = item.src || item.url || item.path || item.file;
-          if (!src.startsWith('./') && !src.startsWith('/') && !src.startsWith('http')) src = './assets/' + src;
+          if (!src.startsWith('./') && !src.startsWith('/') && !src.startsWith('http')) src = '../assets/recoimages/' + src;
           return { name, src };
         });
       } catch (e) {
