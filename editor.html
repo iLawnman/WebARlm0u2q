@@ -613,21 +613,6 @@
       overflow-y: auto;
       padding-right: 4px;
     }
-
-    .recognition-card {
-      background: rgba(11, 17, 32, .8);
-      border: 1px solid rgba(148, 163, 184, .12);
-      border-radius: 8px;
-      padding: 12px 8px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      text-align: center;
-      transition: border-color .2s ease, background .2s ease;
-    }
-
     .recognition-card:hover {
       border-color: var(--cyan);
       background: rgba(6, 182, 212, .1);
@@ -652,6 +637,28 @@
       font-size: 12px;
     }
 
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+    
+    .card {
+      position: relative;
+      min-height: 120px;
+      padding: 30px;
+      background: rgba(17, 24, 39, .82);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition:
+              transform .2s ease,
+              border-color .2s ease,
+              background .2s ease;
+    }
+    
     @media (max-width: 768px) {
       .quest-selector-row {
         flex-direction: column;
@@ -664,7 +671,7 @@
         grid-template-columns: 1fr;
       }
       .cards {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(3, 1fr);
       }
       .drawer {
         width: 320px;
@@ -680,7 +687,7 @@
         height: 180px;
       }
       .recognition-grid {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(3, 1fr);
       }
     }
   </style>
@@ -691,8 +698,12 @@
 <div class="container">
 
   <header class="header">
-    <div class="eyebrow">- - -</div>
-    <h1>РЕДАКТОР КВЕСТА</h1>
+<!--        <div class="eyebrow">-&#45;&#45;</div>-->
+    <h1>FEATURES</h1>
+    <div class="eyebrow">-&#45;&#45;</div>
+        <p class="subtitle">
+          Редакторы для подготовки и правки квестов в браузере.
+        </p>
   </header>
 
   <!-- ВЫБОР КВЕСТА + КНОПКА ОТКРЫТИЯ НАСТРОЕК -->
@@ -719,8 +730,8 @@
 
     <!-- 01: РЕДАКТОР КВЕСТОВ -->
     <article class="card">
-      <div class="number">01</div>
-      <div class="icon">↗</div>
+<!--      <div class="number">01</div>-->
+<!--      <div class="icon">↗</div>-->
       <h2>РЕДАКТОР КВЕСТОВ</h2>
       <p class="description">
         Управление QuestTable Answers, вопросами и сценариями.
@@ -729,11 +740,8 @@
         Перейти <span>→</span>
       </a>
     </article>
-
-    <!-- 02: РЕДАКТОР ПРЕФАБОВ -->
+    
     <article class="card">
-      <div class="number">02</div>
-      <div class="icon">◈</div>
       <h2>РЕДАКТОР ПРЕФАБОВ</h2>
       <p class="description">
         3D редактор AR префабов и пространственных сцен.
@@ -743,6 +751,15 @@
       </a>
     </article>
 
+    <article class="card">
+      <h2>ПРИМЕРЫ</h2>
+      <p class="description">
+        Список бизнес кейсов
+      </p>
+      <a class="button" href="./features/index.html">
+        Перейти <span>→</span>
+      </a>
+    </article>
   </main>
 
   <footer class="footer">

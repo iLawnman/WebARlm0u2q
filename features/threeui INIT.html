@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Three.js + Three-Mesh-UI Test Scene</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: #1a1a2e;
+      font-family: sans-serif;
+    }
+    canvas {
+      display: block;
+    }
+    #loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-size: 1.2rem;
+      pointer-events: none;
+      transition: opacity 0.5s;
+    }
+  </style>
+
+  <!-- Карта импортов для удобной загрузки модулей -->
+  <script type="importmap">
+    {
+         "imports": {
+      "three": "https://unpkg.com/three/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three/examples/jsm/",
+      "three-mesh-ui": "https://unpkg.com/three-mesh-ui/build/three-mesh-ui.module.js"
+    }
+    }
+  </script>
+</head>
+<body>
+
+<div id="loading">Загрузка шрифтов и сцены...</div>
+
+<script type="module">
+  import * as THREE from 'three';
+  import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+  import ThreeMeshUI from 'three-mesh-ui';
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x1a1a2e);
+  // scene.fog = new THREE.Fog(0x1a1a2e, 2, 10);
+
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.set(0, 0, 3);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  document.body.appendChild(renderer.domElement);
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.05;
+
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+  scene.add(ambientLight);
+
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+  dirLight.position.set(5, 5, 5);
+  scene.add(dirLight);
+
+  const fontUrl = 'https://cdn.jsdelivr.net/gh/felixmariotto/three-mesh-ui/examples/assets/Roboto-msdf.json';
+  const fontTextureUrl = 'https://cdn.jsdelivr.net/gh/felixmariotto/three-mesh-ui/examples/assets/Roboto-msdf.png';
+
+  // Создаём основной контейнер (панель)
+  const uiContainer = new ThreeMeshUI.Block({
+    width: 1.4,
+    height: 0.9,
+    backgroundColor: new THREE.Color(0x16213e),
+    backgroundOpacity: 0.85,
+    borderRadius: 0.05,
+    fontFamily: fontUrl,
+    fontTexture: fontTextureUrl,
+    padding: 0.08,
+    justifyContent: 'center',     
+    alignItems: 'center'         
+  });
+  uiContainer.position.set(0, 0, 0);
+  uiContainer.rotation.y = 0;
+  scene.add(uiContainer);
+  
+  const uiContainerLeft = new ThreeMeshUI.Block({
+    width: 1.4,
+    height: 0.9,
+    backgroundColor: new THREE.Color(0x16213e),
+    backgroundOpacity: 0.85,
+    borderRadius: 0.05,
+    fontFamily: fontUrl,
+    fontTexture: fontTextureUrl,
+    padding: 0.08,
+    justifyContent: 'center',     
+    alignItems: 'center'         
+  });
+  uiContainerLeft.position.set(-1.5, 0, 0.45);
+  uiContainerLeft.rotation.y = 0.4;
+  scene.add(uiContainerLeft);
+  
+  const uiContainerRight = new ThreeMeshUI.Block({
+    width: 1.4,
+    height: 0.9,
+    backgroundColor: new THREE.Color(0x16213e),
+    backgroundOpacity: 0.85,
+    borderRadius: 0.05,
+    fontFamily: fontUrl,
+    fontTexture: fontTextureUrl,
+    padding: 0.08,
+    justifyContent: 'center',     
+    alignItems: 'center'         
+  });
+  uiContainerRight.position.set(1.5, 0, 0.45);
+  uiContainerRight.rotation.y = -0.4;
+  scene.add(uiContainerRight);
+  
+  const uiContainerButton = new ThreeMeshUI.Block({
+    width: 1.4,
+    height: 0.4,
+    backgroundColor: new THREE.Color(0x16213e),
+    backgroundOpacity: 0.85,
+    borderRadius: 0.05,
+    fontFamily: fontUrl,
+    fontTexture: fontTextureUrl,
+    padding: 0.08,
+    justifyContent: 'center',     
+    alignItems: 'center'         
+  });
+  uiContainerButton.position.set(0, -0.7, 0.2);
+  uiContainerButton.rotation.x = -0.4;
+  scene.add(uiContainerButton);
+  
+  const title = new ThreeMeshUI.Text({
+    content: 'Three Mesh UI',
+    fontColor: new THREE.Color(0x00ff88),
+    fontSize: 0.09,
+    fontWeight: 'bold'
+  });
+
+  uiContainer.add(title);
+
+  setTimeout(() => {
+    document.getElementById('loading').style.opacity = '0';
+  }, 1000);
+
+  function animate() {
+    requestAnimationFrame(animate);
+
+    ThreeMeshUI.update();
+
+    controls.update();
+    renderer.render(scene, camera);
+  }
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    ThreeMeshUI.update();
+  });
+
+  animate();
+</script>
+</body>
+</html>
