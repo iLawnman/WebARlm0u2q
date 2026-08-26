@@ -1,11 +1,10 @@
+// ===================== app.js =====================
 import { UI } from './ui.js';
-import { Recognition } from './recognition.js';
+import { ImageRecognition } from './recognition.js';
 import { ARScene } from './arscene.js';
 import { playSound } from "./audio.js";
 import { Settings } from './settings.js';
 import { ARSettings } from './arsettings.js';
-import { UIInput } from './uiinput.js';
-import { setArTargetContext } from './artarget.js';
 
 export class App {
   constructor() {
@@ -14,18 +13,6 @@ export class App {
     this.arSettings = new ARSettings();
     this.recognition = null;
     this.arScene = new ARScene(this.ui);
-
-    // REFACTOR (CSS3D -> three-mesh-ui): раньше здесь создавался отдельный
-    // ARInput(renderer, scene, camera) - его логика (raycasting по
-    // указателю/тачу) теперь встроена прямо в ARScene, отдельный класс не
-    // нужен и не существует.
-    //
-    // ModelFactory (artarget.js) тоже больше не принимает renderer/scene/
-    // camera по отдельности - ему нужен сам инстанс ARScene, чтобы
-    // регистрировать интерактивные Block'и панелей в его raycast-цикле.
-    setArTargetContext(this.arScene);
-
-    this.uiInput = new UIInput(this.ui);
 
     this.xrSession = null;
     this.imageTrackingEnabled = false;
@@ -39,7 +26,6 @@ export class App {
   async init() {
     this.ui.log('App init (WebGL / Three.js WebXR)...', 'info');
 
-    this.uiInput.attach();
     this.ui.showCurtain();
 
     // 0. AR CSS-темы
@@ -66,7 +52,8 @@ export class App {
       this.ui.log('Settings failed to load, using defaults (unique_targets=0)', 'warn');
     }
 
-    this.recognition = new Recognition(this.ui, this.settings, this.arScene);
+    // 2. Recognition
+    this.recognition = new ImageRecognition(this.ui, this.settings);
     await this.recognition.init();
 
     this.ui.onStartAR(() => this.startAR());

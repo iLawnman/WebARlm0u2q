@@ -325,19 +325,9 @@
   const debugLog = document.getElementById('debug-log');
 
   let debugClickCount = 0;
-  function logToOverlay(message) {
-    debugClickCount += 1;
-    const time = new Date().toLocaleTimeString('ru-RU', { hour12: false });
-    const line = document.createElement('div');
-    line.className = 'log-line';
-    line.textContent = `[${time}] #${debugClickCount} ${message}`;
-    if (debugLog.querySelector('.log-empty')) debugLog.innerHTML = '';
-    debugLog.prepend(line);
-    console.log('[AR DOM Overlay]', message);
-  }
 
   if (debugBtn) {
-    debugBtn.addEventListener('click', () => logToOverlay('Клик по кнопке в DOM Overlay'));
+    debugBtn.addEventListener('click', () => console.log('Клик по кнопке в DOM Overlay'));
   }
 
   // ---------- Basic WebXR support check ----------
@@ -455,8 +445,8 @@
 
   function makeUI(position) {
     uiContainer = new ThreeMeshUI.Block({
-      height: 0.6,
-      width: 0.8,
+      height: 0.2,
+      width: 0.3,
       backgroundOpacity: 0.8,
       backgroundColor: new THREE.Color(0x0b1120),
       borderRadius: 0.04
@@ -565,7 +555,7 @@
       const intersects = raycaster.intersectObjects(raycastTargets, true);
 
       if (intersects.length > 0 && uiButton) {
-        logToOverlay('Нажата 3D WebXR кнопка!');
+        console.log('Нажата 3D WebXR кнопка!');
         uiButton.setState('selected');
         setTimeout(() => {
           if (uiButton) uiButton.setState('idle');
