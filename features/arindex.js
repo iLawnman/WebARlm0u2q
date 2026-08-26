@@ -114,7 +114,7 @@ async function init() {
   scene.add(edges);
 
   // UI панели
-  createUIPanels();
+  // createUIPanels();
 
   // События сессии
   renderer.xr.addEventListener('sessionstart', () => {
