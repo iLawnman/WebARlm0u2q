@@ -3,135 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>6 WebXR Image Tracking Example</title>
-    <style>
-        body { margin: 0; overflow: hidden; font-family: sans-serif; }
-        #ar-button { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 12px 24px; background: #007bff; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; z-index: 999; }
-        #ar-button:disabled { background: #aaa; cursor: not-allowed; }
-    </style>
+
+    <title>7bWebXR image tracking</title>
+    <script src="//cdn.jsdelivr.net/npm/eruda"></script>
+    <script type="application/javascript" defer> </script>
 </head>
 <body>
-
-<button id="ar-button" disabled>Checking WebXR Support...</button>
-
-<!-- The physical marker image we want the camera to look for -->
-<img id="tracker-image" src="./assets/recoimages/T1.jpg" crossOrigin="anonymous" style="display: none;" />
-
-<script type="module">
-    const button = document.getElementById('ar-button');
-    const imgElement = document.getElementById('tracker-image');
-    let xrSession = null;
-    let xrRefSpace = null;
-
-    // 1. Verify WebXR and Image Tracking feature support
-    if ('xr' in navigator) {
-        navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-            if (supported) {
-                button.textContent = 'Start AR Experience';
-                button.disabled = false;
-                button.addEventListener('click', onButtonClicked);
-            } else {
-                button.textContent = 'AR Not Supported on this Device';
-            }
-        });
-    } else {
-        button.textContent = 'WebXR Not Available';
-    }
-
-    async function onButtonClicked() {
-        if (!xrSession) {
-            // Ensure target image is completely loaded
-            if (!imgElement.complete) {
-                await new Promise(resolve => imgElement.onload = resolve);
-            }
-
-            // Convert the HTML Image into an ImageBitmap required by WebXR
-            const imageBitmap = await createImageBitmap(imgElement);
-
-            // 2. Configure the XR Session and request tracking features
-            const sessionOptions = {
-                requiredFeatures: ['image-tracking'],
-                trackedImages: [
-                    {
-                        image: imageBitmap, // The tracking target bitmap
-                        widthInMeters: 0.2  // Explicit physical width of marker in reality
-                    }
-                ]
-            };
-
-            navigator.xr.requestSession('immersive-ar', sessionOptions)
-                .then(onSessionStarted)
-                .catch(err => console.error("Failed to start session:", err));
-        } else {
-            xrSession.end();
-        }
-    }
-
-    function onSessionStarted(session) {
-        xrSession = session;
-        button.textContent = 'Exit AR';
-
-        // Set up WebGL Context and link it to the WebXR Session layer
-        const canvas = document.createElement('canvas');
-        const gl = canvas.getContext('webgl', { xrCompatible: true });
-        session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
-
-        // 3. Establish the base local coordinate reference space
-        session.requestReferenceSpace('local').then((refSpace) => {
-            xrRefSpace = refSpace;
-            // Kick off the native frame loop
-            session.requestAnimationFrame(onXRFrame);
-        });
-
-        session.addEventListener('end', () => {
-            xrSession = null;
-            button.textContent = 'Start AR Experience';
-        });
-    }
-
-    // 4. Processing frame loops and querying image coordinates
-    function onXRFrame(time, frame) {
-        const session = frame.session;
-        session.requestAnimationFrame(onXRFrame);
-
-        const glLayer = session.renderState.baseLayer;
-        const gl = glLayer.context;
-        gl.bindFramebuffer(gl.FRAMEBUFFER, glLayer.framebuffer);
-
-        // Fetch the tracking results specific to this frame
-        const results = frame.getImageTrackingResults();
-
-        for (const result of results) {
-            // The index corresponds directly to the array order in trackedImages configuration
-            const imageIndex = result.index;
-            const trackingState = result.trackingState; // Can be "tracked" or "emulated"
-
-            if (trackingState === "tracked") {
-                // Retrieve spatial position and rotation matrix relative to our space
-                const pose = frame.getPose(result.imageSpace, xrRefSpace);
-                if (pose) {
-                    const matrix = pose.transform.matrix;
-                    console.log(`Marker ${imageIndex} updated matrix:`, matrix);
-
-                    // TODO: Apply this 16-element transform matrix directly to your 
-                    // Three.js, Babylon.js, or WebGL custom 3D model entity.
-                }
-            } else if (trackingState === "emulated") {
-                // Marker is currently hidden from camera view, using last known position
-                console.log(`Marker ${imageIndex} tracking is currently emulated.`);
-            }
-        }
-
-        // Standard camera rendering logic goes here
-        const viewerPose = frame.getViewerPose(xrRefSpace);
-        if (viewerPose) {
-            for (const view of viewerPose.views) {
-                const viewport = glLayer.getViewport(view);
-                gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
-                // Clear buffer and issue standard draw calls using view.transform.matrix
-            }
-        }
-    }
-</script>
+<canvas class="webgl"></canvas>
+<img id='img' src='./assets/recoimages/T1.jpg' alt='flower' style='display: none;'/>
+<img id='imgBird' src='./assets/recoimages/T2.jpg' alt='box' style='display: none;'/>
+<div id='console-ui'></div>
 </body>
 </html>
