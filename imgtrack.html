@@ -6,21 +6,36 @@
   <title>WebXR Image Tracking</title>
   <style>
     html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
-    #overlay {
-      position: fixed; left: 0; right: 0; bottom: 0;
-      padding: 12px 16px; font: 14px/1.4 sans-serif; color: #fff;
-      background: rgba(0,0,0,0.55); z-index: 10;
-    }
+
     #startButton {
       position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%);
       z-index: 10; padding: 14px 22px; font: 16px sans-serif;
       border: none; border-radius: 8px; cursor: pointer;
     }
+
+    #status {
+      position: fixed; left: 0; right: 260px; bottom: 0;
+      padding: 10px 14px; font: 13px/1.4 monospace; color: #fff;
+      background: rgba(0,0,0,0.55); z-index: 10; pointer-events: none;
+    }
+
+    #logPanel {
+      position: fixed; top: 0; right: 0; bottom: 0; width: 260px;
+      background: rgba(0,0,0,0.75); color: #0f0; z-index: 20;
+      font: 11px/1.35 monospace; overflow-y: auto;
+      padding: 8px; box-sizing: border-box;
+      border-left: 1px solid rgba(255,255,255,0.2);
+    }
+    #logPanel .entry { white-space: pre-wrap; word-break: break-word; margin-bottom: 4px; }
+    #logPanel .entry.warn { color: #ff0; }
+    #logPanel .entry.error { color: #f55; }
+    #logPanel .t { color: #888; }
   </style>
 </head>
 <body>
   <button id="startButton">Start AR</button>
-  <div id="overlay"></div>
+  <div id="status"></div>
+  <div id="logPanel"></div>
 
   <script type="importmap">
     {
@@ -33,7 +48,8 @@
   <script type="module">
     import * as THREE from "three";
 
-    const overlay = document.getElementById("overlay");
+    const statusEl = document.getElementById("status");
+    const logPanel = document.getElementById("logPanel");
     const startButton = document.getElementById("startButton");
 
     // WebXR native image tracking is an experimental "image-tracking" feature.
@@ -41,24 +57,51 @@
     // The tracked image must be provided as a decoded ImageBitmap plus its
     // physical width in meters, so AR.js's .patt marker file is not used here.
 
-    const TRACKED_IMAGE_URL = "./assets/recoimages/T1.jpg";
-    const TRACKED_IMAGE_WIDTH_METERS = 0.1; // measure your printed/screen image and set this correctly
+    const TRACKED_IMAGE_URL = "assets/asset.png";
+    const TRACKED_IMAGE_WIDTH_METERS = 0.2; // measure your printed/screen image and set this correctly
 
     let renderer, scene, camera;
     let trackedImageBitmap;
     let placedNode = null;
+    let frameCounter = 0;
 
-    function log(msg) {
-      overlay.textContent = msg;
+    function logLine(msg, level) {
+      const time = new Date().toISOString().substring(11, 23);
+      const entry = document.createElement("div");
+      entry.className = "entry" + (level ? " " + level : "");
+      entry.innerHTML = '<span class="t">[' + time + "]</span> " + msg;
+      logPanel.appendChild(entry);
+      logPanel.scrollTop = logPanel.scrollHeight;
+
+      const consoleFn =
+        level === "error" ? console.error : level === "warn" ? console.warn : console.log;
+      consoleFn("[webxr-image-tracking]", msg);
+    }
+
+    function setStatus(msg) {
+      statusEl.textContent = msg;
+      logLine(msg);
     }
 
     async function loadTrackedImage(url) {
+      logLine("Fetching tracked image: " + url);
       const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(
+          "Tracked image fetch failed: " + response.status + " " + response.statusText
+        );
+      }
       const blob = await response.blob();
-      return await createImageBitmap(blob);
+      logLine("Tracked image blob loaded, size=" + blob.size + " bytes, type=" + blob.type);
+      const bitmap = await createImageBitmap(blob);
+      logLine(
+        "Tracked image decoded: " + bitmap.width + "x" + bitmap.height + " px"
+      );
+      return bitmap;
     }
 
     function initThree() {
+      logLine("Initializing THREE renderer/scene/camera");
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setPixelRatio(window.devicePixelRatio);
       renderer.setSize(window.innerWidth, window.innerHeight);
@@ -74,11 +117,10 @@
       window.addEventListener("resize", () => {
         renderer.setSize(window.innerWidth, window.innerHeight);
       });
+      logLine("THREE renderer ready");
     }
 
     function buildContentNode() {
-      // Replace this with your real content; kept simple to mirror the
-      // original a-image behaviour (something anchored to the image).
       const geometry = new THREE.PlaneGeometry(
         TRACKED_IMAGE_WIDTH_METERS,
         TRACKED_IMAGE_WIDTH_METERS
@@ -92,25 +134,46 @@
       mesh.rotation.x = -Math.PI / 2;
       mesh.visible = false;
       scene.add(mesh);
+      logLine("Placeholder content node created (hidden until tracked)");
       return mesh;
     }
 
     async function startAR() {
+      logLine("=== Start AR pressed ===");
+
+      logLine("navigator.xr present: " + Boolean(navigator.xr));
       if (!navigator.xr) {
-        log("WebXR not available on this browser/device.");
+        setStatus("WebXR not available on this browser/device.");
         return;
       }
 
-      const supported = await navigator.xr.isSessionSupported("immersive-ar");
+      let supported = false;
+      try {
+        supported = await navigator.xr.isSessionSupported("immersive-ar");
+      } catch (err) {
+        logLine("isSessionSupported threw: " + err.message, "error");
+      }
+      logLine("immersive-ar supported: " + supported);
       if (!supported) {
-        log("immersive-ar not supported on this device.");
+        setStatus("immersive-ar not supported on this device.");
         return;
       }
 
-      trackedImageBitmap = await loadTrackedImage(TRACKED_IMAGE_URL);
+      try {
+        trackedImageBitmap = await loadTrackedImage(TRACKED_IMAGE_URL);
+      } catch (err) {
+        setStatus("Failed to load tracked image: " + err.message);
+        logLine(err.stack || String(err), "error");
+        return;
+      }
 
       initThree();
       placedNode = buildContentNode();
+
+      logLine(
+        "Requesting session with requiredFeatures=[image-tracking, local-floor], " +
+          "trackedImages width=" + TRACKED_IMAGE_WIDTH_METERS + "m"
+      );
 
       let session;
       try {
@@ -123,11 +186,14 @@
             },
           ],
         });
+        logLine("requestSession resolved OK");
       } catch (err) {
-        log(
-          "Failed to start session with image-tracking. " +
-            "This feature is experimental and Chrome-Android-only today. " +
-            err.message
+        setStatus("Failed to start immersive-ar session: " + err.message);
+        logLine(err.stack || String(err), "error");
+        logLine(
+          "Common causes: not HTTPS, image-tracking flag disabled, " +
+            "browser other than Chrome Android, camera permission denied.",
+          "warn"
         );
         return;
       }
@@ -135,52 +201,112 @@
       startButton.style.display = "none";
       renderer.xr.setReferenceSpaceType("local-floor");
       await renderer.xr.setSession(session);
+      logLine("Session attached to renderer");
 
       const referenceSpace = renderer.xr.getReferenceSpace();
+      logLine("Reference space acquired: " + (referenceSpace ? "ok" : "null"));
+
+      if (!("getImageTrackingResults" in XRFrame.prototype)) {
+        logLine(
+          "XRFrame.getImageTrackingResults is not defined by this browser build — " +
+            "image-tracking is unsupported even though the session started.",
+          "error"
+        );
+      }
 
       renderer.setAnimationLoop((timestamp, frame) => {
-        if (!frame) return;
+        frameCounter++;
+        if (!frame) {
+          if (frameCounter % 60 === 0) logLine("Frame " + frameCounter + ": no XRFrame", "warn");
+          return;
+        }
 
         const results = frame.getImageTrackingResults
           ? frame.getImageTrackingResults()
-          : [];
+          : null;
+
+        if (results === null) {
+          if (frameCounter % 60 === 0) {
+            logLine(
+              "Frame " + frameCounter + ": getImageTrackingResults unavailable on this frame",
+              "warn"
+            );
+          }
+          renderer.render(scene, camera);
+          return;
+        }
+
+        if (frameCounter % 30 === 0) {
+          logLine("Frame " + frameCounter + ": " + results.length + " tracking result(s)");
+        }
 
         let matched = false;
 
         for (const result of results) {
           if (result.trackedImageIndex !== 0) continue;
 
-          const pose = frame.getPose(result.imageSpace, referenceSpace);
-          if (pose && result.trackingState === "tracked") {
-            matched = true;
-            placedNode.visible = true;
-            placedNode.matrix.fromArray(pose.transform.matrix);
-            placedNode.matrix.decompose(
-              placedNode.position,
-              placedNode.quaternion,
-              placedNode.scale
+          if (frameCounter % 30 === 0) {
+            logLine(
+              "  result idx=" + result.trackedImageIndex +
+                " state=" + result.trackingState
             );
-            log("Image detected: state=tracked");
+          }
+
+          if (result.trackingState === "tracked") {
+            const pose = frame.getPose(result.imageSpace, referenceSpace);
+            if (pose) {
+              matched = true;
+              placedNode.visible = true;
+              placedNode.matrix.fromArray(pose.transform.matrix);
+              placedNode.matrix.decompose(
+                placedNode.position,
+                placedNode.quaternion,
+                placedNode.scale
+              );
+              setStatus("Image detected: state=tracked");
+            } else {
+              logLine("trackingState=tracked but getPose returned null", "warn");
+            }
           } else if (result.trackingState === "emulated") {
-            log("Image detected: state=emulated (last known pose)");
+            matched = true;
+            setStatus("Image detected: state=emulated (last known pose)");
           }
         }
 
         if (!matched) {
           placedNode.visible = false;
-          log("Searching for image target...");
+          if (frameCounter % 30 === 0) setStatus("Searching for image target...");
         }
 
         renderer.render(scene, camera);
       });
 
       session.addEventListener("end", () => {
+        logLine("Session ended");
         renderer.setAnimationLoop(null);
         startButton.style.display = "block";
       });
+
+      session.addEventListener("visibilitychange", () => {
+        logLine("Session visibility: " + session.visibilityState);
+      });
     }
 
-    startButton.addEventListener("click", startAR);
+    startButton.addEventListener("click", () => {
+      startAR().catch((err) => {
+        setStatus("Unexpected error: " + err.message);
+        logLine(err.stack || String(err), "error");
+      });
+    });
+
+    window.addEventListener("error", (e) => {
+      logLine("window error: " + e.message, "error");
+    });
+    window.addEventListener("unhandledrejection", (e) => {
+      logLine("unhandled rejection: " + (e.reason && e.reason.message ? e.reason.message : e.reason), "error");
+    });
+
+    logLine("Page loaded. Waiting for Start AR.");
   </script>
 </body>
 </html>
