@@ -157,13 +157,6 @@
     #debug-log .log-empty { color: #475569; }
     #debug-log .log-line { color: #67e8f9; }
 
-    /* ---------- Стили для панелей конвертора ---------- */
-    .convertor-panel {
-      width: min(88vw, 320px);
-      font-size: 13px;
-      color: #e2e8f0;
-    }
-
     /* ---------- Кнопка AR ---------- */
     #ar-button-container {
       position: absolute;
@@ -205,7 +198,7 @@
 <body>
 
 <div id="webgl-container"></div>
-<div id="hint">Наведите камеру на пол — появится маркер. Коснитесь экрана, чтобы поставить куб и панель.</div>
+<div id="hint">reco</div>
 
 <div id="unsupported">
   <div>
@@ -232,9 +225,6 @@
       <div id="debug-log"><span class="log-empty">лог пуст…</span></div>
     </div>
   </div>
-
-  <!-- Контейнер для динамических панелей конвертора -->
-  <div id="convertor-panels-container"></div>
 </div>
 
 <script type="importmap">
@@ -295,11 +285,53 @@
   renderer.xr.enabled = true;
   webglContainer.appendChild(renderer.domElement);
 
+  // ================== NEW: Загрузка распознаваемых изображений ==================
+  // Загружаем ./assets/recognitionimages.json — список картинок для WebXR image-tracking.
+  // Ожидаемый формат JSON: [{ "name": "target1", "file": "target1.jpg", "widthInMeters": 0.2 }, ...]
+  let trackedImagesData = []; // сюда попадут { image: ImageBitmap, widthInMeters, name }
+
+  async function loadRecognitionImages() {
+    try {
+      const recoResponse = await fetch('./assets/recognitionimages.json');
+      if (!recoResponse.ok) {
+        console.warn('[Reco] recognitionimages.json не найден, пропускаем image-tracking');
+        return;
+      }
+      const recognitionImages = await recoResponse.json();
+
+      for (const item of recognitionImages) {
+        try {
+          const fileName = item.file || item.src || item.name;
+          const imgResponse = await fetch(`../assets/recoimages/${fileName}`);
+          const blob = await imgResponse.blob();
+          const bitmap = await createImageBitmap(blob);
+          trackedImagesData.push({
+            image: bitmap,
+            widthInMeters: item.widthInMeters || 0.2,
+            name: item.name || fileName
+          });
+        } catch (imgErr) {
+          console.warn('[Reco] Не удалось загрузить изображение из ../assets/recoimages/:', item, imgErr);
+        }
+      }
+
+      console.log(`[Reco] Загружено изображений для распознавания: ${trackedImagesData.length}`);
+    } catch (e) {
+      console.warn('[Reco] Не удалось загрузить ./assets/recognitionimages.json', e);
+    }
+  }
+
+  // Ждём загрузки перед созданием AR-кнопки (top-level await, т.к. это модуль)
+  await loadRecognitionImages();
+  // ================== /NEW ==================
+
   // ---------- AR entry button ----------
   const arButton = ARButton.createButton(renderer, {
     requiredFeatures: ['hit-test'],
-    optionalFeatures: ['local-floor', 'dom-overlay'],
-    domOverlay: { root: arOverlay }
+    optionalFeatures: ['local-floor', 'dom-overlay', 'image-tracking'],
+    domOverlay: { root: arOverlay },
+    // NEW: передаём распознаваемые изображения в сессию, если они загрузились
+    ...(trackedImagesData.length > 0 ? { trackedImages: trackedImagesData } : {})
   });
   arButtonContainer.appendChild(arButton);
 
@@ -462,6 +494,29 @@
     raycastTargets.push(uiButton);
   }
 
+  // ================== NEW: Установка куба на месте распознанной картинки ==================
+  function placeCubeAtImage(pose) {
+    if (placed) return; // куб уже поставлен — не переставляем
+
+    cube.position.setFromMatrixPosition(pose.transform.matrix);
+    const q = pose.transform.orientation;
+    cube.quaternion.set(q.x, q.y, q.z, q.w);
+    cube.position.y += cubeSize / 2;
+    cube.visible = true;
+
+    edges.position.copy(cube.position);
+    edges.quaternion.copy(cube.quaternion);
+    edges.visible = true;
+
+    placed = true;
+    placeHint.style.display = 'none';
+
+    placeThreeUIPanel(cube.position);
+
+    console.log('[Reco] Куб установлен на месте распознанной картинки');
+  }
+  // ================== /NEW ==================
+
   // ---------- WebXR Controller setup & Selection ----------
   const controller = renderer.xr.getController(0);
 
@@ -540,6 +595,21 @@
           reticle.visible = false;
         }
       }
+
+      // ================== NEW: Распознавание изображений ==================
+      if (trackedImagesData.length > 0 && !placed && frame.getImageTrackingResults) {
+        const imageResults = frame.getImageTrackingResults();
+        for (const result of imageResults) {
+          if (result.trackingState === 'tracked') {
+            const imagePose = frame.getPose(result.imageSpace, referenceSpace);
+            if (imagePose) {
+              placeCubeAtImage(imagePose);
+              break;
+            }
+          }
+        }
+      }
+      // ================== /NEW ==================
     }
 
     if (placed) {
