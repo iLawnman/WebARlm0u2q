@@ -370,15 +370,23 @@
 
         const session = await navigator.xr.requestSession('immersive-ar', sessionInit);
         this.xrSession = session;
-        this.renderer.xr.setSession(session);
+
+        // Регистрируем обработчик завершения сессии сразу,
+        // до всех дальнейших await — чтобы не пропустить событие 'end'
+        session.addEventListener('end', () => this.onSessionEnded());
+
+        // КРИТИЧНО: обязательно дожидаемся setSession.
+        // Это асинхронный метод, который привязывает XR-сессию к WebGL-слою рендерера.
+        // Без await рендер-луп и запрос reference space могли стартовать раньше,
+        // чем сессия готова отдавать кадры — из-за этого AR-камера не запускалась,
+        // а сама сессия могла обрываться (нет поданных кадров -> таймаут).
+        await this.renderer.xr.setSession(session);
 
         this.ui.showEndArButton(true);
         this.ui.btnAr.style.display = 'none';
         this.ui.log('AR Session started successfully', 'ok');
 
         this.xrRefSpace = await session.requestReferenceSpace('local');
-
-        session.addEventListener('end', () => this.onSessionEnded());
 
         // Запуск главного render loop
         this.renderer.setAnimationLoop((time, frame) => this.render(time, frame));
@@ -404,10 +412,17 @@
     }
 
     render(time, frame) {
-      if (frame && this.xrRefSpace) {
-        this.recognition.processTracking(frame, this.xrRefSpace, this.scene);
+      // Оборачиваем кадр в try/catch: необработанное исключение внутри
+      // колбэка setAnimationLoop может молча остановить подачу кадров в XR-сессию
+      // (визуально это выглядит как "всё зависло" без единой записи в лог).
+      try {
+        if (frame && this.xrRefSpace) {
+          this.recognition.processTracking(frame, this.xrRefSpace, this.scene);
+        }
+        this.renderer.render(this.scene, this.camera);
+      } catch (e) {
+        this.ui.log('Render frame error: ' + e.message, 'err');
       }
-      this.renderer.render(this.scene, this.camera);
     }
   }
 
