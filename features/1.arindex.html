@@ -4,14 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>WebXR AR — Куб на полу + Three Mesh UI панель</title>
-
-  <!-- Единый файл стилей (включает стили AR UI и Overlay Log) -->
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
   <div id="hint">
-    refactor WebXR AR — Куб на полу + Three Mesh UI панель<br>
     Наведите камеру на пол — появится маркер. Коснитесь экрана, чтобы поставить куб и панель.
   </div>
 
@@ -31,11 +28,8 @@
 
   <div id="webgl-container"></div>
 
-  <!-- Overlay Log (стили подгружаются из style.css) -->
   <script src="overlaylog.js"></script>
-
-  <!-- Основная логика AR -->
-  <!-- <script type="module" src="ar.js"></script> -->
+  <script src="ar.js"></script>
 
 </body>
 </html>
