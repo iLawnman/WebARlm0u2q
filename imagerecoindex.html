@@ -1,731 +1,357 @@
-<!DOCTYPE html>
-<html lang="ru">
+<!doctype html>
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>1 Recognition Image</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <title>WebXR Image Tracking</title>
   <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #05070d;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+    #startButton {
+      position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%);
+      z-index: 10; padding: 14px 22px; font: 16px sans-serif;
+      border: none; border-radius: 8px; cursor: pointer;
+      background: #4CAF50; color: white;
+      font-weight: bold;
     }
-
-    #webgl-container {
-      position: absolute;
-      inset: 0;
+    #status {
+      position: fixed; left: 0; right: 260px; bottom: 0;
+      padding: 10px 14px; font: 13px/1.4 monospace; color: #fff;
+      background: rgba(0,0,0,0.55); z-index: 10; pointer-events: none;
     }
-
-    #hint {
-      position: absolute;
-      z-index: 3;
-      top: 16px;
-      left: 50%;
-      transform: translateX(-50%);
-      color: #e2e8f0;
-      font-size: 13px;
-      background: rgba(11, 17, 32, 0.65);
-      padding: 8px 16px;
-      border-radius: 999px;
-      border: 1px solid rgba(148, 163, 184, 0.25);
-      pointer-events: none;
-      text-align: center;
-      max-width: 90%;
+    #logPanel {
+      position: fixed; top: 0; right: 0; bottom: 0; width: 260px;
+      background: rgba(0,0,0,0.75); color: #0f0; z-index: 20;
+      font: 11px/1.35 monospace; overflow-y: auto;
+      padding: 8px; box-sizing: border-box;
+      border-left: 1px solid rgba(255,255,255,0.2);
     }
-
-    #unsupported {
-      position: absolute;
-      inset: 0;
-      z-index: 5;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      color: #94a3b8;
-      padding: 32px;
-    }
-
-    #unsupported h2 { color: #f8fafc; margin-bottom: 12px; }
-
-    /* ---------- WebXR DOM Overlay root ---------- */
-    #ar-overlay {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      display: none;
-    }
-
-    #place-hint {
-      position: absolute;
-      top: 16px;
-      left: 50%;
-      transform: translateX(-50%);
-      pointer-events: none;
-      color: #f8fafc;
-      background: rgba(11, 17, 32, 0.65);
-      padding: 8px 16px;
-      border-radius: 999px;
-      font-size: 13px;
-      border: 1px solid rgba(148, 163, 184, 0.25);
-    }
-
-    /* ---------- Базовый стиль для всех привязанных панелей ---------- */
-    .ar-anchored-panel {
-      position: absolute;
-      top: 0;
-      left: 0;
-      transform-origin: 50% 100%;
-      opacity: 0;
-      visibility: hidden;
-      pointer-events: none;
-      display: flex;
-      flex-direction: column;
-      border-radius: 16px;
-      overflow: hidden;
-      border: 1px solid rgba(148, 163, 184, 0.3);
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
-      background: #0b1120;
-      transition: opacity 0.15s linear;
-      will-change: transform, opacity;
-    }
-
-    .ar-anchored-panel.visible {
-      opacity: 1;
-      visibility: visible;
-      pointer-events: auto;
-    }
-
-    #anchor-panel {
-      width: 460px;
-    }
-
-    #anchor-panel .panel-frame {
-      width: 100%;
-      height: 560px;
-      background: #0b1120;
-    }
-
-    #anchor-panel iframe {
-      width: 100%;
-      height: 100%;
-      border: 0;
-      display: block;
-    }
-
-    #anchor-panel .panel-debug {
-      flex-shrink: 0;
-      padding: 10px 12px;
-      background: #0f172a;
-      border-top: 1px solid rgba(148, 163, 184, 0.2);
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    #debug-btn {
-      pointer-events: auto;
-      padding: 10px 14px;
-      border-radius: 10px;
-      border: 1px solid rgba(129, 140, 248, 0.4);
-      background: rgba(99, 102, 241, 0.18);
-      color: #e0e7ff;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    #debug-btn:active {
-      background: rgba(99, 102, 241, 0.35);
-    }
-
-    #debug-log {
-      max-height: 96px;
-      overflow-y: auto;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 11px;
-      line-height: 1.5;
-      color: #94a3b8;
-      background: rgba(0, 0, 0, 0.25);
-      border-radius: 8px;
-      padding: 6px 8px;
-    }
-
-    #debug-log .log-empty { color: #475569; }
-    #debug-log .log-line { color: #67e8f9; }
-
-    /* ---------- Кнопка AR ---------- */
-    #ar-button-container {
-      position: absolute;
-      bottom: 40px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 10;
-      pointer-events: auto;
-    }
-
-    #ar-button-container button {
-      padding: 14px 32px;
-      border-radius: 12px;
-      border: none;
-      background: #6366f1;
-      color: white;
-      font-size: 18px;
-      font-weight: 600;
-      cursor: pointer;
-      box-shadow: 0 8px 30px rgba(99, 102, 241, 0.4);
-      transition: all 0.2s;
-    }
-
-    #ar-button-container button:hover {
-      background: #4f46e5;
-      transform: scale(1.02);
-    }
-
-    #ar-button-container button:active {
-      transform: scale(0.95);
-    }
-
-    #ar-button-container button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
+    #logPanel .entry { white-space: pre-wrap; word-break: break-word; margin-bottom: 4px; }
+    #logPanel .entry.warn { color: #ff0; }
+    #logPanel .entry.error { color: #f55; }
+    #logPanel .t { color: #888; }
   </style>
 </head>
 <body>
-
-<!-- NEW: оверлей-лог для отладки на устройстве (перехватывает console.log/warn/error) -->
-<script src="overlaylog.js"></script>
-
-<div id="webgl-container"></div>
-<div id="hint">reco</div>
-
-<div id="unsupported">
-  <div>
-    <h2>WebXR AR недоступен</h2>
-    <p>Откройте страницу на Android-устройстве в Chrome (ARCore) по HTTPS,<br>
-      или на устройстве с поддержкой WebXR immersive-ar.</p>
-  </div>
-</div>
-
-<!-- Кнопка запуска AR -->
-<div id="ar-button-container"></div>
-
-<!-- WebXR DOM Overlay root -->
-<div id="ar-overlay">
-  <div id="place-hint">Коснитесь пола, чтобы поставить куб и панель</div>
-
-  <!-- Основная панель -->
-  <div id="anchor-panel" class="ar-anchored-panel">
-    <div class="panel-frame">
-      <iframe src="about.html" scrolling="yes"></iframe>
-    </div>
-    <div class="panel-debug">
-      <button id="debug-btn" type="button">🧪 Тест клика — вывести в лог</button>
-      <div id="debug-log"><span class="log-empty">лог пуст…</span></div>
-    </div>
-  </div>
-</div>
+<button id="startButton">Start AR</button>
+<div id="status"></div>
+<div id="logPanel"></div>
 
 <script type="importmap">
   {
     "imports": {
-      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
-      "three-mesh-ui": "https://unpkg.com/three-mesh-ui/build/three-mesh-ui.module.js"
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
     }
   }
 </script>
 
 <script type="module">
-  import * as THREE from 'three';
-  import { ARButton } from 'three/addons/webxr/ARButton.js';
-  import * as ThreeMeshUI from "three-mesh-ui";
+  import * as THREE from "three";
 
-  const webglContainer = document.getElementById('webgl-container');
-  const hint = document.getElementById('hint');
-  const unsupportedEl = document.getElementById('unsupported');
-  const arOverlay = document.getElementById('ar-overlay');
-  const placeHint = document.getElementById('place-hint');
-  const arButtonContainer = document.getElementById('ar-button-container');
+  const statusEl = document.getElementById("status");
+  const logPanel = document.getElementById("logPanel");
+  const startButton = document.getElementById("startButton");
 
-  const anchorPanel = document.getElementById('anchor-panel');
-  const debugBtn = document.getElementById('debug-btn');
-  const debugLog = document.getElementById('debug-log');
+  // Используем известное рабочее изображение для теста
+  const TRACKED_IMAGE_URL = "./assets/recoimages/T1.jpg";
+  const TRACKED_IMAGE_WIDTH_METERS = 0.1; // 20 см
 
-  let debugClickCount = 0;
+  let renderer, scene, camera;
+  let placedNode = null;
+  let frameCounter = 0;
+  let session = null;
+  let referenceSpace = null;
+  let imageBitmap = null;
 
-  if (debugBtn) {
-    debugBtn.addEventListener('click', () => console.log('Клик по кнопке в DOM Overlay'));
+  function logLine(msg, level) {
+    const time = new Date().toISOString().substring(11, 23);
+    const entry = document.createElement("div");
+    entry.className = "entry" + (level ? " " + level : "");
+    entry.textContent = `[${time}] ${msg}`;
+    logPanel.appendChild(entry);
+    logPanel.scrollTop = logPanel.scrollHeight;
+
+    const consoleFn = level === "error" ? console.error : level === "warn" ? console.warn : console.log;
+    consoleFn("[webxr-image-tracking]", msg);
   }
 
-  // ---------- Basic WebXR support check ----------
-  if (!('xr' in navigator)) {
-    unsupportedEl.style.display = 'flex';
-  } else {
-    navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-      if (!supported) unsupportedEl.style.display = 'flex';
-    }).catch(() => { unsupportedEl.style.display = 'flex'; });
+  function setStatus(msg) {
+    statusEl.textContent = msg;
+    logLine(msg);
   }
 
-  // ---------- Scene / Camera ----------
-  const scene = new THREE.Scene();
+  async function loadTrackedImage(url) {
+    logLine(`Loading image: ${url}`);
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const blob = await response.blob();
+    logLine(`Image loaded: ${blob.size} bytes`);
+    const bitmap = await createImageBitmap(blob);
+    logLine(`Image decoded: ${bitmap.width}x${bitmap.height}px`);
+    return bitmap;
+  }
 
-  const camera = new THREE.PerspectiveCamera(
-          70,
-          window.innerWidth / window.innerHeight,
-          0.01,
-          20
-  );
+  function initThree() {
+    logLine("Initializing THREE");
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.xr.enabled = true;
+    document.body.appendChild(renderer.domElement);
 
-  // ---------- Renderer ----------
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setPixelRatio(window.devicePixelRatio);
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.xr.enabled = true;
-  webglContainer.appendChild(renderer.domElement);
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera();
 
-  // ================== NEW: Загрузка распознаваемых изображений ==================
-  // Загружаем ./assets/recognitionimages.json — список картинок для WebXR image-tracking.
-  // Ожидаемый формат JSON: [{ "name": "target1", "file": "target1.jpg", "widthInMeters": 0.2 }, ...]
-  let trackedImagesData = []; // сюда попадут { image: ImageBitmap, widthInMeters, name }
-  // NEW: служебные счётчики для троттлинга диагностических логов в цикле рендера
-  let recoApiCheckedOnce = false;
-  let recoFrameLogCounter = 0;
-  let recoLastLoggedStates = {}; // imageIndex -> trackingState, чтобы логировать только изменения
+    const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
+    scene.add(light);
 
-  console.log('[Reco] User-Agent:', navigator.userAgent);
-  console.log('[Reco] ' + (window.isSecureContext ? '✅ Secure context (https/localhost)' : '⚠️ НЕ secure context — WebXR может не работать'));
+    const gridHelper = new THREE.GridHelper(1, 10);
+    gridHelper.position.y = -0.05;
+    scene.add(gridHelper);
 
-  async function loadRecognitionImages() {
-    console.log('[Reco] Начинаю загрузку ./assets/recognitionimages.json …');
+    window.addEventListener("resize", () => {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    logLine("THREE initialized");
+  }
+
+  function buildContentNode() {
+    const size = TRACKED_IMAGE_WIDTH_METERS * 0.5;
+    // Создаем яркий объект
+    const geometry = new THREE.BoxGeometry(size, size, size);
+    const material = new THREE.MeshStandardMaterial({
+      color: 0xff4400,
+      emissive: 0xff2200,
+      emissiveIntensity: 0.5,
+      metalness: 0.3,
+      roughness: 0.4
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.visible = false;
+
+    // Добавляем рамку
+    const edges = new THREE.EdgesGeometry(geometry);
+    const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff }));
+    mesh.add(line);
+
+    scene.add(mesh);
+    logLine(`Content node created`);
+    return mesh;
+  }
+
+  async function startAR() {
+    logLine("=== START AR ===");
+
+    if (!navigator.xr) {
+      throw new Error("WebXR not available");
+    }
+
+    // Проверяем поддержку
+    let supported = false;
     try {
-      const recoResponse = await fetch('./assets/recognitionimages.json');
-      console.log(`[Reco] Ответ на recognitionimages.json: status=${recoResponse.status}, ok=${recoResponse.ok}`);
+      supported = await navigator.xr.isSessionSupported("immersive-ar");
+    } catch (err) {
+      throw new Error(`isSessionSupported failed: ${err.message}`);
+    }
 
-      if (!recoResponse.ok) {
-        console.warn('[Reco] ❌ recognitionimages.json не найден (проверьте путь ./assets/recognitionimages.json относительно текущей страницы). image-tracking будет отключён.');
+    if (!supported) {
+      throw new Error("Immersive AR not supported");
+    }
+    logLine("Immersive AR supported");
+
+    // Загружаем изображение для трекинга
+    try {
+      imageBitmap = await loadTrackedImage(TRACKED_IMAGE_URL);
+    } catch (err) {
+      throw new Error(`Image load failed: ${err.message}`);
+    }
+
+    initThree();
+    placedNode = buildContentNode();
+
+    // ВАЖНО: Правильный способ передачи изображения для трекинга
+    logLine("Creating session with image-tracking...");
+
+    const sessionInit = {
+      requiredFeatures: ["local-floor", "image-tracking"],
+      trackedImages: [{
+        image: imageBitmap,
+        widthInMeters: TRACKED_IMAGE_WIDTH_METERS,
+      }]
+    };
+
+    logLine(`Session options: ${JSON.stringify({
+      features: sessionInit.requiredFeatures,
+      imageWidth: TRACKED_IMAGE_WIDTH_METERS
+    })}`);
+
+    try {
+      session = await navigator.xr.requestSession("immersive-ar", sessionInit);
+      logLine("✅ Session created successfully");
+    } catch (err) {
+      logLine(`Session creation failed: ${err.message}`, "error");
+      throw new Error(`Failed to create session: ${err.message}`);
+    }
+
+    startButton.style.display = "none";
+
+    // Настраиваем сессию
+    await renderer.xr.setSession(session);
+    logLine("Session attached to renderer");
+
+    referenceSpace = await session.requestReferenceSpace("local-floor");
+    if (!referenceSpace) {
+      throw new Error("Failed to get reference space");
+    }
+    logLine("Reference space acquired");
+
+    // Проверяем API
+    const hasTracking = 'getImageTrackingResults' in XRFrame.prototype;
+    logLine(`Image tracking API: ${hasTracking ? '✅' : '❌'}`);
+
+    if (!hasTracking) {
+      throw new Error("Image tracking API not available");
+    }
+
+    // Пробуем получить tracked images через session
+    try {
+      // В некоторых реализациях изображения доступны через session
+      if (session.trackedImages) {
+        logLine(`Session has ${session.trackedImages.length} tracked images`);
+      } else {
+        logLine("Session.trackedImages not available (normal for some browsers)");
+      }
+    } catch (e) {
+      logLine(`Cannot access trackedImages: ${e.message}`);
+    }
+
+    logLine("🚀 Starting tracking loop");
+
+    // Основной цикл
+    renderer.setAnimationLoop((timestamp, frame) => {
+      frameCounter++;
+
+      if (!frame) {
+        if (frameCounter % 30 === 0) logLine("No frame", "warn");
         return;
       }
 
-      const recognitionImages = await recoResponse.json();
-      console.log(`[Reco] JSON распарсен, записей: ${recognitionImages.length}`, recognitionImages);
+      let imageDetected = false;
 
-      for (const item of recognitionImages) {
-        const isPlainString = typeof item === 'string';
-        const fileName = isPlainString ? item : (item.file || item.src || item.name);
-        const displayName = isPlainString ? item.replace(/\.[^.]+$/, '') : (item.name || fileName);
-        const imgUrl = `./assets/recoimages/${fileName}`;
-        console.log(`[Reco] Загружаю картинку "${displayName}" по адресу ${imgUrl} …`);
-        try {
-          const imgResponse = await fetch(imgUrl);
-          console.log(`[Reco]   → status=${imgResponse.status}, ok=${imgResponse.ok}, content-type=${imgResponse.headers.get('content-type')}`);
+      try {
+        // Получаем результаты трекинга
+        const results = frame.getImageTrackingResults();
 
-          if (!imgResponse.ok) {
-            console.warn(`[Reco] ❌ Не удалось получить файл ${imgUrl} (HTTP ${imgResponse.status}). Проверьте, что файл лежит именно в ${imgUrl}`);
-            continue;
+        // Логируем каждые 60 кадров
+        if (frameCounter % 60 === 0) {
+          logLine(`Frame ${frameCounter}: ${results.length} result(s)`);
+        }
+
+        // Обрабатываем результаты
+        for (const result of results) {
+          // Проверяем состояние
+          const state = result.trackingState;
+
+          if (frameCounter % 60 === 0) {
+            logLine(`  Result: idx=${result.trackedImageIndex}, state=${state}`);
           }
 
-          const blob = await imgResponse.blob();
-          console.log(`[Reco]   → blob получен: size=${blob.size} байт, type=${blob.type}`);
+          // Если изображение отслеживается
+          if (state === "tracked" || state === "emulated") {
+            try {
+              const pose = frame.getPose(result.imageSpace, referenceSpace);
+              if (pose) {
+                imageDetected = true;
+                placedNode.visible = true;
 
-          const bitmap = await createImageBitmap(blob);
-          console.log(`[Reco]   ✅ ImageBitmap создан: ${bitmap.width}x${bitmap.height}px`);
+                // Применяем матрицу
+                const matrix = pose.transform.matrix;
+                placedNode.matrix.fromArray(matrix);
+                placedNode.matrix.decompose(
+                        placedNode.position,
+                        placedNode.quaternion,
+                        placedNode.scale
+                );
 
-          trackedImagesData.push({
-            image: bitmap,
-            widthInMeters: (!isPlainString && item.widthInMeters) || 0.2,
-            name: displayName
-          });
-        } catch (imgErr) {
-          console.error(`[Reco] ❌ Ошибка при загрузке изображения ${imgUrl}:`, imgErr);
-        }
-      }
-
-      console.log(`[Reco] ИТОГО загружено изображений для распознавания: ${trackedImagesData.length} из ${recognitionImages.length}`);
-      trackedImagesData.forEach((t, i) => console.log(`[Reco]   [${i}] name="${t.name}" widthInMeters=${t.widthInMeters} размер=${t.image.width}x${t.image.height}`));
-
-      if (trackedImagesData.length === 0) {
-        console.warn('[Reco] ⚠️ Ни одна картинка не загрузилась — image-tracking не будет включён в сессию.');
-      }
-    } catch (e) {
-      console.error('[Reco] ❌ Не удалось загрузить/распарсить ./assets/recognitionimages.json', e);
-    }
-  }
-
-  // Ждём загрузки перед созданием AR-кнопки (top-level await, т.к. это модуль)
-  await loadRecognitionImages();
-  // ================== /NEW ==================
-
-  // ---------- AR entry button ----------
-  const arButton = ARButton.createButton(renderer, {
-    requiredFeatures: ['hit-test'],
-    optionalFeatures: ['local-floor', 'dom-overlay', 'image-tracking'],
-    domOverlay: { root: arOverlay },
-    // NEW: передаём распознаваемые изображения в сессию, если они загрузились
-    ...(trackedImagesData.length > 0 ? { trackedImages: trackedImagesData } : {})
-  });
-  arButtonContainer.appendChild(arButton);
-
-  // NEW: лог того, что реально уйдёт в sessionInit (для отладки регрессий/фичи image-tracking)
-  console.log('[Reco] sessionInit.optionalFeatures:', ['local-floor', 'dom-overlay', 'image-tracking']);
-  console.log(`[Reco] sessionInit.trackedImages передано: ${trackedImagesData.length > 0 ? trackedImagesData.length + ' шт.' : 'НЕТ (массив пуст)'}`);
-
-  // ---------- Lights ----------
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x333344, 1.2));
-
-  const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-  dirLight.position.set(2, 4, 2);
-  scene.add(dirLight);
-
-  // ---------- Reticle (floor marker) ----------
-  const reticleGeometry = new THREE.RingGeometry(0.08, 0.1, 32).rotateX(-Math.PI / 2);
-  const reticleMaterial = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
-  const reticle = new THREE.Mesh(reticleGeometry, reticleMaterial);
-  reticle.matrixAutoUpdate = false;
-  reticle.visible = false;
-  scene.add(reticle);
-
-  // ---------- Cube ----------
-  const cubeSize = 0.18;
-  const cube = new THREE.Mesh(
-          new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize),
-          new THREE.MeshStandardMaterial({
-            color: 0x6366f1,
-            metalness: 0.3,
-            roughness: 0.35,
-            emissive: 0x1e1b4b,
-            emissiveIntensity: 0.4,
-          })
-  );
-  cube.visible = false;
-  scene.add(cube);
-
-  const edges = new THREE.LineSegments(
-          new THREE.EdgesGeometry(cube.geometry),
-          new THREE.LineBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.7 })
-  );
-  edges.visible = false;
-  scene.add(edges);
-
-  // ---------- Hit-test state ----------
-  let hitTestSource = null;
-  let hitTestSourceRequested = false;
-  let placed = false;
-
-  // ---------- ThreeMeshUI Elements & Raycasting ----------
-  let uiContainer = null;
-  let uiButton = null;
-  const raycaster = new THREE.Raycaster();
-  const raycastTargets = [];
-
-  renderer.xr.addEventListener('sessionstart', () => {
-    placed = false;
-    cube.visible = false;
-    edges.visible = false;
-    anchorPanel.classList.remove('visible');
-    reticle.visible = false;
-    hitTestSourceRequested = false;
-    hitTestSource = null;
-    placeHint.style.display = 'block';
-
-    if (uiContainer) {
-      scene.remove(uiContainer);
-      uiContainer = null;
-      uiButton = null;
-      raycastTargets.length = 0;
-    }
-  });
-
-  renderer.xr.addEventListener('sessionend', () => {
-    hitTestSource = null;
-    hitTestSourceRequested = false;
-  });
-
-  // ================== NEW: Диагностика сессии для image-tracking ==================
-  renderer.xr.addEventListener('sessionstart', () => {
-    const session = renderer.xr.getSession();
-    console.log('[Reco] === Сессия WebXR стартовала ===');
-    console.log('[Reco] session.environmentBlendMode:', session && session.environmentBlendMode);
-
-    // enabledFeatures — нестандартное, но поддерживается некоторыми браузерами (Chrome/ARCore)
-    if (session && 'enabledFeatures' in session) {
-      console.log('[Reco] session.enabledFeatures:', session.enabledFeatures);
-      if (session.enabledFeatures && !session.enabledFeatures.includes('image-tracking')) {
-        console.warn('[Reco] ⚠️ Фича "image-tracking" НЕ входит в enabledFeatures сессии — распознавание работать не будет. Возможно, браузер/устройство её не поддерживает (нужен Chrome с флагом WebXR Incubations на Android/ARCore) или в chrome://flags нужно включить "WebXR Incubations".');
-      } else if (session.enabledFeatures) {
-        console.log('[Reco] ✅ "image-tracking" присутствует в enabledFeatures — сессия должна поддерживать распознавание.');
-      }
-    } else {
-      console.log('[Reco] session.enabledFeatures недоступен в этом браузере — не можем напрямую проверить, включена ли image-tracking. Смотрите логи ниже из цикла рендера.');
-    }
-
-    console.log(`[Reco] Изображений передано в trackedImages: ${trackedImagesData.length}`);
-  });
-  // ================== /NEW ==================
-
-  function placeThreeUIPanel(position) {
-    if (uiContainer) {
-      scene.remove(uiContainer);
-      raycastTargets.length = 0;
-    }
-    makeUI(position);
-  }
-
-  function makeUI(position) {
-    uiContainer = new ThreeMeshUI.Block({
-      height: 0.2,
-      width: 0.3,
-      backgroundOpacity: 0.8,
-      backgroundColor: new THREE.Color(0x0b1120),
-      borderRadius: 0.04
-    });
-
-    // Размещаем UI рядом с кубом
-    uiContainer.position.copy(position);
-    uiContainer.position.y += 0.35;
-    uiContainer.rotation.y = camera.rotation.y;
-    scene.add(uiContainer);
-
-    const imageBlock = new ThreeMeshUI.Block({
-      height: 0.25,
-      width: 0.7,
-      margin: 0.02
-    });
-
-    const textBlock = new ThreeMeshUI.Block({
-      height: 0.15,
-      width: 0.7,
-      margin: 0.02
-    });
-
-    uiContainer.add(imageBlock, textBlock);
-
-    // Безопасная загрузка текстуры
-    const loader = new THREE.TextureLoader();
-    loader.load(
-            './assets/asset.png',
-            (texture) => { imageBlock.set({ backgroundTexture: texture }); },
-            undefined,
-            (err) => console.warn('[ThreeMeshUI] Ошибка загрузки текстуры:', err)
-    );
-
-    // Безопасная установка шрифтов
-    try {
-      uiContainer.set({
-        fontFamily: './assets/Roboto-msdf.json',
-        fontTexture: './assets/Roboto-msdf.png',
-      });
-    } catch (e) {
-      console.warn('[ThreeMeshUI] Не удалось загрузить файлы шрифта', e);
-    }
-
-    const text = new ThreeMeshUI.Text({
-      content: "3D UI Панель в AR",
-      fontSize: 0.04,
-      fontColor: new THREE.Color(0xd2ffbd)
-    });
-
-    textBlock.add(text);
-
-    // Кнопка (Block)
-    uiButton = new ThreeMeshUI.Block({
-      width: 0.4,
-      height: 0.1,
-      justifyContent: 'center',
-      alignContent: 'center',
-      backgroundOpacity: 1,
-      backgroundColor: new THREE.Color(0x007bff),
-      borderRadius: 0.02,
-      margin: 0.02
-    });
-
-    const buttonText = new ThreeMeshUI.Text({
-      content: 'Кликни меня',
-      fontSize: 0.035
-    });
-
-    uiButton.add(buttonText);
-    uiContainer.add(uiButton);
-
-    // Регистрируем кнопку для перехвата лучей
-    raycastTargets.push(uiButton);
-  }
-
-  // ================== NEW: Установка куба на месте распознанной картинки ==================
-  function placeCubeAtImage(pose, imageName) {
-    if (placed) {
-      console.log(`[Reco] Картинка "${imageName}" распознана, но куб уже установлен — игнорируем`);
-      return; // куб уже поставлен — не переставляем
-    }
-
-    const p = pose.transform.position;
-    const q = pose.transform.orientation;
-    console.log(`[Reco] 🎯 Ставлю куб на месте картинки "${imageName}": pos=(${p.x.toFixed(3)}, ${p.y.toFixed(3)}, ${p.z.toFixed(3)}), quat=(${q.x.toFixed(3)}, ${q.y.toFixed(3)}, ${q.z.toFixed(3)}, ${q.w.toFixed(3)})`);
-
-    cube.position.setFromMatrixPosition(pose.transform.matrix);
-    cube.quaternion.set(q.x, q.y, q.z, q.w);
-    cube.position.y += cubeSize / 2;
-    cube.visible = true;
-
-    edges.position.copy(cube.position);
-    edges.quaternion.copy(cube.quaternion);
-    edges.visible = true;
-
-    placed = true;
-    placeHint.style.display = 'none';
-
-    placeThreeUIPanel(cube.position);
-
-    console.log('[Reco] ✅ Куб установлен на месте распознанной картинки');
-  }
-  // ================== /NEW ==================
-
-  // ---------- WebXR Controller setup & Selection ----------
-  const controller = renderer.xr.getController(0);
-
-  controller.addEventListener('select', () => {
-    // 1. Если объект еще не установлен — устанавливаем его по попаданию hit-test
-    if (!placed) {
-      if (!reticle.visible) return;
-
-      cube.position.setFromMatrixPosition(reticle.matrix);
-      cube.position.y += cubeSize / 2;
-      cube.visible = true;
-      edges.position.copy(cube.position);
-      edges.visible = true;
-
-      placed = true;
-      placeHint.style.display = 'none';
-
-      placeThreeUIPanel(cube.position);
-      return;
-    }
-
-    // 2. Если объект установлен — проверяем нажатие по 3D UI элементам лучем контроллера
-    if (raycastTargets.length > 0) {
-      const tempMatrix = new THREE.Matrix4();
-      tempMatrix.identity().extractRotation(controller.matrixWorld);
-
-      raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
-      raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
-
-      const intersects = raycaster.intersectObjects(raycastTargets, true);
-
-      if (intersects.length > 0 && uiButton) {
-        console.log('Нажата 3D WebXR кнопка!');
-        uiButton.setState('selected');
-        setTimeout(() => {
-          if (uiButton) uiButton.setState('idle');
-        }, 300);
-      }
-    }
-  });
-
-  scene.add(controller);
-
-  // ---------- Animation loop ----------
-  const clock = new THREE.Clock();
-
-  renderer.setAnimationLoop((timestamp, frame) => {
-    if (frame) {
-      const session = renderer.xr.getSession();
-      const referenceSpace = renderer.xr.getReferenceSpace();
-
-      hint.style.display = 'none';
-      arOverlay.style.display = 'block';
-
-      if (!hitTestSourceRequested) {
-        session.requestReferenceSpace('viewer').then((viewerSpace) => {
-          session.requestHitTestSource({ space: viewerSpace }).then((source) => {
-            hitTestSource = source;
-          });
-        });
-        session.addEventListener('end', () => {
-          hitTestSourceRequested = false;
-          hitTestSource = null;
-        });
-        hitTestSourceRequested = true;
-      }
-
-      if (hitTestSource) {
-        const hitTestResults = frame.getHitTestResults(hitTestSource);
-        if (hitTestResults.length > 0 && !placed) {
-          const hit = hitTestResults[0];
-          const pose = hit.getPose(referenceSpace);
-          reticle.visible = true;
-          reticle.matrix.fromArray(pose.transform.matrix);
-        } else {
-          reticle.visible = false;
-        }
-      }
-
-      // ================== NEW: Распознавание изображений ==================
-      if (trackedImagesData.length > 0 && !placed) {
-
-        // Один раз проверяем, вообще доступен ли метод getImageTrackingResults в этой сессии
-        if (!recoApiCheckedOnce) {
-          recoApiCheckedOnce = true;
-          if (typeof frame.getImageTrackingResults !== 'function') {
-            console.error('[Reco] ❌ frame.getImageTrackingResults недоступен — этот браузер/сборка three.js/устройство НЕ поддерживает WebXR image-tracking. Распознавание работать не будет. Нужен Chrome for Android с включённым флагом "WebXR Incubations" (chrome://flags/#webxr-incubations) и поддержкой ARCore Augmented Images.');
-          } else {
-            console.log('[Reco] ✅ frame.getImageTrackingResults доступен, начинаю опрашивать каждый кадр…');
-          }
-        }
-
-        if (typeof frame.getImageTrackingResults === 'function') {
-          try {
-            const imageResults = frame.getImageTrackingResults();
-
-            // Троттлим "пустой" лог, чтобы не спамить (раз в ~90 кадров, если вообще нет результатов)
-            recoFrameLogCounter++;
-            if (imageResults.length === 0) {
-              if (recoFrameLogCounter % 90 === 0) {
-                console.log('[Reco] getImageTrackingResults() вернул 0 результатов (картинка ещё не в кадре / не распознана)');
+                if (frameCounter % 30 === 0) {
+                  setStatus(`✅ TRACKED! State: ${state}`);
+                  logLine(`  Position: ${placedNode.position.x.toFixed(3)}, ${placedNode.position.y.toFixed(3)}, ${placedNode.position.z.toFixed(3)}`);
+                }
+                break;
+              } else {
+                if (frameCounter % 60 === 0) {
+                  logLine(`  Pose is null for tracked image`, "warn");
+                }
               }
-            } else {
-              for (let i = 0; i < imageResults.length; i++) {
-                const result = imageResults[i];
-                const info = trackedImagesData[result.index];
-                const name = info ? info.name : `#${result.index}`;
-
-                // Логируем только когда состояние трекинга реально поменялось
-                if (recoLastLoggedStates[result.index] !== result.trackingState) {
-                  recoLastLoggedStates[result.index] = result.trackingState;
-                  console.log(`[Reco] Картинка "${name}" (index=${result.index}) → trackingState="${result.trackingState}"`);
-                }
-
-                if (result.trackingState === 'tracked') {
-                  const imagePose = frame.getPose(result.imageSpace, referenceSpace);
-                  if (imagePose) {
-                    placeCubeAtImage(imagePose, name);
-                    break;
-                  } else {
-                    console.warn(`[Reco] ⚠️ Картинка "${name}" в состоянии tracked, но frame.getPose() вернул null (нет валидной позы для referenceSpace)`);
-                  }
-                }
+            } catch (err) {
+              if (frameCounter % 60 === 0) {
+                logLine(`  Pose error: ${err.message}`, "error");
               }
             }
-          } catch (err) {
-            // Например, InvalidStateError, если 'image-tracking' не был реально разрешён сессией
-            console.error('[Reco] ❌ Ошибка при вызове frame.getImageTrackingResults():', err.name, err.message);
           }
         }
+      } catch (err) {
+        if (frameCounter % 60 === 0) {
+          logLine(`getImageTrackingResults error: ${err.message}`, "error");
+        }
       }
-      // ================== /NEW ==================
-    }
 
-    if (placed) {
-      const t = clock.getElapsedTime();
-      cube.rotation.y = t * 0.6;
-    }
+      if (!imageDetected) {
+        placedNode.visible = false;
+        if (frameCounter % 60 === 0) {
+          setStatus("🔍 Searching for image...");
+        }
+      }
 
-    ThreeMeshUI.update();
-    renderer.render(scene, camera);
+      renderer.render(scene, camera);
+    });
+
+    // Обработчики сессии
+    session.addEventListener("end", () => {
+      logLine("Session ended");
+      renderer.setAnimationLoop(null);
+      startButton.style.display = "block";
+      startButton.disabled = false;
+      startButton.textContent = "Start AR";
+      setStatus("Session ended");
+    });
+
+    session.addEventListener("visibilitychange", () => {
+      logLine(`Visibility: ${session.visibilityState}`);
+    });
+  }
+
+  startButton.addEventListener("click", async () => {
+    try {
+      startButton.disabled = true;
+      startButton.textContent = "Starting...";
+      await startAR();
+    } catch (err) {
+      setStatus(`❌ ${err.message}`);
+      logLine(err.stack || String(err), "error");
+      startButton.disabled = false;
+      startButton.textContent = "Start AR";
+      startButton.style.display = "block";
+    }
   });
+
+  logLine("Page loaded. Click Start AR.");
+
+  // Диагностика
+  if (navigator.xr) {
+    logLine("WebXR available");
+
+    try {
+      const supported = await navigator.xr.isSessionSupported("immersive-ar");
+      logLine(`Immersive AR support: ${supported}`);
+    } catch (err) {
+      logLine(`Support check error: ${err.message}`, "error");
+    }
+  } else {
+    logLine("WebXR NOT available", "error");
+  }
 </script>
 </body>
 </html>
