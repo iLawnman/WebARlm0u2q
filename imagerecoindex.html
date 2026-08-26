@@ -234,7 +234,7 @@
       frameCounter++;
 
       if (!frame) {
-        if (frameCounter % 30 === 0) logLine("No frame", "warn");
+        //if (frameCounter % 30 === 0) logLine("No frame", "warn");
         return;
       }
 
@@ -246,7 +246,7 @@
 
         // Логируем каждые 60 кадров
         if (frameCounter % 60 === 0) {
-          logLine(`Frame ${frameCounter}: ${results.length} result(s)`);
+          //logLine(`Frame ${frameCounter}: ${results.length} result(s)`);
         }
 
         // Обрабатываем результаты
@@ -255,7 +255,7 @@
           const state = result.trackingState;
 
           if (frameCounter % 60 === 0) {
-            logLine(`  Result: idx=${result.trackedImageIndex}, state=${state}`);
+            //logLine(`  Result: idx=${result.trackedImageIndex}, state=${state}`);
           }
 
           // Если изображение отслеживается
@@ -301,7 +301,7 @@
       if (!imageDetected) {
         placedNode.visible = false;
         if (frameCounter % 60 === 0) {
-          setStatus("🔍 Searching for image...");
+          //setStatus("🔍 Searching for image...");
         }
       }
 
