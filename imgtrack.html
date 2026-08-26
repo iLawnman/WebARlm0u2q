@@ -1,41 +1,186 @@
 <!doctype html>
 <html>
 <head>
-  <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-detector.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-handler.js"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <title>WebXR Image Tracking</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+    #overlay {
+      position: fixed; left: 0; right: 0; bottom: 0;
+      padding: 12px 16px; font: 14px/1.4 sans-serif; color: #fff;
+      background: rgba(0,0,0,0.55); z-index: 10;
+    }
+    #startButton {
+      position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%);
+      z-index: 10; padding: 14px 22px; font: 16px sans-serif;
+      border: none; border-radius: 8px; cursor: pointer;
+    }
+  </style>
 </head>
+<body>
+  <button id="startButton">Start AR</button>
+  <div id="overlay"></div>
 
-<body style="margin: 0; overflow: hidden;">
-<a-scene
-        vr-mode-ui="enabled: false;"
-        loading-screen="enabled: false;"
-        arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
-        id="scene"
-        embedded
-        gesture-detector
->
-  <a-marker
-          id="animated-marker"
-          type="pattern"
-          preset="custom"
-          url="assets/marker.patt"
-          raycaster="objects: .clickable"
-          emitevents="true"
-          cursor="fuse: false; rayOrigin: mouse;"
-          id="markerA"
-  >
-    <a-image
-            src="assets/asset.png"
-            scale="1 1 1"
-            class="clickable"
-            rotation="-90 0 0"
-            gesture-handler
-    ></a-image>
-  </a-marker>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+      }
+    }
+  </script>
 
-  <a-entity camera></a-entity>
-</a-scene>
+  <script type="module">
+    import * as THREE from "three";
+
+    const overlay = document.getElementById("overlay");
+    const startButton = document.getElementById("startButton");
+
+    // WebXR native image tracking is an experimental "image-tracking" feature.
+    // As of now it only ships (behind a flag) in Chrome for Android.
+    // The tracked image must be provided as a decoded ImageBitmap plus its
+    // physical width in meters, so AR.js's .patt marker file is not used here.
+
+    const TRACKED_IMAGE_URL = "assets/asset.png";
+    const TRACKED_IMAGE_WIDTH_METERS = 0.2; // measure your printed/screen image and set this correctly
+
+    let renderer, scene, camera;
+    let trackedImageBitmap;
+    let placedNode = null;
+
+    function log(msg) {
+      overlay.textContent = msg;
+    }
+
+    async function loadTrackedImage(url) {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      return await createImageBitmap(blob);
+    }
+
+    function initThree() {
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.xr.enabled = true;
+      document.body.appendChild(renderer.domElement);
+
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera();
+
+      const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
+      scene.add(light);
+
+      window.addEventListener("resize", () => {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    }
+
+    function buildContentNode() {
+      // Replace this with your real content; kept simple to mirror the
+      // original a-image behaviour (something anchored to the image).
+      const geometry = new THREE.PlaneGeometry(
+        TRACKED_IMAGE_WIDTH_METERS,
+        TRACKED_IMAGE_WIDTH_METERS
+      );
+      const material = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        side: THREE.DoubleSide,
+        transparent: true,
+      });
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.visible = false;
+      scene.add(mesh);
+      return mesh;
+    }
+
+    async function startAR() {
+      if (!navigator.xr) {
+        log("WebXR not available on this browser/device.");
+        return;
+      }
+
+      const supported = await navigator.xr.isSessionSupported("immersive-ar");
+      if (!supported) {
+        log("immersive-ar not supported on this device.");
+        return;
+      }
+
+      trackedImageBitmap = await loadTrackedImage(TRACKED_IMAGE_URL);
+
+      initThree();
+      placedNode = buildContentNode();
+
+      let session;
+      try {
+        session = await navigator.xr.requestSession("immersive-ar", {
+          requiredFeatures: ["image-tracking", "local-floor"],
+          trackedImages: [
+            {
+              image: trackedImageBitmap,
+              widthInMeters: TRACKED_IMAGE_WIDTH_METERS,
+            },
+          ],
+        });
+      } catch (err) {
+        log(
+          "Failed to start session with image-tracking. " +
+            "This feature is experimental and Chrome-Android-only today. " +
+            err.message
+        );
+        return;
+      }
+
+      startButton.style.display = "none";
+      renderer.xr.setReferenceSpaceType("local-floor");
+      await renderer.xr.setSession(session);
+
+      const referenceSpace = renderer.xr.getReferenceSpace();
+
+      renderer.setAnimationLoop((timestamp, frame) => {
+        if (!frame) return;
+
+        const results = frame.getImageTrackingResults
+          ? frame.getImageTrackingResults()
+          : [];
+
+        let matched = false;
+
+        for (const result of results) {
+          if (result.trackedImageIndex !== 0) continue;
+
+          const pose = frame.getPose(result.imageSpace, referenceSpace);
+          if (pose && result.trackingState === "tracked") {
+            matched = true;
+            placedNode.visible = true;
+            placedNode.matrix.fromArray(pose.transform.matrix);
+            placedNode.matrix.decompose(
+              placedNode.position,
+              placedNode.quaternion,
+              placedNode.scale
+            );
+            log("Image detected: state=tracked");
+          } else if (result.trackingState === "emulated") {
+            log("Image detected: state=emulated (last known pose)");
+          }
+        }
+
+        if (!matched) {
+          placedNode.visible = false;
+          log("Searching for image target...");
+        }
+
+        renderer.render(scene, camera);
+      });
+
+      session.addEventListener("end", () => {
+        renderer.setAnimationLoop(null);
+        startButton.style.display = "block";
+      });
+    }
+
+    startButton.addEventListener("click", startAR);
+  </script>
 </body>
 </html>
