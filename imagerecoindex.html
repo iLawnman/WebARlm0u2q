@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>refactor WebXR AR — Куб на полу + Three Mesh UI панель</title>
+  <title>Recognition Image</title>
   <style>
     html, body {
       margin: 0;
@@ -157,6 +157,51 @@
     #debug-log .log-empty { color: #475569; }
     #debug-log .log-line { color: #67e8f9; }
 
+    /* ---------- Стили для панелей конвертора ---------- */
+    .convertor-panel {
+      width: min(88vw, 320px);
+      font-size: 13px;
+      color: #e2e8f0;
+    }
+
+    .convertor-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      background: rgba(99, 102, 241, 0.18);
+      font-weight: 600;
+    }
+
+    .convertor-panel-close {
+      background: none;
+      border: 0;
+      color: #94a3b8;
+      font-size: 18px;
+      line-height: 1;
+      padding: 0 4px;
+      cursor: pointer;
+    }
+
+    .convertor-panel-body {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .convertor-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+    }
+
+    .convertor-row.ok { color: #86efac; }
+    .convertor-row.missing { color: #fca5a5; }
+
     /* ---------- Кнопка AR ---------- */
     #ar-button-container {
       position: absolute;
@@ -193,9 +238,32 @@
       opacity: 0.5;
       cursor: not-allowed;
     }
+
+    /* ---------- Кнопка-триггер конвертора ---------- */
+    .convertor-trigger {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      pointer-events: auto;
+      z-index: 10;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(6, 182, 212, 0.4);
+      background: rgba(6, 182, 212, 0.15);
+      color: #cffafe;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .convertor-trigger:disabled { opacity: 0.6; }
+    .convertor-trigger:active { background: rgba(6, 182, 212, 0.3); }
   </style>
 </head>
 <body>
+
+<!-- NEW: оверлей-лог для отладки на устройстве (перехватывает console.log/warn/error) -->
+<script src="overlaylog.js"></script>
 
 <div id="webgl-container"></div>
 <div id="hint">reco</div>
@@ -225,6 +293,12 @@
       <div id="debug-log"><span class="log-empty">лог пуст…</span></div>
     </div>
   </div>
+
+  <!-- Контейнер для динамических панелей конвертора -->
+  <div id="convertor-panels-container"></div>
+
+  <!-- Кнопка-триггер конвертора -->
+  <button id="convertor-trigger-btn" type="button" class="convertor-trigger">📦 Проверить assets</button>
 </div>
 
 <script type="importmap">
@@ -289,35 +363,65 @@
   // Загружаем ./assets/recognitionimages.json — список картинок для WebXR image-tracking.
   // Ожидаемый формат JSON: [{ "name": "target1", "file": "target1.jpg", "widthInMeters": 0.2 }, ...]
   let trackedImagesData = []; // сюда попадут { image: ImageBitmap, widthInMeters, name }
+  // NEW: служебные счётчики для троттлинга диагностических логов в цикле рендера
+  let recoApiCheckedOnce = false;
+  let recoFrameLogCounter = 0;
+  let recoLastLoggedStates = {}; // imageIndex -> trackingState, чтобы логировать только изменения
+
+  console.log('[Reco] User-Agent:', navigator.userAgent);
+  console.log('[Reco] ' + (window.isSecureContext ? '✅ Secure context (https/localhost)' : '⚠️ НЕ secure context — WebXR может не работать'));
 
   async function loadRecognitionImages() {
+    console.log('[Reco] Начинаю загрузку ./assets/recognitionimages.json …');
     try {
       const recoResponse = await fetch('./assets/recognitionimages.json');
+      console.log(`[Reco] Ответ на recognitionimages.json: status=${recoResponse.status}, ok=${recoResponse.ok}`);
+
       if (!recoResponse.ok) {
-        console.warn('[Reco] recognitionimages.json не найден, пропускаем image-tracking');
+        console.warn('[Reco] ❌ recognitionimages.json не найден (проверьте путь ./assets/recognitionimages.json относительно текущей страницы). image-tracking будет отключён.');
         return;
       }
+
       const recognitionImages = await recoResponse.json();
+      console.log(`[Reco] JSON распарсен, записей: ${recognitionImages.length}`, recognitionImages);
 
       for (const item of recognitionImages) {
+        const fileName = item.file || item.src || item.name;
+        const imgUrl = `../assets/recoimages/${fileName}`;
+        console.log(`[Reco] Загружаю картинку "${item.name || fileName}" по адресу ${imgUrl} …`);
         try {
-          const fileName = item.file || item.src || item.name;
-          const imgResponse = await fetch(`../assets/recoimages/${fileName}`);
+          const imgResponse = await fetch(imgUrl);
+          console.log(`[Reco]   → status=${imgResponse.status}, ok=${imgResponse.ok}, content-type=${imgResponse.headers.get('content-type')}`);
+
+          if (!imgResponse.ok) {
+            console.warn(`[Reco] ❌ Не удалось получить файл ${imgUrl} (HTTP ${imgResponse.status}). Проверьте, что файл лежит именно в ../assets/recoimages/`);
+            continue;
+          }
+
           const blob = await imgResponse.blob();
+          console.log(`[Reco]   → blob получен: size=${blob.size} байт, type=${blob.type}`);
+
           const bitmap = await createImageBitmap(blob);
+          console.log(`[Reco]   ✅ ImageBitmap создан: ${bitmap.width}x${bitmap.height}px`);
+
           trackedImagesData.push({
             image: bitmap,
             widthInMeters: item.widthInMeters || 0.2,
             name: item.name || fileName
           });
         } catch (imgErr) {
-          console.warn('[Reco] Не удалось загрузить изображение из ../assets/recoimages/:', item, imgErr);
+          console.error(`[Reco] ❌ Ошибка при загрузке изображения ${imgUrl}:`, imgErr);
         }
       }
 
-      console.log(`[Reco] Загружено изображений для распознавания: ${trackedImagesData.length}`);
+      console.log(`[Reco] ИТОГО загружено изображений для распознавания: ${trackedImagesData.length} из ${recognitionImages.length}`);
+      trackedImagesData.forEach((t, i) => console.log(`[Reco]   [${i}] name="${t.name}" widthInMeters=${t.widthInMeters} размер=${t.image.width}x${t.image.height}`));
+
+      if (trackedImagesData.length === 0) {
+        console.warn('[Reco] ⚠️ Ни одна картинка не загрузилась — image-tracking не будет включён в сессию.');
+      }
     } catch (e) {
-      console.warn('[Reco] Не удалось загрузить ./assets/recognitionimages.json', e);
+      console.error('[Reco] ❌ Не удалось загрузить/распарсить ./assets/recognitionimages.json', e);
     }
   }
 
@@ -334,6 +438,10 @@
     ...(trackedImagesData.length > 0 ? { trackedImages: trackedImagesData } : {})
   });
   arButtonContainer.appendChild(arButton);
+
+  // NEW: лог того, что реально уйдёт в sessionInit (для отладки регрессий/фичи image-tracking)
+  console.log('[Reco] sessionInit.optionalFeatures:', ['local-floor', 'dom-overlay', 'image-tracking']);
+  console.log(`[Reco] sessionInit.trackedImages передано: ${trackedImagesData.length > 0 ? trackedImagesData.length + ' шт.' : 'НЕТ (массив пуст)'}`);
 
   // ---------- Lights ----------
   scene.add(new THREE.HemisphereLight(0xffffff, 0x333344, 1.2));
@@ -405,6 +513,28 @@
     hitTestSource = null;
     hitTestSourceRequested = false;
   });
+
+  // ================== NEW: Диагностика сессии для image-tracking ==================
+  renderer.xr.addEventListener('sessionstart', () => {
+    const session = renderer.xr.getSession();
+    console.log('[Reco] === Сессия WebXR стартовала ===');
+    console.log('[Reco] session.environmentBlendMode:', session && session.environmentBlendMode);
+
+    // enabledFeatures — нестандартное, но поддерживается некоторыми браузерами (Chrome/ARCore)
+    if (session && 'enabledFeatures' in session) {
+      console.log('[Reco] session.enabledFeatures:', session.enabledFeatures);
+      if (session.enabledFeatures && !session.enabledFeatures.includes('image-tracking')) {
+        console.warn('[Reco] ⚠️ Фича "image-tracking" НЕ входит в enabledFeatures сессии — распознавание работать не будет. Возможно, браузер/устройство её не поддерживает (нужен Chrome с флагом WebXR Incubations на Android/ARCore) или в chrome://flags нужно включить "WebXR Incubations".');
+      } else if (session.enabledFeatures) {
+        console.log('[Reco] ✅ "image-tracking" присутствует в enabledFeatures — сессия должна поддерживать распознавание.');
+      }
+    } else {
+      console.log('[Reco] session.enabledFeatures недоступен в этом браузере — не можем напрямую проверить, включена ли image-tracking. Смотрите логи ниже из цикла рендера.');
+    }
+
+    console.log(`[Reco] Изображений передано в trackedImages: ${trackedImagesData.length}`);
+  });
+  // ================== /NEW ==================
 
   function placeThreeUIPanel(position) {
     if (uiContainer) {
@@ -495,11 +625,17 @@
   }
 
   // ================== NEW: Установка куба на месте распознанной картинки ==================
-  function placeCubeAtImage(pose) {
-    if (placed) return; // куб уже поставлен — не переставляем
+  function placeCubeAtImage(pose, imageName) {
+    if (placed) {
+      console.log(`[Reco] Картинка "${imageName}" распознана, но куб уже установлен — игнорируем`);
+      return; // куб уже поставлен — не переставляем
+    }
+
+    const p = pose.transform.position;
+    const q = pose.transform.orientation;
+    console.log(`[Reco] 🎯 Ставлю куб на месте картинки "${imageName}": pos=(${p.x.toFixed(3)}, ${p.y.toFixed(3)}, ${p.z.toFixed(3)}), quat=(${q.x.toFixed(3)}, ${q.y.toFixed(3)}, ${q.z.toFixed(3)}, ${q.w.toFixed(3)})`);
 
     cube.position.setFromMatrixPosition(pose.transform.matrix);
-    const q = pose.transform.orientation;
     cube.quaternion.set(q.x, q.y, q.z, q.w);
     cube.position.y += cubeSize / 2;
     cube.visible = true;
@@ -513,7 +649,7 @@
 
     placeThreeUIPanel(cube.position);
 
-    console.log('[Reco] Куб установлен на месте распознанной картинки');
+    console.log('[Reco] ✅ Куб установлен на месте распознанной картинки');
   }
   // ================== /NEW ==================
 
@@ -597,15 +733,54 @@
       }
 
       // ================== NEW: Распознавание изображений ==================
-      if (trackedImagesData.length > 0 && !placed && frame.getImageTrackingResults) {
-        const imageResults = frame.getImageTrackingResults();
-        for (const result of imageResults) {
-          if (result.trackingState === 'tracked') {
-            const imagePose = frame.getPose(result.imageSpace, referenceSpace);
-            if (imagePose) {
-              placeCubeAtImage(imagePose);
-              break;
+      if (trackedImagesData.length > 0 && !placed) {
+
+        // Один раз проверяем, вообще доступен ли метод getImageTrackingResults в этой сессии
+        if (!recoApiCheckedOnce) {
+          recoApiCheckedOnce = true;
+          if (typeof frame.getImageTrackingResults !== 'function') {
+            console.error('[Reco] ❌ frame.getImageTrackingResults недоступен — этот браузер/сборка three.js/устройство НЕ поддерживает WebXR image-tracking. Распознавание работать не будет. Нужен Chrome for Android с включённым флагом "WebXR Incubations" (chrome://flags/#webxr-incubations) и поддержкой ARCore Augmented Images.');
+          } else {
+            console.log('[Reco] ✅ frame.getImageTrackingResults доступен, начинаю опрашивать каждый кадр…');
+          }
+        }
+
+        if (typeof frame.getImageTrackingResults === 'function') {
+          try {
+            const imageResults = frame.getImageTrackingResults();
+
+            // Троттлим "пустой" лог, чтобы не спамить (раз в ~90 кадров, если вообще нет результатов)
+            recoFrameLogCounter++;
+            if (imageResults.length === 0) {
+              if (recoFrameLogCounter % 90 === 0) {
+                console.log('[Reco] getImageTrackingResults() вернул 0 результатов (картинка ещё не в кадре / не распознана)');
+              }
+            } else {
+              for (let i = 0; i < imageResults.length; i++) {
+                const result = imageResults[i];
+                const info = trackedImagesData[result.index];
+                const name = info ? info.name : `#${result.index}`;
+
+                // Логируем только когда состояние трекинга реально поменялось
+                if (recoLastLoggedStates[result.index] !== result.trackingState) {
+                  recoLastLoggedStates[result.index] = result.trackingState;
+                  console.log(`[Reco] Картинка "${name}" (index=${result.index}) → trackingState="${result.trackingState}"`);
+                }
+
+                if (result.trackingState === 'tracked') {
+                  const imagePose = frame.getPose(result.imageSpace, referenceSpace);
+                  if (imagePose) {
+                    placeCubeAtImage(imagePose, name);
+                    break;
+                  } else {
+                    console.warn(`[Reco] ⚠️ Картинка "${name}" в состоянии tracked, но frame.getPose() вернул null (нет валидной позы для referenceSpace)`);
+                  }
+                }
+              }
             }
+          } catch (err) {
+            // Например, InvalidStateError, если 'image-tracking' не был реально разрешён сессией
+            console.error('[Reco] ❌ Ошибка при вызове frame.getImageTrackingResults():', err.name, err.message);
           }
         }
       }
