@@ -1,392 +1,176 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="ru">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-  <title>WebXR Image Tracking</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Three.js WebXR DOM Overlay</title>
   <style>
-    html, body {
+    body, html {
       margin: 0;
+      padding: 0;
+      width: 100%;
       height: 100%;
       overflow: hidden;
-      background: #000;
-      font-family: monospace;
+      background-color: #000;
+      font-family: sans-serif;
     }
 
-    #startButton {
-      position: fixed;
+    /* Контейнер для 3D-графики */
+    #webgl-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    /* Наш контейнер поверх сцены. По умолчанию скрыт. */
+    #overlay-container {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      /* Важно: клики проходят сквозь пустые области оверлея в 3D сцену */
+      pointer-events: none;
+    }
+
+    /* Кастомная кнопка внутри интерфейса */
+    .ar-ui-button {
+      /* Возвращаем кликабельность кнопке */
+      pointer-events: auto;
+      position: absolute;
+      bottom: 50px;
       left: 50%;
-      top: 50%;
-      transform: translate(-50%,-50%);
-      z-index: 100;
-      padding: 14px 22px;
-      font: 16px sans-serif;
+      transform: translateX(-50%);
+      padding: 16px 32px;
+      font-size: 16px;
+      background: rgba(255, 255, 255, 0.85);
+      color: #000;
       border: none;
-      border-radius: 8px;
+      border-radius: 25px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
       cursor: pointer;
-      background: #4CAF50;
-      color: white;
       font-weight: bold;
     }
 
-    #status {
-      position: fixed;
-      left: 0;
-      right: 260px;
-      bottom: 0;
-      padding: 10px 14px;
-      font: 13px/1.4 monospace;
-      color: #fff;
-      background: rgba(0,0,0,0.7);
-      z-index: 100;
-      pointer-events: none;
-      border-top: 1px solid rgba(255,255,255,0.2);
-    }
-
-    #logPanel {
-      position: fixed;
-      top: 0;
-      right: 0;
-      bottom: 0;
-      width: 260px;
-      background: rgba(0,0,0,0.85);
-      color: #0f0;
-      z-index: 500;
-      font: 11px/1.35 monospace;
-      overflow-y: auto;
-      padding: 8px;
-      box-sizing: border-box;
-      border-left: 2px solid rgba(255,255,255,0.2);
-      pointer-events: none;
-    }
-
-    #logPanel .entry {
-      white-space: pre-wrap;
-      word-break: break-word;
-      margin-bottom: 4px;
-      padding: 2px 4px;
-      border-radius: 2px;
-    }
-
-    #logPanel .entry.warn {
-      color: #ff0;
-      background: rgba(255,255,0,0.1);
-    }
-
-    #logPanel .entry.error {
-      color: #f55;
-      background: rgba(255,0,0,0.1);
-    }
-
-    #logPanel .entry.success {
-      color: #0f0;
-      background: rgba(0,255,0,0.1);
-    }
-
-    #logPanel .t {
-      color: #888;
-      margin-right: 6px;
-    }
-
-    canvas {
-      position: fixed !important;
-      top: 0 !important;
-      left: 0 !important;
-      z-index: 999 !important;
+    .ar-ui-button:active {
+      background: #ffffff;
+      transform: translateX(-50%) scale(0.95);
     }
   </style>
+
+  <!-- Импортируем Three.js через ES Modules -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com",
+        "three/addons/": "https://unpkg.com"
+      }
+    }
+  </script>
 </head>
 <body>
-<button id="startButton">Start AR</button>
-<div id="status">Ready</div>
-<div id="logPanel"></div>
 
-<script type="importmap">
-  {
-    "imports": {
-      "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-    }
-  }
-</script>
+<!-- Блок, куда Three.js вставит свой <canvas> -->
+<div id="webgl-container"></div>
+
+<!-- Контейнер для кнопок, который мы превратим в DOM Overlay -->
+<div id="overlay-container">
+  <button id="action-btn" class="ar-ui-button">Взаимодействие в AR</button>
+</div>
 
 <script type="module">
-  import * as THREE from "three";
+  import * as THREE from 'three';
+  import { ARButton } from 'three/addons/webxr/ARButton.js';
 
-  const statusEl = document.getElementById("status");
-  const logPanel = document.getElementById("logPanel");
-  const startButton = document.getElementById("startButton");
+  // Ссылки на элементы
+  const webglContainer = document.getElementById('webgl-container');
+  const overlayContainer = document.getElementById('overlay-container');
+  const actionBtn = document.getElementById('action-btn');
 
-  // Используем ваше изображение
-  const TRACKED_IMAGE_URL = "./assets/recoimages/T1.jpg";
-  const TRACKED_IMAGE_WIDTH_METERS = 0.1;
+  let scene, camera, renderer, mesh;
 
-  let renderer, scene, camera;
-  let placedNode = null;
-  let frameCounter = 0;
-  let session = null;
-  let referenceSpace = null;
-  let imageBitmap = null;
-  let hitTestSource = null;
+  init();
 
-  function logLine(msg, level) {
-    const time = new Date().toISOString().substring(11, 23);
-    const entry = document.createElement("div");
-    entry.className = "entry" + (level ? " " + level : "");
-    entry.innerHTML = `<span class="t">[${time}]</span> ${msg}`;
-    logPanel.appendChild(entry);
-    logPanel.scrollTop = logPanel.scrollHeight;
+  function init() {
+    // 1. Создаем сцену и камеру
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
-    const consoleFn = level === "error" ? console.error : level === "warn" ? console.warn : console.log;
-    consoleFn("[webxr-image-tracking]", msg);
-  }
+    // Добавим немного света
+    const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 3);
+    scene.add(light);
 
-  function setStatus(msg) {
-    statusEl.textContent = msg;
-    logLine(msg);
-  }
+    // Создаем тестовый куб, чтобы увидеть его в AR
+    const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+    const material = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+    mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(0, 0, -0.5); // Ставим перед камерой
+    scene.add(mesh);
 
-  async function loadTrackedImage(url) {
-    logLine(`Loading image: ${url}`);
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    const blob = await response.blob();
-    logLine(`Image loaded: ${blob.size} bytes`);
-    const bitmap = await createImageBitmap(blob);
-    logLine(`Image decoded: ${bitmap.width}x${bitmap.height}px`);
-    return bitmap;
-  }
-
-  function initThree() {
-    logLine("Initializing THREE");
+    // 2. Настраиваем WebGLRenderer
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.xr.enabled = true;
-    document.body.appendChild(renderer.domElement);
+    renderer.xr.enabled = true; // Важно для WebXR
 
-    renderer.domElement.style.position = 'fixed';
-    renderer.domElement.style.top = '0';
-    renderer.domElement.style.left = '0';
-    renderer.domElement.style.zIndex = '1';
+    // Добавляем canvas именно в webgl-container, а не в overlay!
+    webglContainer.appendChild(renderer.domElement);
 
-    scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera();
-
-    const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
-    scene.add(light);
-
-    const gridHelper = new THREE.GridHelper(1, 10);
-    gridHelper.position.y = -0.05;
-    scene.add(gridHelper);
-
-    window.addEventListener("resize", () => {
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    });
-
-    logLine("THREE initialized");
-  }
-
-  function buildContentNode() {
-    const size = TRACKED_IMAGE_WIDTH_METERS * 0.5;
-    const geometry = new THREE.BoxGeometry(size, size, size);
-    const material = new THREE.MeshStandardMaterial({
-      color: 0xff4400,
-      emissive: 0xff2200,
-      emissiveIntensity: 0.5,
-      metalness: 0.3,
-      roughness: 0.4
-    });
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.visible = false;
-
-    const edges = new THREE.EdgesGeometry(geometry);
-    const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff }));
-    mesh.add(line);
-
-    scene.add(mesh);
-    logLine(`Content node created`);
-    return mesh;
-  }
-
-  async function startAR() {
-    logLine("=== START AR ===");
-
-    if (!navigator.xr) {
-      throw new Error("WebXR not available");
-    }
-
-    let supported = false;
-    try {
-      supported = await navigator.xr.isSessionSupported("immersive-ar");
-    } catch (err) {
-      throw new Error(`isSessionSupported failed: ${err.message}`);
-    }
-
-    if (!supported) {
-      throw new Error("Immersive AR not supported");
-    }
-    logLine("Immersive AR supported");
-
-    try {
-      imageBitmap = await loadTrackedImage(TRACKED_IMAGE_URL);
-    } catch (err) {
-      throw new Error(`Image load failed: ${err.message}`);
-    }
-
-    initThree();
-    placedNode = buildContentNode();
-
-    logLine("Creating session with image-tracking...");
-
-    const sessionInit = {
-      requiredFeatures: ["image-tracking"],
-      trackedImages: [{
-        image: imageBitmap,
-        widthInMeters: TRACKED_IMAGE_WIDTH_METERS,
-      }]
+    // 3. Создаем кнопку ARButton и подключаем к ней DOM Overlay
+    const arButtonOptions = {
+      requiredFeatures: ['dom-overlay'],
+      domOverlay: { root: overlayContainer } // Привязываем оверлей интерфейса
     };
 
-    try {
-      session = await navigator.xr.requestSession("immersive-ar", sessionInit);
-      logLine("✅ Session created successfully", "success");
-    } catch (err) {
-      logLine(`Session creation failed: ${err.message}`, "error");
-      throw new Error(`Failed to create session: ${err.message}`);
-    }
+    // Генерируем кнопку "START AR" на экране
+    document.body.appendChild(ARButton.createButton(renderer, arButtonOptions));
 
-    startButton.style.display = "none";
-
-    await renderer.xr.setSession(session);
-    logLine("Session attached to renderer");
-
-    // Используем 'viewer' вместо 'local-floor'
-    try {
-      referenceSpace = await session.requestReferenceSpace("viewer");
-      logLine("Reference space (viewer) acquired", "success");
-    } catch (err) {
-      logLine(`Failed to get viewer space: ${err.message}`, "error");
-      throw err;
-    }
-
-    const hasTracking = 'getImageTrackingResults' in XRFrame.prototype;
-    logLine(`Image tracking API: ${hasTracking ? '✅' : '❌'}`);
-
-    if (!hasTracking) {
-      throw new Error("Image tracking API not available");
-    }
-
-    logLine("🚀 Starting tracking loop");
-
-    renderer.setAnimationLoop((timestamp, frame) => {
-      frameCounter++;
-
-      if (!frame) {
-        if (frameCounter % 30 === 0) logLine("No frame", "warn");
-        return;
-      }
-
-      let imageDetected = false;
-
-      try {
-        const results = frame.getImageTrackingResults();
-
-        if (frameCounter % 60 === 0 && results.length > 0) {
-          logLine(`Frame ${frameCounter}: ${results.length} result(s)`);
-        }
-
-        for (const result of results) {
-          const state = result.trackingState;
-
-          if (frameCounter % 60 === 0 && results.length > 0) {
-            logLine(`  Result: idx=${result.trackedImageIndex}, state=${state}`);
-          }
-
-          if (state === "tracked" || state === "emulated") {
-            try {
-              const pose = frame.getPose(result.imageSpace, referenceSpace);
-              if (pose) {
-                imageDetected = true;
-                placedNode.visible = true;
-
-                const matrix = pose.transform.matrix;
-                placedNode.matrix.fromArray(matrix);
-                placedNode.matrix.decompose(
-                        placedNode.position,
-                        placedNode.quaternion,
-                        placedNode.scale
-                );
-
-                if (frameCounter % 30 === 0) {
-                  setStatus(`✅ TRACKED! State: ${state}`);
-                }
-                break;
-              }
-            } catch (err) {
-              if (frameCounter % 60 === 0) {
-                logLine(`  Pose error: ${err.message}`, "error");
-              }
-            }
-          }
-        }
-      } catch (err) {
-        if (frameCounter % 60 === 0) {
-          logLine(`getImageTrackingResults error: ${err.message}`, "error");
-        }
-      }
-
-      if (!imageDetected) {
-        placedNode.visible = false;
-        if (frameCounter % 60 === 0) {
-          setStatus("🔍 Searching for image...");
-        }
-      }
-
-      renderer.render(scene, camera);
+    // 4. Управление видимостью интерфейса во время AR-сессии
+    renderer.xr.addEventListener('sessionstart', () => {
+      overlayContainer.style.display = 'block'; // Показываем интерфейс в AR
     });
 
-    session.addEventListener("end", () => {
-      logLine("Session ended");
-      renderer.setAnimationLoop(null);
-      startButton.style.display = "block";
-      startButton.disabled = false;
-      startButton.textContent = "Start AR";
-      setStatus("Session ended");
+    renderer.xr.addEventListener('sessionend', () => {
+      overlayContainer.style.display = 'none';  // Прячем интерфейс при выходе
     });
 
-    session.addEventListener("visibilitychange", () => {
-      logLine(`Visibility: ${session.visibilityState}`);
+    // 5. Предотвращаем "прокликивание" сквозь кнопку в WebXR-сцену
+    actionBtn.addEventListener('beforexrselect', (event) => {
+      event.preventDefault();
     });
+
+    // Логика нажатия на кнопку
+    actionBtn.addEventListener('click', () => {
+      // Пример действия: меняем цвет куба при нажатии на HTML-кнопку
+      mesh.material.color.setHex(Math.random() * 0xffffff);
+      console.log('Цвет куба изменен с помощью DOM Overlay!');
+    });
+
+    // Обработка изменения размера экрана
+    window.addEventListener('resize', onWindowResize);
+
+    // Запуск цикла анимации через встроенный метод XR
+    renderer.setAnimationLoop(render);
   }
 
-  startButton.addEventListener("click", async () => {
-    try {
-      startButton.disabled = true;
-      startButton.textContent = "Starting...";
-      await startAR();
-    } catch (err) {
-      setStatus(`❌ ${err.message}`);
-      logLine(err.stack || String(err), "error");
-      startButton.disabled = false;
-      startButton.textContent = "Start AR";
-      startButton.style.display = "block";
+  function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+
+  function render(timestamp, frame) {
+    // Медленное вращение куба для теста
+    if (mesh) {
+      mesh.rotation.x += 0.01;
+      mesh.rotation.y += 0.01;
     }
-  });
-
-  logLine("Page loaded. Click Start AR.");
-
-  if (navigator.xr) {
-    logLine("WebXR available");
-
-    try {
-      const supported = await navigator.xr.isSessionSupported("immersive-ar");
-      logLine(`Immersive AR support: ${supported}`);
-    } catch (err) {
-      logLine(`Support check error: ${err.message}`, "error");
-    }
-  } else {
-    logLine("WebXR NOT available", "error");
+    renderer.render(scene, camera);
   }
 </script>
 </body>
