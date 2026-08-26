@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createArTargetSync, preloadArTargetPrefab, preloadArTargetDesign } from './artarget.js';
+import { createArTargetSync, preloadArTargetDesign } from './artarget.js';
 import { playSound } from './audio.js';
 import { QuestManager } from './quests.js';
 import { Policies } from './policies.js';
@@ -7,15 +7,19 @@ import { MediaPipeReco } from './mediapipe.js';
 import { ImageReco } from './imagereco.js';
 
 export class Recognition {
-  constructor(ui, settings, arInput = null) {
+  constructor(ui, settings, arScene = null) {
     this.ui = ui;
     this.settings = settings;
 
-    // Единственный ARInput приложения (реальные renderer/scene/camera из
-    // WebXR-сессии). Должен передаваться в каждый createArTargetSync(),
-    // иначе arobjects.js создаст свой fallback ARInput с camera=null,
-    // и рейкастинг кликов по AR-таргету будет молча падать.
-    this.arInput = arInput;
+    // REFACTOR (CSS3D -> three-mesh-ui): the standalone ARInput helper is
+    // gone - raycasting now lives inside ARScene itself, and target buttons
+    // register themselves with it via ModelFactory. This constructor arg is
+    // only useful as an early value for this._arScene (normally overwritten
+    // by attachInput() once the XR session actually starts); every real use
+    // of it below happens inside processTracking(), which only ever runs
+    // after attachInput() has already set this._arScene, so this is mostly
+    // for symmetry/safety.
+    this._arScene = arScene;
 
     this.questManager = new QuestManager();
     this.policies = new Policies(settings, this.questManager);
@@ -29,7 +33,6 @@ export class Recognition {
     this._pointerNdc = new THREE.Vector2(0, 0);
     this._boundOnSelect = null;
     this._boundOnClick = null;
-    this._arScene = null;
     this._xrSession = null;
 
     this._tmpPos = new THREE.Vector3();
@@ -51,11 +54,10 @@ export class Recognition {
     this.policies.init();
     await this.imageReco.init();
 
-    this.ui.log('Preloading AR target prefab...', 'info');
-    const prefabSource = await preloadArTargetPrefab(undefined, this.ui);
-    if (prefabSource !== 'server') {
-      this.ui.log('AR target prefab NOT loaded from server → using built-in defaultPrefab from code', 'warn');
-    }
+    // REFACTOR (CSS3D -> three-mesh-ui): panels are built directly from
+    // three-mesh-ui Blocks, there is no HTML prefab to preload anymore -
+    // preloadArTargetPrefab is now a deprecated no-op, so it's no longer
+    // called here at all.
 
     this.ui.log('Preloading AR target design...', 'info');
     const designPrefab = await preloadArTargetDesign(this.ui);
@@ -268,7 +270,7 @@ export class Recognition {
           // Создаем AR Target
           const arTarget = createArTargetSync(targetInfoData, {
             ui: this.ui,
-            arInput: this.arInput,
+            arScene,
             onAnswer: (value) => {
               const e = this.imageReco.trackedMarkers.get(idx);
               if (e) this._onQuestionAnswered(e, value);
@@ -278,7 +280,7 @@ export class Recognition {
           // Полностью скрываем весь AR Target
           arTarget.visible = false;
           arTarget.traverse((child) => {
-            if (child.isCSS3DObject || child.isMesh) {
+            if (child.isMesh) {
               child.visible = false;
             }
           });
@@ -349,7 +351,7 @@ export class Recognition {
                 // Делаем видимой всю группу
                 e.arTarget.visible = true;
                 e.arTarget.traverse((child) => {
-                  if (child.isCSS3DObject || child.isMesh) {
+                  if (child.isMesh) {
                     child.visible = true;
                   }
                 });
@@ -358,15 +360,16 @@ export class Recognition {
                 this.ui.log(`✅ AR Target SHOWN: ${markerName}`, 'ok');
                 
                 // Небольшая задержка перед показом модалки
+                // REFACTOR (CSS3D -> three-mesh-ui) BUGFIX: userData.panelEl
+                // and '.modal-overlay' were DOM-only concepts from the old
+                // CSS3D panel and no longer exist, so this used to silently
+                // do nothing. ARPanel now exposes openModal()/closeModal()
+                // directly on userData for exactly this purpose.
                 setTimeout(() => {
-                  const panelEl = e.arTarget.userData?.panelEl;
-                  if (panelEl) {
-                    const modalOverlay = panelEl.querySelector('.modal-overlay');
-                    if (modalOverlay) {
-                      modalOverlay.style.display = 'flex';
-                      console.log('[Recognition] ✅ Modal shown');
-                      this.ui.log('✅ Modal shown', 'ok');
-                    }
+                  if (typeof e.arTarget.userData?.openModal === 'function') {
+                    e.arTarget.userData.openModal();
+                    console.log('[Recognition] ✅ Modal shown');
+                    this.ui.log('✅ Modal shown', 'ok');
                   }
                 }, 150);
                 
@@ -387,7 +390,7 @@ export class Recognition {
             if (entry.arTarget) {
               entry.arTarget.visible = true;
               entry.arTarget.traverse((child) => {
-                if (child.isCSS3DObject || child.isMesh) {
+                if (child.isMesh) {
                   child.visible = true;
                 }
               });
