@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-    <title>? WebXR Image Tracking</title>
+    <title>log move WebXR Image Tracking</title>
     <style>
         html, body {
             margin: 0;
@@ -58,6 +58,7 @@
             box-sizing: border-box;
             border-left: 2px solid rgba(255,255,255,0.2);
             pointer-events: none;
+            display: block;
         }
 
         #logPanel .entry {
@@ -103,22 +104,21 @@
             inset: 0;
             z-index: 999;
             pointer-events: none; /* сам контейнер прозрачен для тапов */
-            display: none;        /* показываем только пока идёт AR-сессия */
+            /*display: none;        !* показываем только пока идёт AR-сессия *!*/
         }
 
         #ar-button {
             position: fixed;
-            left: 50%;
+            left: 10px;
             top: 50%;
-            transform: translate(-50%,-50%);
-            padding: 14px 22px;
-            font: 16px sans-serif;
-            border: none;
-            border-radius: 8px;
+            /*transform: translate(-50%,-50%);*/
+            /*padding: 14px 22px;*/
+            /*font: 16px sans-serif;*/
+            /*border-radius: 4px;*/
             cursor: pointer;
-            background: #4CAF50;
-            color: white;
-            font-weight: bold;
+            /*background: rgb(255 255 255 / 0);*/
+            /*color: white;*/
+            /*font-weight: bold;*/
             pointer-events: auto; /* а кнопка внутри — кликабельна */
         }
     </style>
@@ -127,9 +127,9 @@
 <button id="startButton">Start AR</button>
 <div id="overlay-container">
     <button id="ar-button">Нажми меня</button>
+    <div id="status">Ready</div>
+    <div id="logPanel"></div>
 </div>
-<div id="status">Ready</div>
-<div id="logPanel"></div>
 
 <script type="importmap">
     {
@@ -149,6 +149,10 @@
 
     arButtonEl.addEventListener("click", () => {
         logLine("✅ Клик по 'Нажми меня' сработал (DOM Overlay)");
+    });
+    
+    startButton.addEventListener("click", () => {
+        logLine("✅ Клик по 'start ar' сработал (DOM Overlay)");
     });
 
     // Используем известное рабочее изображение для теста
@@ -350,7 +354,7 @@
 
                 // Логируем каждые 60 кадров
                 if (frameCounter % 60 === 0 && results.length > 0) {
-                    logLine(`Frame ${frameCounter}: ${results.length} result(s)`);
+                    // logLine(`Frame ${frameCounter}: ${results.length} result(s)`);
                 }
 
                 // Обрабатываем результаты
@@ -358,7 +362,7 @@
                     const state = result.trackingState;
 
                     if (frameCounter % 60 === 0 && results.length > 0) {
-                        logLine(`  Result: idx=${result.trackedImageIndex}, state=${state}`);
+                        //logLine(`  Result: idx=${result.trackedImageIndex}, state=${state}`);
                     }
 
                     // Если изображение отслеживается
@@ -379,7 +383,7 @@
                                 );
 
                                 if (frameCounter % 30 === 0) {
-                                    setStatus(`✅ TRACKED! State: ${state}`);
+                                    //setStatus(`✅ TRACKED! State: ${state}`);
                                 }
                                 break;
                             }
@@ -399,7 +403,7 @@
             if (!imageDetected) {
                 placedNode.visible = false;
                 if (frameCounter % 60 === 0) {
-                    setStatus("🔍 Searching for image...");
+                    // setStatus("🔍 Searching for image...");
                 }
             }
 
